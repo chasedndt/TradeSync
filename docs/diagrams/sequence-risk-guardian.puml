@@ -1,0 +1,14 @@
+﻿@startuml
+actor Trader as U
+participant "UI" as UI
+participant "state-api" as SA
+participant "risk-guardian" as RG
+database "Postgres" as DB
+
+U -> UI : Preview(opportunity_id, size, venue)
+UI -> SA : POST /actions/preview
+SA -> DB : read exposure, cooldowns, quality gates
+SA -> RG : evaluate(policy, plan)
+RG -> SA : allow + plan OR block + reason
+SA -> UI : preview or block
+@enduml

@@ -1,0 +1,11 @@
+﻿@startuml
+queue "x:signals.*" as SIG
+participant "fusion-engine" as FE
+database "Postgres" as DB
+queue "x:opps" as OP
+
+SIG --> FE : batch window (symbol, tf)
+FE -> DB : fetch calibration & regime weights
+FE -> OP : Opportunity{bias, quality, confluence, links}
+FE -> DB : persist snapshot + provenance
+@enduml

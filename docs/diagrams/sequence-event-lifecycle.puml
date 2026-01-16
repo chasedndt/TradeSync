@@ -1,0 +1,37 @@
+﻿@startuml
+title Event Lifecycle – From Ingest to Opportunities
+
+actor Source as S
+participant "ingest-gateway" as IG
+queue "x:events.raw" as ER
+participant "normalizer" as NM
+queue "x:events.norm" as EN
+participant "agents (tech/funding/sent/rot)" as AG
+queue "x:signals.*" as SIG
+participant "fusion-engine" as FE
+database "Postgres" as DB
+
+S -> IG : POST /ingest (payload)
+activate IG
+IG -> DB : SELECT 1 FROM events WHERE hash=?
+alt first_seen
+  IG -> DB : INSERT events{... , hash}
+  IG -> ER : append(event)
+else duplicate
+  IG --> S : 200 OK (deduped)
+  deactivate IG
+  return
+end
+deactivate IG
+
+ER --> NM : consume(event)
+NM -> EN : append(normalized_event)
+EN --> AG : consume(batch window by symbol,tf)
+
+AG -> DB : read regimes, calibration
+AG -> SIG : emit signals (features,confidence,links)
+
+SIG --> FE : consume(signal batch)
+FE -> DB : upsert snapshot(opportunities) + provenance
+FE --> SIG : ack
+@enduml

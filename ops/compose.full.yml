@@ -1,0 +1,167 @@
+﻿name: tradesync-full
+
+services:
+  # --- Infra (same as compose.infra.yml) ---
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./ops/sql:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    command: [ "redis-server", "--appendonly", "yes" ]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    restart: unless-stopped
+    ports:
+      - "${QDRANT_PORT:-6333}:6333"
+    volumes:
+      - qdrantdata:/qdrant/storage
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -sf http://localhost:6333/readyz || exit 1" ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  # --- Services ---
+  state-api:
+    build:
+      context: services/state-api
+      dockerfile: Dockerfile
+    image: tradesync/state-api:dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # In-container DSN: talk to "postgres" at 5432
+      PG_DSN: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      EXECUTION_ENABLED: "true"
+      MAX_SIGNAL_AGE_SECONDS: "3600"
+      MAX_EVENT_AGE_SECONDS: "3600"
+      MIN_QUALITY: "1.0"
+    ports:
+      - "8000:8000"
+
+  core-scorer:
+    build:
+      context: services/core-scorer
+    image: tradesync/core-scorer:dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PG_DSN: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      SCORING_INTERVAL: 10
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "8001:8000"
+
+  exec-drift-svc:
+    build:
+      context: services/exec-drift-svc
+    image: tradesync/exec-drift-svc:dev
+    ports:
+      - "8003:8003"
+    environment:
+      DRY_RUN: "true"
+      EXECUTION_ENABLED: "false"
+      # DRIFT_RPC_URL: ${DRIFT_RPC_URL}
+      # DRIFT_WALLET_PRIVATE_KEY: ${DRIFT_WALLET_PRIVATE_KEY}
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    healthcheck:
+      test: [ "CMD", "curl", "-sf", "http://localhost:8003/healthz" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  exec-hl-svc:
+    build:
+      context: services/exec-hl-svc
+    image: tradesync/exec-hl-svc:dev
+    ports:
+      - "8004:8004"
+    environment:
+      DRY_RUN: "true"
+      EXECUTION_ENABLED: "true" # Enabled for dry-run verification
+      # HYPERLIQUID_API_URL: ${HYPERLIQUID_API_URL}
+      # HYPERLIQUID_WALLET_PK: ${HYPERLIQUID_WALLET_PK}
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    healthcheck:
+      test: [ "CMD", "curl", "-sf", "http://localhost:8004/healthz" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  ingest-gateway:
+    build:
+      context: services/ingest-gateway
+    image: tradesync/ingest-gateway:dev
+    depends_on:
+      - redis
+    environment:
+      PYTHONPATH: /app
+      PG_DSN: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      ENABLE_DRIFT: "true"
+      REDIS_URL: redis://redis:6379
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    ports:
+      - "8080:8080"
+
+  opportunity-builder:
+    build:
+      context: services/opportunity-builder
+    image: tradesync/opportunity-builder:dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      PG_DSN: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379
+      PYTHONUNBUFFERED: 1
+      OPPORTUNITY_THRESHOLD: 2.0
+      OPPORTUNITY_TTL_SECONDS: 900
+      CLAIM_IDLE_MS: 60000
+      CLAIM_BATCH: 50
+      STREAM_READ_COUNT: 50
+      STREAM_BLOCK_MS: 5000
+    ports:
+      - "8002:8002"
+    healthcheck:
+      test: [ "CMD", "curl", "-sf", "http://localhost:8002/healthz" ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
+  qdrantdata:

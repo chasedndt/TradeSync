@@ -1,0 +1,36 @@
+# === Core Data & ML Stack ===
+pandas
+numpy
+scikit-learn
+ta
+yfinance
+
+# === LLM & Agent Tools ===
+openai
+langchain
+openai-whisper
+
+# === Backend API + Frontend Dev ===
+fastapi[all]
+streamlit
+uvicorn
+
+# === Webhooks & Integration ===
+requests
+discord-webhook
+
+# === Environment Config ===
+python-dotenv
+
+# === HTTP & Async Clients ===
+httpx
+
+# === On-Chain Execution SDKs ===
+driftpy
+hyperliquid-python-sdk
+websockets
+
+# === Database & Testing ===
+asyncpg
+pytest
+pytest-asyncio

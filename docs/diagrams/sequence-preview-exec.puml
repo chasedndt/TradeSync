@@ -1,0 +1,33 @@
+@startuml
+actor Trader as U
+participant "UI" as UI
+participant "state-api" as SA
+participant "risk-guardian" as RG
+participant "exec-drift-svc" as DRIFT
+participant "exec-hl-svc" as HL
+database "Postgres" as DB
+queue "x:decisions" as DEC
+queue "x:exec.orders" as EO
+
+U -> UI : Click "Preview" on Opportunity
+UI -> SA : POST /actions/preview {opportunity_id, size, venue}
+SA -> RG : check(policy, exposure, cooldowns, quality)
+RG --> SA : allow + plan (entry/sl/tps) OR block + reason
+SA -> UI : show preview OR block reason
+
+U -> UI : Confirm Execute
+UI -> SA : POST /actions/execute {plan_id, venue}
+SA -> RG : final check
+RG --> SA : allow OR block + reason
+
+alt venue = Drift
+  SA -> DRIFT : place order(s)
+  DRIFT -> EO : order result
+else venue = Hyperliquid
+  SA -> HL : place order(s)
+  HL -> EO : order result
+end
+
+SA -> DB : append decision + evidence links
+UI <- SA : success/txid or blocked reason
+@enduml

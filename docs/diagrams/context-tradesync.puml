@@ -1,0 +1,45 @@
+﻿@startuml
+skinparam shadowing false
+skinparam componentStyle rectangle
+skinparam wrapWidth 240
+skinparam defaultTextAlignment center
+
+actor Trader as trader
+
+package "TradeSync" {
+  rectangle "Ingest Gateway" as ingest
+  rectangle "Domain Agents" as agents
+  rectangle "Fusion & Opportunity Scoring" as fusion
+  rectangle "Risk Guardian" as risk
+  rectangle "Execution Services" as exec
+  rectangle "Web UI / API" as ui
+  database  "Postgres / Qdrant" as db
+}
+
+rectangle "TradingView Webhooks" as tv
+rectangle "YouTube + TV Ideas (RAG)" as yt
+rectangle "Metrics Provider (Funding/OI/Liq)" as metrics
+rectangle "Discord Alert Feeds" as discord
+rectangle "Drift Protocol" as drift
+rectangle "Hyperliquid" as hl
+
+trader --> ui : review / execute
+tv --> ingest : POST alerts
+yt --> ingest : summaries
+metrics --> ingest : poll / stream
+discord --> ingest : webhooks
+
+ingest --> agents : normalized Events
+agents --> fusion : Signals
+fusion --> ui : Opportunities / Bias
+ui --> risk : preview / execute
+risk --> exec : allow / plan
+exec --> drift : orders
+exec --> hl : orders
+
+agents --> db : read / write
+fusion --> db
+risk --> db
+ui --> db : read
+
+@enduml

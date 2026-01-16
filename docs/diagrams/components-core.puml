@@ -1,0 +1,64 @@
+﻿@startuml
+title TradeSync – Core Components
+
+package "Ingest" {
+  [ingest-gateway]
+  queue "x:events.raw"
+  [nlp-summarizer]
+  [metrics-poller]
+  queue "x:events.norm"
+}
+
+package "Agents" {
+  [tech-agent]
+  [funding-agent]
+  [sentiment-agent]
+  [rotation-agent]
+  queue "x:signals.*"
+}
+
+package "Fusion" {
+  [fusion-engine]
+}
+
+package "Decisioning" {
+  [risk-guardian]
+  [state-api]
+}
+
+package "Execution" {
+  [exec-drift-svc]
+  [exec-hl-svc]
+  queue "x:exec.orders"
+}
+
+database "Postgres"
+database "Qdrant"
+
+[ingest-gateway] -> "x:events.raw"
+[nlp-summarizer] -down-> "x:events.norm"
+[metrics-poller] -down-> "x:events.norm"
+"x:events.raw" -down-> [nlp-summarizer]
+"x:events.raw" -down-> [ingest-gateway] : structured TV
+
+"x:events.norm" -right-> [tech-agent]
+"x:events.norm" -right-> [funding-agent]
+"x:events.norm" -right-> [sentiment-agent]
+"x:events.norm" -right-> [rotation-agent]
+
+[tech-agent] -> "x:signals.*"
+[funding-agent] -> "x:signals.*"
+[sentiment-agent] -> "x:signals.*"
+[rotation-agent] -> "x:signals.*"
+
+"x:signals.*" -right-> [fusion-engine]
+[fusion-engine] -> Postgres
+[fusion-engine] -> Qdrant
+
+[state-api] -> Postgres
+[risk-guardian] -> [state-api]
+[state-api] -> [exec-drift-svc]
+[state-api] -> [exec-hl-svc]
+[exec-drift-svc] -> "x:exec.orders"
+[exec-hl-svc] -> "x:exec.orders"
+@enduml

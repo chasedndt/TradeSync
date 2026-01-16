@@ -1,0 +1,31 @@
+@startuml
+actor TradingView
+participant "ingest-gateway" as IG
+participant "nlp-summarizer" as NLP
+participant "metrics-poller" as MET
+queue "x:events.raw" as ER
+queue "x:events.norm" as EN
+participant "agent-runner" as AR
+queue "x:signals.*" as SIG
+participant "fusion-engine" as FE
+database "Postgres" as DB
+queue "x:bias.state" as BS
+
+TradingView -> IG : POST /ingest/tv (Unikill V1 payload)
+IG -> ER : push raw alert
+
+MET -> ER : push metric threshold (funding/OI)
+NLP -> ER : push summarized YT/Idea events
+
+ER --> NLP : consume raw text items
+NLP -> EN : push normalized Event
+
+ER --> IG : (tv alerts already structured)
+IG -> EN : push normalized Event
+
+EN --> AR : consume Events
+AR -> SIG : emit Signals (tech, funding, sentiment, rotation)
+SIG --> FE : consume Signals
+FE -> DB : upsert Bias components & Opportunity candidates
+FE -> BS : publish Bias snapshot
+@enduml

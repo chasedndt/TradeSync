@@ -1,0 +1,11 @@
+﻿@startuml
+participant "calibration-job" as CJ
+database "Postgres" as DB
+participant "calibrator" as CAL
+database "config" as CFG
+
+CJ -> DB : fetch signals vs outcomes (7d)
+DB --> CAL : dataset by agent & regime
+CAL -> CFG : write calibration params (isotonic/Platt)
+CAL -> DB : log reliability / brier scores
+@enduml

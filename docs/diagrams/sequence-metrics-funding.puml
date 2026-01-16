@@ -1,0 +1,15 @@
+﻿@startuml
+participant "metrics-poller" as MP
+queue "x:events.norm" as EN
+participant "funding-agent" as FA
+queue "x:signals.funding" as SF
+database "Postgres" as DB
+
+MP -> EN : Event(kind=funding, fields={funding_8h, window})
+MP -> EN : Event(kind=oi_delta, fields={zscore, window})
+MP -> EN : Event(kind=liqmap, fields={cluster_dist})
+
+EN --> FA : consume metrics window
+FA -> DB : get regime + calibration
+FA -> SF : Signal(kind=squeeze_risk|unwind, confidence, features)
+@enduml

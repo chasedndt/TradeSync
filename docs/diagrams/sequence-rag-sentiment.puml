@@ -1,0 +1,22 @@
+﻿@startuml
+actor Curator as C
+participant "ingest-gateway" as IG
+participant "yt-dl/whisper" as W
+database "Qdrant" as Q
+participant "rag-summarizer" as R
+queue "x:events.norm" as EN
+participant "sentiment-agent" as SA
+queue "x:signals.sentiment" as SS
+
+C -> IG : submit TV Idea URL(s)
+IG -> R : fetch text, extract tickers/levels
+R -> Q : upsert chunks (namespace=ideas)
+R -> EN : Event(kind=idea, symbols, stance?, provenance)
+
+W -> Q : upsert chunks (namespace=youtube)
+R -> EN : Event(kind=yt_chunk, symbols, stance?, provenance)
+
+EN --> SA : consume Events (ideas+yt)
+SA -> Q : RAG retrieve top-k
+SA -> SS : Signal(kind=narrative_push|fade, confidence, event_ids, notes)
+@enduml

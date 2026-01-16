@@ -1,0 +1,127 @@
+﻿@startuml
+title TradeSync – Data & Config ERD (light)
+
+hide circle
+skinparam linetype ortho
+skinparam wrapWidth 220
+
+entity events {
+  * id : uuid PK
+  kind : enum(tv|yt_chunk|idea|funding|oi_delta|liqmap)
+  symbol : text?
+  timeframe : text?
+  source : text  <<tv|yt|metrics|discord>>
+  payload : jsonb
+  ts : timestamptz
+  hash : text  <<idempotency>>
+  UNIQUE(hash)
+  INDEX(symbol, timeframe, ts)
+}
+
+entity signals {
+  * id : uuid PK
+  agent : text <<tech|funding|sentiment|rotation>>
+  symbol : text
+  timeframe : text
+  kind : text
+  confidence : numeric
+  features : jsonb
+  event_ids : uuid[]  <<FK to events.id>>
+  created_at : timestamptz
+  INDEX(symbol, timeframe, created_at)
+}
+
+entity opportunities {
+  * id : uuid PK
+  symbol : text
+  timeframe : text
+  bias : numeric
+  quality : numeric
+  confluence : jsonb
+  links : jsonb  <<evidence URLs, event_ids>>
+  snapshot_ts : timestamptz
+  expires_at : timestamptz
+  status : text <<new|previewed|executed|blocked|expired>>
+  INDEX(symbol, timeframe, snapshot_ts)
+}
+
+entity decisions {
+  * id : uuid PK
+  opportunity_id : uuid FK
+  plan : jsonb  <<entry/sl/tp,size,venue>>
+  allowed : bool
+  reason : text?
+  created_at : timestamptz
+}
+
+entity exec_orders {
+  * id : uuid PK
+  decision_id : uuid FK
+  venue : text <<drift|hyperliquid>>
+  order_json : jsonb
+  status : text <<placed|filled|rejected>>
+  txid : text?
+  created_at : timestamptz
+  INDEX(venue, created_at)
+}
+
+entity exposures {
+  * id : uuid PK
+  venue : text
+  symbol : text
+  size : numeric
+  notional : numeric
+  avg_entry : numeric
+  updated_at : timestamptz
+  UNIQUE(venue, symbol)
+}
+
+entity regimes {
+  * id : uuid PK
+  symbol : text
+  timeframe : text
+  regime : text <<bull|bear|chop|expansion|squeeze>>
+  detected_at : timestamptz
+  UNIQUE(symbol, timeframe, detected_at)
+}
+
+entity calibration_params {
+  * id : uuid PK
+  agent : text
+  regime : text
+  method : text <<isotonic|platt|temp>>
+  params : jsonb
+  brier : numeric
+  updated_at : timestamptz
+  UNIQUE(agent, regime)
+}
+
+entity vector_ideas {
+  * id : uuid PK
+  doc_id : text
+  symbol : text?
+  stance : text <<bull|bear|neutral>>
+  level_json : jsonb?
+  embedding : vector
+  ts : timestamptz
+}
+
+entity vector_youtube {
+  * id : uuid PK
+  video_id : text
+  symbol : text?
+  stance : text?
+  embedding : vector
+  ts : timestamptz
+}
+
+events "1..*" -down- "0..*" signals : source_of >
+signals "1..*" -down- "0..*" opportunities : evidence >
+opportunities "1" -down- "0..*" decisions
+decisions "1" -down- "0..*" exec_orders
+regimes "0..*" -right- "0..*" signals : regime_fit
+calibration_params "0..*" -right- "0..*" signals : calibrate
+exposures "1" -right- "0..*" decisions : risk_check
+vector_ideas "0..*" -down- "0..*" signals : RAG
+vector_youtube "0..*" -down- "0..*" signals : RAG
+@enduml

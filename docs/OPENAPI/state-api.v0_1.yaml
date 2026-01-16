@@ -1,0 +1,10 @@
+﻿openapi: 3.0.3
+info: { title: TradeSync State API, version: 0.1.0 }
+paths:
+  /healthz: { get: { summary: Health, responses: { '200': { description: OK } } } }
+  /metrics: { get: { summary: Metrics, responses: { '200': { description: OK } } } }
+  /opps/latest: { get: { summary: Latest opps, responses: { '200': { description: OK } } } }
+  /opps/{id}: { get: { summary: Get opp, responses: { '200': { description: OK } } } }
+  /actions/preview: { post: { summary: Preview, responses: { '200': { description: OK } } } }
+  /actions/execute: { post: { summary: Execute, responses: { '200': { description: OK } } } }
+  /internal/agents/register: { post: { summary: Register agent, responses: { '201': { description: Created } } } }

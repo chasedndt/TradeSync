@@ -1,0 +1,84 @@
+﻿@startuml
+title TradeSync – Deployment View (impl split Python/Node)
+
+skinparam componentStyle rectangle
+skinparam wrapWidth 200
+
+node "User Laptop" as user {
+  artifact "Browser\n(Next.js UI)" as ui
+}
+
+node "Kubernetes / Docker Host" as k8s {
+  frame "Python Services" {
+    rectangle "ingest-gateway\nFastAPI\n:8080" as ingest
+    rectangle "nlp-summarizer\nworker\n(yt-dl + Whisper)" as nlp
+    rectangle "metrics-poller\nworker" as mpoller
+    rectangle "tech-agent\nworker" as agent_tech
+    rectangle "funding-agent\nworker" as agent_funding
+    rectangle "sentiment-agent\nworker" as agent_sentiment
+    rectangle "rotation-agent\nworker" as agent_rotation
+    rectangle "fusion-engine\nworker" as fusion
+    rectangle "risk-guardian\nsvc\n:8090" as risk
+    rectangle "state-api\nFastAPI\n:8000" as stateapi
+    rectangle "exec-drift-svc\nsvc\n(DriftPy)" as exec_drift
+  }
+
+  frame "Node.js Services" {
+    rectangle "exec-hl-svc\nNode/TS\n(Hyperliquid SDK)\n:7000" as exec_hl
+  }
+
+  frame "Infra" {
+    database "Postgres" as pg
+    cloud "Qdrant\n(Vector DB)" as qd
+    queue "Redis Streams\nx:events.raw\nx:events.norm\nx:signals.*\nx:exec.orders" as rs
+  }
+}
+
+cloud "TradingView Webhooks" as tv
+cloud "YouTube/TV Ideas" as yt
+cloud "Metrics Provider\n(CoinAnk-like)" as metrics
+cloud "Discord\n(alerts & ops)" as dc
+cloud "Drift (Solana)" as drift
+cloud "Hyperliquid (L2)" as hl
+
+ui -[#blue]-> stateapi : HTTPS (review/execute)
+tv -[#darkgreen]-> ingest : POST /ingest/tv
+yt -[#darkgreen]-> nlp : URLs/feeds
+metrics -[#darkgreen]-> mpoller : REST/WS
+
+ingest -down-> rs : append x:events.raw
+nlp -down-> qd : upsert chunks
+nlp -down-> rs : append x:events.norm
+mpoller -down-> rs : append x:events.norm
+
+rs -right-> agent_tech
+rs -right-> agent_funding
+rs -right-> agent_sentiment
+rs -right-> agent_rotation
+agent_tech -down-> rs : x:signals.tech
+agent_funding -down-> rs : x:signals.funding
+agent_sentiment -down-> rs : x:signals.sentiment
+agent_rotation -down-> rs : x:signals.rotation
+
+rs -right-> fusion
+fusion -down-> pg : snapshots + provenance
+fusion -down-> qd : embeddings (optional)
+
+stateapi -down-> risk
+risk -down-> pg : exposure, cooldowns, quality
+stateapi -right-> exec_drift : place orders
+stateapi -right-> exec_hl : place orders
+exec_drift -right-> drift : orders/txid
+exec_hl -right-> hl : orders/txid
+
+stateapi -down-> pg : decisions, exec logs
+stateapi -right-> dc : ops/alerts (webhook)
+
+note right of rs
+Topics:
+- x:events.raw (structured TV, raw text)
+- x:events.norm (normalized events)
+- x:signals.* (agent outputs)
+- x:exec.orders (async exec logs)
+end note
+@enduml

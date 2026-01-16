@@ -1,0 +1,30 @@
+﻿@startuml
+title Opportunity – State Machine
+
+[*] --> New
+New --> Scored : fusion snapshot created
+Scored --> Previewed : user/API Preview
+Previewed --> Executed : Risk OK + Exec placed
+Previewed --> Blocked : Risk Fail (exposure/cooldown/quality)
+Scored --> Expired : t > expires_at
+Blocked --> Expired : cooldown elapsed (no re-preview)
+Executed --> Completed : fill + journal
+Executed --> Failed : reject/timeout
+
+state Executed {
+  [*] --> Placed
+  Placed --> Filled : tx confirmed
+  Placed --> Rejected : venue error
+}
+
+note right of Blocked
+- reason_code
+- policy_id
+- until (cooldown)
+end note
+
+note bottom of Executed
+decision_id, txid, order_json,
+post-trade PnL hooks
+end note
+@enduml
