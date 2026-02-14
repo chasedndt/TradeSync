@@ -1,8 +1,8 @@
-﻿FROM python:3.11-slim
+FROM python:3.11-slim
 
 WORKDIR /app
 
-COPY requirements.txt /app/
+COPY services/ingest-gateway/requirements.txt /app/
 
 # Install build tools, then our Python deps, then clean up.
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -11,7 +11,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get purge -y --auto-remove build-essential gcc \
     && rm -rf /var/lib/apt/lists/*
 
-COPY app /app/app
-COPY sources /app/sources
+# Install shared library
+COPY libs/tradesync_core /tmp/tradesync_core
+RUN pip install --no-cache-dir /tmp/tradesync_core && rm -rf /tmp/tradesync_core
+
+COPY services/ingest-gateway/app /app/app
+COPY services/ingest-gateway/sources /app/sources
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]

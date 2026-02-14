@@ -3,16 +3,128 @@ import json
 import uuid
 import time
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 from typing import List, Optional, Any, Dict
 from datetime import datetime
+from collections import defaultdict
 
 import asyncpg
 import redis.asyncio as redis
 import httpx
 from fastapi import FastAPI, HTTPException, Query, Request, Response
+from fastapi.responses import PlainTextResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel, Field
-from app.risk import RiskGuardian
+from tradesync_core import RiskGuardian
+from tradesync_core import normalize_symbol, normalize_venue
+from app.macro_feed import macro_feed, MacroHeadline
+
+# --- Logging Setup ---
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] trace_id=%(trace_id)s %(message)s",
+    datefmt="%Y-%m-%dT%H:%M:%S"
+)
+logger = logging.getLogger("state-api")
+
+# --- Metrics Storage ---
+class MetricsCollector:
+    def __init__(self):
+        self.request_count = defaultdict(int)  # {(method, path, status): count}
+        self.request_latency_sum = defaultdict(float)  # {(method, path): sum_ms}
+        self.request_latency_count = defaultdict(int)  # {(method, path): count}
+        self.startup_time = time.time()
+
+    def record_request(self, method: str, path: str, status: int, latency_ms: float):
+        key = (method, path, status)
+        self.request_count[key] += 1
+        latency_key = (method, path)
+        self.request_latency_sum[latency_key] += latency_ms
+        self.request_latency_count[latency_key] += 1
+
+    def to_prometheus(self, db_stats: dict = None) -> str:
+        lines = []
+
+        # HTTP request metrics
+        lines.append("# HELP http_requests_total Total HTTP requests")
+        lines.append("# TYPE http_requests_total counter")
+        for (method, path, status), count in self.request_count.items():
+            lines.append(f'http_requests_total{{method="{method}",path="{path}",status="{status}"}} {count}')
+
+        lines.append("# HELP http_request_duration_ms_sum Sum of HTTP request durations in ms")
+        lines.append("# TYPE http_request_duration_ms_sum counter")
+        for (method, path), total in self.request_latency_sum.items():
+            lines.append(f'http_request_duration_ms_sum{{method="{method}",path="{path}"}} {total:.2f}')
+
+        lines.append("# HELP http_request_duration_ms_count Count of HTTP requests for latency")
+        lines.append("# TYPE http_request_duration_ms_count counter")
+        for (method, path), count in self.request_latency_count.items():
+            lines.append(f'http_request_duration_ms_count{{method="{method}",path="{path}"}} {count}')
+
+        # Uptime
+        lines.append("# HELP process_uptime_seconds Uptime in seconds")
+        lines.append("# TYPE process_uptime_seconds gauge")
+        lines.append(f"process_uptime_seconds {time.time() - self.startup_time:.2f}")
+
+        # Database pool stats
+        if db_stats:
+            lines.append("# HELP db_pool_size Current database pool size")
+            lines.append("# TYPE db_pool_size gauge")
+            lines.append(f"db_pool_size {db_stats.get('size', 0)}")
+
+            lines.append("# HELP db_pool_free Free connections in pool")
+            lines.append("# TYPE db_pool_free gauge")
+            lines.append(f"db_pool_free {db_stats.get('free', 0)}")
+
+        return "\n".join(lines) + "\n"
+
+metrics = MetricsCollector()
+
+# --- Trace ID Middleware ---
+class TraceIdMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # Get or generate trace ID
+        trace_id = request.headers.get("X-Trace-Id") or str(uuid.uuid4())
+
+        # Store in request state for access in endpoints
+        request.state.trace_id = trace_id
+
+        # Log request start
+        logger.info(
+            f"Request started: {request.method} {request.url.path}",
+            extra={"trace_id": trace_id}
+        )
+
+        # Time the request
+        start_time = time.time()
+
+        try:
+            response = await call_next(request)
+        except Exception as e:
+            latency_ms = (time.time() - start_time) * 1000
+            logger.error(
+                f"Request failed: {request.method} {request.url.path} - {str(e)}",
+                extra={"trace_id": trace_id}
+            )
+            metrics.record_request(request.method, request.url.path, 500, latency_ms)
+            raise
+
+        latency_ms = (time.time() - start_time) * 1000
+
+        # Record metrics
+        metrics.record_request(request.method, request.url.path, response.status_code, latency_ms)
+
+        # Log request completion
+        logger.info(
+            f"Request completed: {request.method} {request.url.path} {response.status_code} {latency_ms:.2f}ms",
+            extra={"trace_id": trace_id}
+        )
+
+        # Add trace ID to response headers
+        response.headers["X-Trace-Id"] = trace_id
+
+        return response
 
 # --- Config ---
 PG_DSN = os.getenv("PG_DSN", "postgresql://tradesync:CHANGE_ME@postgres:5432/tradesync")
@@ -20,6 +132,7 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
 POOL_MIN_SIZE = int(os.getenv("POOL_MIN_SIZE", "5"))
 POOL_MAX_SIZE = int(os.getenv("POOL_MAX_SIZE", "20"))
 POOL_TIMEOUT = float(os.getenv("POOL_TIMEOUT", "5.0"))
+VALID_TIMEFRAMES = ["1m", "5m", "15m", "30m", "1h", "2h", "4h", "8h", "1d"]
 
 # --- Global Client ---
 redis_client = None
@@ -68,6 +181,8 @@ class OpportunityResponse(BaseModel):
     status: str
     snapshot_ts: datetime
     links: Dict[str, Any]
+    # Phase 3C: Enhanced scoring data
+    confluence: Optional[Dict[str, Any]] = None
 
 class ExecutionError(BaseModel):
     code: str
@@ -192,12 +307,85 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Add Trace ID Middleware
+app.add_middleware(TraceIdMiddleware)
+
+def apply_deprecation_headers(response: Response, successor: str):
+    response.headers["Deprecation"] = "true"
+    response.headers["Link"] = f'<{successor}>; rel="successor-version"'
+
 # --- Endpoints ---
 
 @app.get("/healthz")
 async def healthz():
     """Simple liveness probe for k8s/docker."""
     return {"ok": True}
+
+@app.get("/metrics", response_class=PlainTextResponse)
+async def get_metrics():
+    """Prometheus-compatible metrics endpoint."""
+    db_stats = {}
+    if state.pool:
+        db_stats = {
+            "size": state.pool.get_size(),
+            "free": state.pool.get_idle_size()
+        }
+
+    # Get additional application metrics from database
+    app_metrics = {}
+    if state.pool:
+        try:
+            async with state.pool.acquire() as conn:
+                # Get counts
+                row = await conn.fetchrow("""
+                    SELECT
+                        (SELECT COUNT(*) FROM events) as events_total,
+                        (SELECT COUNT(*) FROM signals) as signals_total,
+                        (SELECT COUNT(*) FROM opportunities) as opportunities_total,
+                        (SELECT COUNT(*) FROM opportunities WHERE status = 'new') as opportunities_new,
+                        (SELECT COUNT(*) FROM decisions) as decisions_total,
+                        (SELECT COUNT(*) FROM exec_orders) as exec_orders_total,
+                        (SELECT COUNT(*) FROM exec_orders WHERE status = 'placed') as exec_orders_placed
+                """)
+                if row:
+                    app_metrics = dict(row)
+        except Exception as e:
+            logger.warning(f"Failed to fetch app metrics: {e}", extra={"trace_id": "metrics"})
+
+    # Build Prometheus output
+    output = metrics.to_prometheus(db_stats)
+
+    # Add application-specific metrics
+    if app_metrics:
+        output += "\n# HELP tradesync_events_total Total events in database\n"
+        output += "# TYPE tradesync_events_total gauge\n"
+        output += f"tradesync_events_total {app_metrics.get('events_total', 0)}\n"
+
+        output += "\n# HELP tradesync_signals_total Total signals in database\n"
+        output += "# TYPE tradesync_signals_total gauge\n"
+        output += f"tradesync_signals_total {app_metrics.get('signals_total', 0)}\n"
+
+        output += "\n# HELP tradesync_opportunities_total Total opportunities in database\n"
+        output += "# TYPE tradesync_opportunities_total gauge\n"
+        output += f"tradesync_opportunities_total {app_metrics.get('opportunities_total', 0)}\n"
+
+        output += "\n# HELP tradesync_opportunities_new New opportunities awaiting action\n"
+        output += "# TYPE tradesync_opportunities_new gauge\n"
+        output += f"tradesync_opportunities_new {app_metrics.get('opportunities_new', 0)}\n"
+
+        output += "\n# HELP tradesync_decisions_total Total decisions made\n"
+        output += "# TYPE tradesync_decisions_total gauge\n"
+        output += f"tradesync_decisions_total {app_metrics.get('decisions_total', 0)}\n"
+
+        output += "\n# HELP tradesync_exec_orders_total Total execution orders\n"
+        output += "# TYPE tradesync_exec_orders_total gauge\n"
+        output += f"tradesync_exec_orders_total {app_metrics.get('exec_orders_total', 0)}\n"
+
+        output += "\n# HELP tradesync_exec_orders_placed Successfully placed orders\n"
+        output += "# TYPE tradesync_exec_orders_placed gauge\n"
+        output += f"tradesync_exec_orders_placed {app_metrics.get('exec_orders_placed', 0)}\n"
+
+    return output
 
 @app.get("/state/health", response_model=HealthResponse)
 async def state_health():
@@ -308,12 +496,25 @@ async def get_state_snapshot():
 
 @app.get("/state/events/latest", response_model=List[EventResponse])
 async def get_latest_events(
+    request: Request,
     symbol: str, 
-    tf: str = "1m", 
+    tf: Optional[str] = None,
+    timeframe: str = Query("1m"), 
     kind: str = "market_snapshot", 
     limit: int = Query(20, le=100)
 ):
     """Fetch latest events for a given symbol/tf/kind."""
+    # Logic for tf vs timeframe
+    params = request.query_params
+    final_tf = timeframe
+    if "tf" in params and "timeframe" not in params:
+        final_tf = tf
+    
+    if final_tf not in VALID_TIMEFRAMES:
+        final_tf = "1m" # Default back to 1m if invalid variant passed
+        
+    symbol = normalize_symbol(symbol)
+
     if not state.pool:
         raise HTTPException(status_code=503, detail="DB Pool not ready")
 
@@ -325,7 +526,7 @@ async def get_latest_events(
                 WHERE symbol = $1 AND timeframe = $2 AND kind = $3
                 ORDER BY ts DESC
                 LIMIT $4
-            """, symbol, tf, kind, limit)
+            """, symbol, final_tf, kind, limit)
             
             return [
                 {
@@ -344,12 +545,24 @@ async def get_latest_events(
 
 @app.get("/state/signals/latest", response_model=List[SignalResponse])
 async def get_latest_signals(
+    request: Request,
     symbol: str, 
-    tf: str = "1m", 
+    tf: Optional[str] = None,
+    timeframe: str = Query("1m"), 
     kind: str = "funding_oi_squeeze",
     limit: int = Query(20, le=100)
 ):
     """Fetch latest signals for a given symbol/tf/kind."""
+    params = request.query_params
+    final_tf = timeframe
+    if "tf" in params and "timeframe" not in params:
+        final_tf = tf
+    
+    if final_tf not in VALID_TIMEFRAMES:
+        final_tf = "1m"
+
+    symbol = normalize_symbol(symbol)
+
     if not state.pool:
         raise HTTPException(status_code=503, detail="DB Pool not ready")
 
@@ -361,7 +574,7 @@ async def get_latest_signals(
                 WHERE symbol = $1 AND timeframe = $2 AND kind = $3
                 ORDER BY created_at DESC
                 LIMIT $4
-            """, symbol, tf, kind, limit)
+            """, symbol, final_tf, kind, limit)
             
             return [
                 {
@@ -387,6 +600,9 @@ async def get_opportunities(
     limit: int = Query(20, le=100)
 ):
     """Fetch opportunities."""
+    if symbol:
+        symbol = normalize_symbol(symbol)
+
     if not state.pool:
         raise HTTPException(status_code=503, detail="DB Pool not ready")
 
@@ -394,7 +610,7 @@ async def get_opportunities(
         async with state.pool.acquire() as conn:
             if symbol:
                 rows = await conn.fetch("""
-                    SELECT id, symbol, timeframe, bias, quality, dir, status, snapshot_ts, links
+                    SELECT id, symbol, timeframe, bias, quality, dir, status, snapshot_ts, links, confluence
                     FROM opportunities
                     WHERE symbol = $1 AND status = $2
                     ORDER BY snapshot_ts DESC
@@ -402,13 +618,13 @@ async def get_opportunities(
                 """, symbol, status, limit)
             else:
                 rows = await conn.fetch("""
-                    SELECT id, symbol, timeframe, bias, quality, dir, status, snapshot_ts, links
+                    SELECT id, symbol, timeframe, bias, quality, dir, status, snapshot_ts, links, confluence
                     FROM opportunities
                     WHERE status = $1
                     ORDER BY snapshot_ts DESC
                     LIMIT $2
                 """, status, limit)
-            
+
             return [
                 {
                     "id": str(r["id"]),
@@ -419,7 +635,9 @@ async def get_opportunities(
                     "dir": r["dir"],
                     "status": r["status"],
                     "snapshot_ts": r["snapshot_ts"],
-                    "links": json.loads(r["links"]) if isinstance(r["links"], str) else r["links"]
+                    "links": json.loads(r["links"]) if isinstance(r["links"], str) else r["links"],
+                    # Phase 3C: Include confluence with score_breakdown, execution_risk, warnings
+                    "confluence": json.loads(r["confluence"]) if isinstance(r["confluence"], str) else (r["confluence"] or {})
                 }
                 for r in rows
             ]
@@ -463,7 +681,8 @@ async def get_evidence(opportunity_id: str):
                     {
                         "id": str(r["id"]), "created_at": r["created_at"], "agent": r["agent"],
                         "symbol": r["symbol"], "timeframe": r["timeframe"], "kind": r["kind"],
-                        "confidence": r["confidence"], "dir": r["dir"], "features": r["features"]
+                        "confidence": r["confidence"], "dir": r["dir"],
+                        "features": json.loads(r["features"]) if isinstance(r["features"], str) else r["features"]
                     } for r in sig_rows
                 ]
 
@@ -475,7 +694,8 @@ async def get_evidence(opportunity_id: str):
                 events = [
                     {
                         "id": str(r["id"]), "ts": r["ts"], "source": r["source"], "kind": r["kind"],
-                        "symbol": r["symbol"], "timeframe": r["timeframe"], "payload": r["payload"]
+                        "symbol": r["symbol"], "timeframe": r["timeframe"],
+                        "payload": json.loads(r["payload"]) if isinstance(r["payload"], str) else r["payload"]
                     } for r in evt_rows
                 ]
 
@@ -518,6 +738,7 @@ async def get_evidence(opportunity_id: str):
 @app.get("/state/positions", response_model=List[Position])
 async def get_aggregated_positions(venue: str = "all"):
     """Aggregates positions from execution services."""
+    venue = normalize_venue(venue)
     venues = ["drift", "hyperliquid"] if venue == "all" else [venue]
     urls = {
         "drift": "http://exec-drift-svc:8003/exec/drift/positions",
@@ -543,6 +764,7 @@ async def get_aggregated_positions(venue: str = "all"):
 @app.post("/actions/preview", response_model=PreviewResponse)
 async def preview_action(req: PreviewRequest):
     """Generates an execution plan and validates it against risk rules."""
+    req.venue = normalize_venue(req.venue)
     risk_engine = RiskGuardian()
     
     if not state.pool:
@@ -588,17 +810,52 @@ async def preview_action(req: PreviewRequest):
 
             # 4. Check for existing decisions (count for cooldown/limit rules)
             recent_decisions = await conn.fetchval("""
-                SELECT count(*) FROM decisions 
+                SELECT count(*) FROM decisions
                 WHERE EXISTS (SELECT 1 FROM opportunities o WHERE o.id = decisions.opportunity_id AND o.symbol = $1)
             """, symbol)
 
-            # 5. Check Risk
+            # Phase 3C: 4b. Fetch microstructure data for risk assessment
+            microstructure = None
+            margin_utilization = 0.0
+            symbol_exposure_usd = 0.0
+
+            try:
+                async with httpx.AsyncClient() as client:
+                    # Fetch market snapshot with microstructure
+                    market_resp = await client.get(
+                        f"{MARKET_DATA_URL}/snapshot/{req.venue}/{symbol}",
+                        timeout=2.0
+                    )
+                    if market_resp.status_code == 200:
+                        market_data = market_resp.json()
+                        microstructure = market_data.get("microstructure")
+
+                    # Fetch current exposure (if available)
+                    exposure_resp = await client.get(
+                        f"http://exec-{req.venue}-svc:800{3 if req.venue == 'drift' else 4}/exec/{req.venue[:2]}/positions",
+                        timeout=2.0
+                    )
+                    if exposure_resp.status_code == 200:
+                        positions = exposure_resp.json()
+                        for pos in positions:
+                            if pos.get("symbol") == symbol:
+                                symbol_exposure_usd = abs(pos.get("notional", 0))
+                        # Rough margin utilization (simplified)
+                        total_notional = sum(abs(p.get("notional", 0)) for p in positions)
+                        margin_utilization = total_notional / 50000.0  # Assuming $50k account
+            except Exception as e:
+                logger.warning(f"Failed to fetch market/exposure data for risk check: {e}", extra={"trace_id": "preview"})
+
+            # 5. Check Risk (Phase 3C: with microstructure data)
             verdict = risk_engine.check(
                 symbol=symbol,
                 size_usd=req.size_usd,
                 opportunity=opportunity,
                 latest_signal=latest_signal,
-                recent_decisions_count=recent_decisions
+                recent_decisions_count=recent_decisions,
+                microstructure=microstructure,
+                margin_utilization=margin_utilization,
+                symbol_exposure_usd=symbol_exposure_usd
             )
             
             decision_id = None
@@ -867,3 +1124,230 @@ async def execute_action(req: ExecuteRequest):
             error=ExecutionError(code="UNKNOWN", message=str(e)),
             ts=datetime.utcnow().isoformat()
         )
+
+# --- Market Data Endpoints (Phase 3B) ---
+
+MARKET_DATA_URL = os.getenv("MARKET_DATA_URL", "http://market-data:8005")
+
+class MarketSnapshotResponse(BaseModel):
+    """Market snapshot with truthfulness indicators."""
+    venue: str
+    symbol: str
+    ts: int
+    data_age_ms: int
+    available_metrics: List[Dict[str, Any]]
+    funding: Optional[Dict[str, Any]] = None
+    oi: Optional[Dict[str, Any]] = None
+    liquidations: Optional[Dict[str, Any]] = None
+    volume: Optional[Dict[str, Any]] = None
+    orderbook: Optional[Dict[str, Any]] = None
+    # Phase 3C: Derived microstructure data
+    microstructure: Optional[Dict[str, Any]] = None
+    regimes: Dict[str, Any]
+    sources: List[Dict[str, Any]] = []
+
+class MarketAlertResponse(BaseModel):
+    """Market alert for regime changes."""
+    id: str
+    venue: str
+    symbol: str
+    ts: int
+    alert_type: str
+    metric: str
+    previous_value: Optional[str] = None
+    new_value: str
+    context: Dict[str, Any] = {}
+
+@app.get("/state/market/snapshot", response_model=MarketSnapshotResponse)
+async def get_market_snapshot(venue: str, symbol: str):
+    """
+    Get latest market snapshot for venue/symbol.
+
+    Returns truthful market data with available_metrics[] showing
+    REAL/PROXY/UNAVAILABLE status for each metric.
+    """
+    symbol = normalize_symbol(symbol)
+    venue = normalize_venue(venue)
+
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.get(
+                f"{MARKET_DATA_URL}/snapshot/{venue}/{symbol}",
+                timeout=5.0
+            )
+            if resp.status_code == 404:
+                raise HTTPException(status_code=404, detail=f"No snapshot for {venue}:{symbol}")
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            raise HTTPException(status_code=e.response.status_code, detail=str(e))
+        except Exception as e:
+            logger.error(f"Error fetching market snapshot: {e}", extra={"trace_id": "market"})
+            raise HTTPException(status_code=503, detail="Market data service unavailable")
+
+@app.get("/state/market/snapshots")
+async def get_all_market_snapshots():
+    """Get all current market snapshots."""
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.get(f"{MARKET_DATA_URL}/snapshots", timeout=5.0)
+            resp.raise_for_status()
+            return resp.json()
+        except Exception as e:
+            logger.error(f"Error fetching market snapshots: {e}", extra={"trace_id": "market"})
+            raise HTTPException(status_code=503, detail="Market data service unavailable")
+
+@app.get("/state/market/timeseries")
+async def get_market_timeseries(
+    venue: str,
+    symbol: str,
+    metric: str = "funding",
+    window: str = "1h"
+):
+    """
+    Get rolling timeseries data for a metric.
+
+    Useful for sparklines and charts.
+    """
+    symbol = normalize_symbol(symbol)
+    venue = normalize_venue(venue)
+
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.get(
+                f"{MARKET_DATA_URL}/timeseries/{venue}/{symbol}/{metric}",
+                params={"window": window},
+                timeout=5.0
+            )
+            resp.raise_for_status()
+            return resp.json()
+        except Exception as e:
+            logger.error(f"Error fetching market timeseries: {e}", extra={"trace_id": "market"})
+            raise HTTPException(status_code=503, detail="Market data service unavailable")
+
+@app.get("/state/market/alerts", response_model=List[MarketAlertResponse])
+async def get_market_alerts(limit: int = 50):
+    """
+    Get recent market alerts (regime changes, extreme values).
+
+    These appear in the /logs page.
+    """
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.get(
+                f"{MARKET_DATA_URL}/alerts",
+                params={"limit": limit},
+                timeout=5.0
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return data.get("alerts", [])
+        except Exception as e:
+            logger.error(f"Error fetching market alerts: {e}", extra={"trace_id": "market"})
+            raise HTTPException(status_code=503, detail="Market data service unavailable")
+
+@app.get("/state/market/status")
+async def get_market_data_status():
+    """Get status of market data service and providers."""
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.get(f"{MARKET_DATA_URL}/status", timeout=5.0)
+            resp.raise_for_status()
+            return resp.json()
+        except Exception as e:
+            logger.error(f"Error fetching market status: {e}", extra={"trace_id": "market"})
+            return {
+                "status": "unavailable",
+                "error": str(e),
+                "providers": []
+            }
+
+# --- Phase 3C: Macro Feed Endpoints ---
+
+class MacroHeadlineResponse(BaseModel):
+    title: str
+    source: str
+    category: str
+    url: str
+    published_at: Optional[str] = None
+    summary: Optional[str] = None
+    sentiment: Optional[str] = None
+
+class MacroFeedResponse(BaseModel):
+    headlines: List[MacroHeadlineResponse]
+    status: Dict[str, Any]
+    cached: bool
+    ts: str
+
+@app.get("/state/macro/headlines", response_model=MacroFeedResponse, tags=["macro"])
+async def get_macro_headlines(
+    refresh: bool = Query(False, description="Force refresh from sources"),
+    limit: int = Query(20, le=50, description="Max headlines to return"),
+    category: Optional[str] = Query(None, description="Filter by category (crypto, macro)")
+):
+    """
+    Get macro news headlines from RSS feeds.
+
+    Phase 3C MVP: Simple RSS aggregation for trading context.
+    """
+    try:
+        headlines = await macro_feed.fetch_headlines(force_refresh=refresh)
+
+        # Filter by category if specified
+        if category:
+            headlines = [h for h in headlines if h.category == category]
+
+        # Apply limit
+        headlines = headlines[:limit]
+
+        return MacroFeedResponse(
+            headlines=[MacroHeadlineResponse(**h.to_dict()) for h in headlines],
+            status=macro_feed.get_status(),
+            cached=not refresh,
+            ts=datetime.now(timezone.utc).isoformat()
+        )
+    except Exception as e:
+        logger.error(f"Error fetching macro headlines: {e}", extra={"trace_id": "macro"})
+        return MacroFeedResponse(
+            headlines=[],
+            status={"error": str(e), **macro_feed.get_status()},
+            cached=False,
+            ts=datetime.now(timezone.utc).isoformat()
+        )
+
+@app.get("/state/macro/status", tags=["macro"])
+async def get_macro_status():
+    """Get macro feed service status."""
+    return macro_feed.get_status()
+
+# --- Legacy Aliases (Step 0 Compat) ---
+
+@app.get("/opps", response_model=List[OpportunityResponse], tags=["legacy"])
+async def get_opportunities_alias(
+    response: Response,
+    symbol: Optional[str] = None, 
+    status: str = "new", 
+    limit: int = Query(20, le=100)
+):
+    apply_deprecation_headers(response, "/state/opportunities")
+    return await get_opportunities(symbol=symbol, status=status, limit=limit)
+
+@app.get("/opps/{opportunity_id}", response_model=EvidenceResponse, tags=["legacy"])
+async def get_opportunity_by_id_alias(response: Response, opportunity_id: str):
+    apply_deprecation_headers(response, f"/state/evidence?opportunity_id={opportunity_id}")
+    return await get_evidence(opportunity_id=opportunity_id)
+
+@app.post("/preview", response_model=PreviewResponse, tags=["legacy"])
+async def preview_action_alias(response: Response, req: PreviewRequest):
+    apply_deprecation_headers(response, "/actions/preview")
+    return await preview_action(req)
+
+@app.post("/execute", response_model=ExecutionResult, tags=["legacy"])
+async def execute_action_alias(response: Response, req: ExecuteRequest):
+    apply_deprecation_headers(response, "/actions/execute")
+    return await execute_action(req)
+
+@app.get("/execution/status", tags=["legacy"])
+async def get_execution_status_alias(response: Response):
+    apply_deprecation_headers(response, "/state/execution/status")
+    return await get_execution_status()

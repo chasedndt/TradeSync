@@ -1,0 +1,2 @@
+{"id": "opp-001", "symbol": "BTC-PERP", "timeframe": "1m", "bias": 4.5, "quality": 45.0, "dir": "LONG", "status": "new", "snapshot_ts": "2025-05-01T10:04:00+00:00", "links": {"signal_id": "sig-001"}, "confluence": {}}
+{"id": "opp-002", "symbol": "ETH-PERP", "timeframe": "1m", "bias": -3.5, "quality": 35.0, "dir": "SHORT", "status": "new", "snapshot_ts": "2025-05-01T10:04:00+00:00", "links": {"signal_id": "sig-002"}, "confluence": {}}

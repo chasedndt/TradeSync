@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel, Field
+from tradesync_core.core_score import calculate_score as _core_calculate_score, Event as CoreEvent
 
 app = FastAPI(title="TradeSync Core Scorer", version="0.1.0")
 
@@ -53,52 +54,14 @@ class SignalResponse(BaseModel):
 # --- Logic ---
 
 def calculate_score(events: List[Event]) -> float:
+    """Adapter: converts DB Event -> CoreEvent, delegates to shared library."""
     if not events:
         return 0.0
-        
-    # Sort events by time
-    sorted_events = sorted(events, key=lambda e: e.ts)
-    latest_event = sorted_events[-1]
-    score = 0.0
-    
-    # 1. TradingView Rules
-    for event in sorted_events:
-        if event.source == "tradingview":
-            bias = event.payload.get("bias")
-            if bias == "LONG":
-                score += 1.0
-            elif bias == "SHORT":
-                score -= 1.0
-        
-    # 2. Metrics (Funding/OI) Logic
-    metrics_events = [e for e in sorted_events if e.source == "metrics" and e.kind == "market_snapshot"]
-    
-    if metrics_events:
-        latest = metrics_events[-1]
-        first = metrics_events[0]
-        
-        funding = float(latest.payload.get("funding", 0.0) or 0.0)
-        oi_current = float(latest.payload.get("oi", 0.0) or 0.0)
-        oi_start = float(first.payload.get("oi", 0.0) or 0.0)
-        
-        oi_delta_pct = 0.0
-        if oi_start > 0:
-            oi_delta_pct = (oi_current - oi_start) / oi_start
-            
-        # MVP Rules: Squeeze Logic
-        # Negative Funding + Rising OI -> Short Squeeze Risk (Long Bias)
-        if funding < -0.0001 and oi_delta_pct > 0.005:
-            score += 2.0
-        # Positive Funding + Rising OI -> Long Squeeze Risk (Short Bias)
-        elif funding > 0.0001 and oi_delta_pct > 0.005:
-            score -= 2.0
-            
-        # Base Funding Bias
-        if funding < 0: score += 0.5
-        elif funding > 0: score -= 0.5
-            
-    # Clamp score
-    return max(-10.0, min(10.0, score))
+    core_events = [
+        CoreEvent(ts=e.ts, source=e.source, kind=e.kind, payload=e.payload)
+        for e in events
+    ]
+    return _core_calculate_score(core_events)
 
 async def fetch_events(conn, symbol: str, minutes: int = 30) -> List[Event]:
     # Fetch events for the last N minutes

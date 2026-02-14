@@ -1,0 +1,7 @@
+{"ts": "2025-05-01T10:00:00+00:00", "source": "tradingview", "kind": "alert", "payload": {"bias": "LONG"}, "symbol": "BTC-PERP"}
+{"ts": "2025-05-01T10:01:00+00:00", "source": "metrics", "kind": "market_snapshot", "payload": {"funding": -0.0005, "oi": 1000000}, "symbol": "BTC-PERP"}
+{"ts": "2025-05-01T10:02:00+00:00", "source": "metrics", "kind": "market_snapshot", "payload": {"funding": -0.0005, "oi": 1020000}, "symbol": "BTC-PERP"}
+{"ts": "2025-05-01T10:03:00+00:00", "source": "tradingview", "kind": "alert", "payload": {"bias": "LONG"}, "symbol": "BTC-PERP"}
+{"ts": "2025-05-01T10:00:00+00:00", "source": "tradingview", "kind": "alert", "payload": {"bias": "SHORT"}, "symbol": "ETH-PERP"}
+{"ts": "2025-05-01T10:01:00+00:00", "source": "metrics", "kind": "market_snapshot", "payload": {"funding": 0.0003, "oi": 500000}, "symbol": "ETH-PERP"}
+{"ts": "2025-05-01T10:02:00+00:00", "source": "metrics", "kind": "market_snapshot", "payload": {"funding": 0.0003, "oi": 510000}, "symbol": "ETH-PERP"}

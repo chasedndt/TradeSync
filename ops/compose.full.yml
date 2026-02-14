@@ -48,15 +48,19 @@ services:
   # --- Services ---
   state-api:
     build:
-      context: services/state-api
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: services/state-api/Dockerfile
     image: tradesync/state-api:dev
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       # In-container DSN: talk to "postgres" at 5432
       PG_DSN: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379
+      MARKET_DATA_URL: http://market-data:8005
       EXECUTION_ENABLED: "true"
       MAX_SIGNAL_AGE_SECONDS: "3600"
       MAX_EVENT_AGE_SECONDS: "3600"
@@ -66,7 +70,8 @@ services:
 
   core-scorer:
     build:
-      context: services/core-scorer
+      context: ..
+      dockerfile: services/core-scorer/Dockerfile
     image: tradesync/core-scorer:dev
     depends_on:
       postgres:
@@ -80,7 +85,7 @@ services:
 
   exec-drift-svc:
     build:
-      context: services/exec-drift-svc
+      context: ../services/exec-drift-svc
     image: tradesync/exec-drift-svc:dev
     ports:
       - "8003:8003"
@@ -100,7 +105,7 @@ services:
 
   exec-hl-svc:
     build:
-      context: services/exec-hl-svc
+      context: ../services/exec-hl-svc
     image: tradesync/exec-hl-svc:dev
     ports:
       - "8004:8004"
@@ -120,7 +125,8 @@ services:
 
   ingest-gateway:
     build:
-      context: services/ingest-gateway
+      context: ..
+      dockerfile: services/ingest-gateway/Dockerfile
     image: tradesync/ingest-gateway:dev
     depends_on:
       - redis
@@ -135,15 +141,20 @@ services:
     ports:
       - "8080:8080"
 
-  opportunity-builder:
+  fusion-engine:
     build:
-      context: services/opportunity-builder
-    image: tradesync/opportunity-builder:dev
+      context: ..
+      dockerfile: services/fusion-engine/Dockerfile
+    image: tradesync/fusion-engine:dev
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    networks:
+      default:
+        aliases:
+          - opportunity-builder
     environment:
       PG_DSN: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       REDIS_URL: redis://redis:6379
@@ -161,6 +172,55 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  cockpit-ui:
+    build:
+      context: ../services/cockpit-ui
+    image: tradesync/cockpit-ui:dev
+    depends_on:
+      - state-api
+    ports:
+      - "3000:80"
+    healthcheck:
+      test: [ "CMD", "curl", "-sf", "http://localhost:80" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  market-data:
+    build:
+      context: ../services/market-data
+    image: tradesync/market-data:dev
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      REDIS_URL: redis://redis:6379
+      MARKET_SYMBOLS: "BTC-PERP,ETH-PERP,SOL-PERP"
+      ENABLE_HYPERLIQUID: "true"
+      ENABLE_DRIFT: "true"
+      POLL_INTERVAL_CONTEXT: "5000"
+      POLL_INTERVAL_ORDERBOOK: "3000"
+      PYTHONUNBUFFERED: 1
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    ports:
+      - "8005:8005"
+    healthcheck:
+      test: [ "CMD", "curl", "-sf", "http://localhost:8005/healthz" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  backtest-runner:
+    profiles: [backtest]
+    build:
+      context: ..
+      dockerfile: services/backtest-runner/Dockerfile
+    image: tradesync/backtest-runner:dev
+    volumes:
+      - ../data:/app/data
 
 volumes:
   pgdata:
