@@ -6,7 +6,7 @@ from pathlib import Path
 
 # Get DB config from environment or use defaults
 DB_USER = os.getenv("POSTGRES_USER", "tradesync")
-DB_PASS = os.getenv("POSTGRES_PASSWORD", "CHANGE_ME")
+DB_PASS = os.getenv("POSTGRES_PASSWORD")
 DB_NAME = os.getenv("POSTGRES_DB", "tradesync")
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = os.getenv("DB_PORT", "5432")

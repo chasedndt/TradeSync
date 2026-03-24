@@ -1,11 +1,15 @@
 node_modules/
 __pycache__/
 *.pyc
+*.pyo
 .env
 .env.*
+!.env.example
 .env.bak
 *.pem
 *.key
+*.p12
+*.pfx
 credentials.json
 secrets/
 .venv/
@@ -17,3 +21,7 @@ htmlcov/
 dist/
 build/
 *.egg-info/
+*.sarif
+gitleaks.*
+temp_*.json
+.DS_Store
