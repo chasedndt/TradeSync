@@ -157,19 +157,19 @@ POST /ingest/metrics – provider webhooks or poll pushes (threshold hits).
 
 POST /ingest/yt/callback – transcript ready.
 
-7.2 State-API (FastAPI)
+7.2 State-API (FastAPI) [Port 8000]
 
-GET /state/bias?symbol=BTC&tf=1h
+GET /state/snapshot
 
-GET /state/opportunities?symbol=BTC
+GET /state/opportunities?symbol=BTC-PERP
 
 GET /state/evidence?opportunity_id=...
 
 GET /state/positions
 
-POST /actions/preview {opportunity_id, size, venue}
+POST /actions/preview {opportunity_id, size_usd, venue}
 
-POST /actions/execute {plan_id, venue}
+POST /actions/execute {decision_id, confirm}
 
 7.3 Copilot-API
 

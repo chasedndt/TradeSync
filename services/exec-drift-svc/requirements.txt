@@ -2,6 +2,7 @@ fastapi==0.104.1
 uvicorn==0.24.0
 pydantic==2.5.2
 httpx==0.25.2
+redis==5.0.0
 # Placeholder for driftpy - will add when real execution is confirmed to avoid build bloat if not needed yet
 # driftpy>=0.7.0
 # solana>=0.30.2

@@ -1,0 +1,42 @@
+{
+  "_comment": "Sample response from POST https://api.hyperliquid.xyz/info with {\"type\": \"l2Book\", \"coin\": \"BTC\"}",
+  "_fetched_at": "2026-01-21T12:00:00Z",
+  "response": {
+    "coin": "BTC",
+    "time": 1737475200000,
+    "levels": [
+      [
+        {"px": "105248.00", "sz": "1.25", "n": 3},
+        {"px": "105247.50", "sz": "2.50", "n": 5},
+        {"px": "105247.00", "sz": "0.75", "n": 2},
+        {"px": "105246.50", "sz": "3.00", "n": 8},
+        {"px": "105246.00", "sz": "1.50", "n": 4},
+        {"px": "105245.50", "sz": "5.25", "n": 12},
+        {"px": "105245.00", "sz": "2.00", "n": 6},
+        {"px": "105244.50", "sz": "4.50", "n": 10},
+        {"px": "105244.00", "sz": "1.75", "n": 3},
+        {"px": "105243.50", "sz": "6.00", "n": 15}
+      ],
+      [
+        {"px": "105252.00", "sz": "1.00", "n": 2},
+        {"px": "105252.50", "sz": "2.25", "n": 4},
+        {"px": "105253.00", "sz": "0.50", "n": 1},
+        {"px": "105253.50", "sz": "3.50", "n": 7},
+        {"px": "105254.00", "sz": "1.25", "n": 3},
+        {"px": "105254.50", "sz": "4.75", "n": 11},
+        {"px": "105255.00", "sz": "2.50", "n": 5},
+        {"px": "105255.50", "sz": "5.00", "n": 13},
+        {"px": "105256.00", "sz": "1.50", "n": 4},
+        {"px": "105256.50", "sz": "7.25", "n": 18}
+      ]
+    ]
+  },
+  "_normalization_notes": {
+    "levels_order": "[bids, asks]",
+    "bid_order": "Best bid first (highest price)",
+    "ask_order": "Best ask first (lowest price)",
+    "sz_unit": "Asset units (BTC)",
+    "n_meaning": "Number of orders at this price level",
+    "spread_calculation": "ask[0].px - bid[0].px = 105252.00 - 105248.00 = $4.00"
+  }
+}

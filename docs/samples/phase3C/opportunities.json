@@ -1,0 +1,121 @@
+{
+  "_comment": "GET /state/opportunities - Sample response showing current structure + Phase 3C additions",
+  "opportunities": [
+    {
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "symbol": "BTC-PERP",
+      "timeframe": "1h",
+      "bias": 3.5,
+      "quality": 72.5,
+      "dir": "LONG",
+      "status": "new",
+      "snapshot_ts": "2025-01-22T18:00:00Z",
+      "links": {
+        "signal_id": "s1g2n3a4-l5i6-d789-0abc-def123456789",
+        "event_ids": [
+          "e1v2e3n4-t5i6-d789-0abc-def123456789",
+          "e1v2e3n4-t5i6-d789-0abc-def123456788"
+        ]
+      },
+      "_phase3C_additions": {
+        "score_breakdown": {
+          "alpha": 4.2,
+          "microstructure_penalty": -0.3,
+          "exposure_penalty": 0.0,
+          "regime_bonus": 0.5,
+          "final_score": 4.4,
+          "notes": [
+            "Funding squeeze potential detected (negative funding + rising OI)",
+            "Slight microstructure penalty: spread 0.5 bps above optimal",
+            "Regime bonus: OI build in neutral funding environment"
+          ]
+        },
+        "execution_risk": {
+          "spread_bps": 0.5,
+          "impact_est_bps_5k": 1.1,
+          "depth_25bp": 1500000,
+          "flags": []
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "b2c3d4e5-f6g7-8901-bcde-f12345678901",
+      "symbol": "ETH-PERP",
+      "timeframe": "15m",
+      "bias": -2.8,
+      "quality": 58.3,
+      "dir": "SHORT",
+      "status": "new",
+      "snapshot_ts": "2025-01-22T17:45:00Z",
+      "links": {
+        "signal_id": "s2i3g4n5-a6l7-8901-bcde-f12345678901",
+        "event_ids": [
+          "e2v3e4n5-t6i7-8901-bcde-f12345678901"
+        ]
+      },
+      "_phase3C_additions": {
+        "score_breakdown": {
+          "alpha": -3.2,
+          "microstructure_penalty": -0.8,
+          "exposure_penalty": 0.0,
+          "regime_bonus": 0.0,
+          "final_score": -4.0,
+          "notes": [
+            "Elevated positive funding suggests long crowding",
+            "Moderate microstructure penalty: thin depth at 25bp"
+          ]
+        },
+        "execution_risk": {
+          "spread_bps": 1.2,
+          "impact_est_bps_5k": 3.5,
+          "depth_25bp": 800000,
+          "flags": ["THIN_DEPTH"]
+        },
+        "warnings": [
+          "Depth at 25bp below recommended threshold (800k < 1M)"
+        ]
+      }
+    },
+    {
+      "id": "c3d4e5f6-g7h8-9012-cdef-123456789012",
+      "symbol": "SOL-PERP",
+      "timeframe": "4h",
+      "bias": 1.5,
+      "quality": 45.0,
+      "dir": "LONG",
+      "status": "new",
+      "snapshot_ts": "2025-01-22T16:00:00Z",
+      "links": {
+        "signal_id": "s3i4g5n6-a7l8-9012-cdef-123456789012",
+        "event_ids": []
+      },
+      "_phase3C_additions": {
+        "score_breakdown": {
+          "alpha": 1.8,
+          "microstructure_penalty": -1.5,
+          "exposure_penalty": -0.5,
+          "regime_bonus": -0.3,
+          "final_score": -0.5,
+          "notes": [
+            "Weak alpha signal",
+            "Heavy microstructure penalty: wide spread + thin depth",
+            "Minor exposure penalty: existing SOL position",
+            "Regime mismatch: choppy market condition"
+          ]
+        },
+        "execution_risk": {
+          "spread_bps": 2.8,
+          "impact_est_bps_5k": 8.5,
+          "depth_25bp": 450000,
+          "flags": ["WIDE_SPREAD", "THIN_DEPTH", "HIGH_SLIPPAGE"]
+        },
+        "warnings": [
+          "Spread exceeds optimal threshold (2.8 bps > 2.0 bps)",
+          "Depth critically thin for position sizing",
+          "Expected slippage may exceed limits for $5k+ orders"
+        ]
+      }
+    }
+  ]
+}

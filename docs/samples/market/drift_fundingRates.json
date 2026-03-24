@@ -1,0 +1,51 @@
+{
+  "_comment": "Sample response from GET https://data.api.drift.trade/fundingRates?marketIndex=0",
+  "_fetched_at": "2026-01-21T12:00:00Z",
+  "response": [
+    {
+      "market_index": 0,
+      "ticker_id": "BTC-PERP",
+      "funding_rate": "0.00004567",
+      "timestamp": 1737475200000,
+      "oracle_price_twap": "105045.00",
+      "mark_price_twap": "105052.50"
+    },
+    {
+      "market_index": 0,
+      "ticker_id": "BTC-PERP",
+      "funding_rate": "0.00003987",
+      "timestamp": 1737471600000,
+      "oracle_price_twap": "104980.00",
+      "mark_price_twap": "104985.25"
+    },
+    {
+      "market_index": 0,
+      "ticker_id": "BTC-PERP",
+      "funding_rate": "0.00005123",
+      "timestamp": 1737468000000,
+      "oracle_price_twap": "105120.00",
+      "mark_price_twap": "105128.50"
+    },
+    {
+      "market_index": 0,
+      "ticker_id": "BTC-PERP",
+      "funding_rate": "0.00004321",
+      "timestamp": 1737464400000,
+      "oracle_price_twap": "105200.00",
+      "mark_price_twap": "105208.75"
+    },
+    {
+      "market_index": 0,
+      "ticker_id": "BTC-PERP",
+      "funding_rate": "0.00003654",
+      "timestamp": 1737460800000,
+      "oracle_price_twap": "105050.00",
+      "mark_price_twap": "105055.00"
+    }
+  ],
+  "_normalization_notes": {
+    "timestamp_unit": "milliseconds since epoch",
+    "funding_type": "Continuous (not fixed interval like HL)",
+    "rate_interpretation": "Instantaneous rate at timestamp"
+  }
+}

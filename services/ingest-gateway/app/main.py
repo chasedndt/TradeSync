@@ -4,7 +4,7 @@ import uuid
 import asyncpg
 import asyncio
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from fastapi import FastAPI, Request, HTTPException, Header
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -13,6 +13,7 @@ from contextlib import asynccontextmanager
 
 from .models import TradingViewAlert, NormalizedEvent
 from .db import insert_event, close_redis, get_redis
+from .normalize import normalize_symbol, normalize_venue
 
 class SourceInfo(BaseModel):
     source: str
@@ -135,6 +136,8 @@ async def ingest_tv(
         "received_at": ts.isoformat()
     }
 
+    alert.symbol = normalize_symbol(alert.symbol)
+    
     # Map to NormalizedEvent
     # We use source:symbol:ts:bias to allow multiple alerts for same symbol if timestamps differ
     event_hash = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{alert.source}:{alert.symbol}:{ts.isoformat()}:{alert.bias}"))

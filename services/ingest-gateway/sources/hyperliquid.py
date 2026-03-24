@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import List, Optional
 from app.models import NormalizedEvent
 from app.db import insert_event
+from app.normalize import normalize_symbol
 
 # Configuration
 HYPERLIQUID_API_URL = "https://api.hyperliquid.xyz/info"
@@ -64,7 +65,7 @@ async def poll_hyperliquid_markets():
                 }
                 
                 # Canonical Symbol: BTC -> BTC-PERP
-                canonical_symbol = f"{symbol}-PERP"
+                canonical_symbol = normalize_symbol(symbol)
                 
                 event = NormalizedEvent(
                     id=event_id,

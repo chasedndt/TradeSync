@@ -1,0 +1,59 @@
+{
+  "_comment": "Sample response from POST https://api.hyperliquid.xyz/info with {\"type\": \"fundingHistory\", \"coin\": \"BTC\", \"startTime\": 1737388800000}",
+  "_fetched_at": "2026-01-21T12:00:00Z",
+  "response": [
+    {
+      "coin": "BTC",
+      "fundingRate": "0.00003125",
+      "premium": "0.00005234",
+      "time": 1737475200000
+    },
+    {
+      "coin": "BTC",
+      "fundingRate": "0.00002876",
+      "premium": "0.00004123",
+      "time": 1737471600000
+    },
+    {
+      "coin": "BTC",
+      "fundingRate": "0.00003542",
+      "premium": "0.00005876",
+      "time": 1737468000000
+    },
+    {
+      "coin": "BTC",
+      "fundingRate": "0.00004123",
+      "premium": "0.00006234",
+      "time": 1737464400000
+    },
+    {
+      "coin": "BTC",
+      "fundingRate": "0.00002345",
+      "premium": "0.00003456",
+      "time": 1737460800000
+    },
+    {
+      "coin": "BTC",
+      "fundingRate": "0.00001876",
+      "premium": "0.00002987",
+      "time": 1737457200000
+    },
+    {
+      "coin": "BTC",
+      "fundingRate": "0.00003654",
+      "premium": "0.00005123",
+      "time": 1737453600000
+    },
+    {
+      "coin": "BTC",
+      "fundingRate": "0.00002987",
+      "premium": "0.00004321",
+      "time": 1737450000000
+    }
+  ],
+  "_normalization_notes": {
+    "time_unit": "milliseconds since epoch",
+    "funding_interval": "1 hour",
+    "rate_interpretation": "Per-hour rate paid by longs to shorts (if positive)"
+  }
+}

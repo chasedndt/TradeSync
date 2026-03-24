@@ -1,0 +1,192 @@
+{
+  "_comment": "POST /actions/preview - Sample responses showing current + Phase 3C block codes",
+  "allowed_preview": {
+    "decision_id": "d1e2c3i4-s5i6-o789-nabc-def123456789",
+    "plan": {
+      "action": "Market Order",
+      "symbol": "BTC-PERP",
+      "size_usd": 1000,
+      "venue": "hyperliquid",
+      "slippage_tolerance": 0.01
+    },
+    "risk_verdict": {
+      "allowed": true,
+      "reason_code": "OK",
+      "reason": "All risk checks passed",
+      "suggested_adjustment": null
+    },
+    "suggested_adjustments": null,
+    "_phase3C_additions": {
+      "execution_risk": {
+        "spread_bps": 0.5,
+        "impact_est_bps": 0.8,
+        "depth_25bp_usd": 1500000,
+        "liquidity_score": 0.85,
+        "flags": []
+      },
+      "microstructure_checks": [
+        {"check": "spread", "status": "pass", "value": 0.5, "threshold": 50.0},
+        {"check": "depth_25bp", "status": "pass", "value": 1500000, "threshold": 100000},
+        {"check": "impact_5k", "status": "pass", "value": 1.1, "threshold": 25.0},
+        {"check": "liquidity_score", "status": "pass", "value": 0.85, "threshold": 0.3}
+      ]
+    }
+  },
+  "blocked_existing_codes": {
+    "EXEC_DISABLED": {
+      "decision_id": null,
+      "plan": {"action": "Market Order", "symbol": "BTC-PERP", "size_usd": 1000, "venue": "hyperliquid", "slippage_tolerance": 0.01},
+      "risk_verdict": {
+        "allowed": false,
+        "reason_code": "EXEC_DISABLED",
+        "reason": "Global execution gate is DISABLED",
+        "suggested_adjustment": null
+      }
+    },
+    "DNT": {
+      "decision_id": null,
+      "plan": {"action": "Market Order", "symbol": "LUNA-PERP", "size_usd": 1000, "venue": "hyperliquid", "slippage_tolerance": 0.01},
+      "risk_verdict": {
+        "allowed": false,
+        "reason_code": "DNT",
+        "reason": "Symbol LUNA-PERP is on the Do Not Trade (DNT) list",
+        "suggested_adjustment": null
+      }
+    },
+    "MIN_QUALITY": {
+      "decision_id": null,
+      "plan": {"action": "Market Order", "symbol": "BTC-PERP", "size_usd": 1000, "venue": "hyperliquid", "slippage_tolerance": 0.01},
+      "risk_verdict": {
+        "allowed": false,
+        "reason_code": "MIN_QUALITY",
+        "reason": "Quality 35.0 below minimum 50.0",
+        "suggested_adjustment": null
+      }
+    },
+    "MAX_LEVERAGE": {
+      "decision_id": null,
+      "plan": {"action": "Market Order", "symbol": "BTC-PERP", "size_usd": 100000, "venue": "hyperliquid", "slippage_tolerance": 0.01},
+      "risk_verdict": {
+        "allowed": false,
+        "reason_code": "MAX_LEVERAGE",
+        "reason": "Leverage 10.00x exceeds limit 5.0x",
+        "suggested_adjustment": {"action": "RESIZE", "value": 50000}
+      }
+    }
+  },
+  "_phase3C_new_block_codes": {
+    "SPREAD_TOO_WIDE": {
+      "decision_id": null,
+      "plan": {"action": "Market Order", "symbol": "ALT-PERP", "size_usd": 5000, "venue": "hyperliquid", "slippage_tolerance": 0.01},
+      "risk_verdict": {
+        "allowed": false,
+        "reason_code": "SPREAD_TOO_WIDE",
+        "reason": "Spread 75.5 bps exceeds maximum 50.0 bps",
+        "suggested_adjustment": {"action": "WAIT", "condition": "spread < 50 bps"}
+      },
+      "execution_risk": {
+        "spread_bps": 75.5,
+        "impact_est_bps": 12.5,
+        "depth_25bp_usd": 250000,
+        "liquidity_score": 0.25,
+        "flags": ["SPREAD_TOO_WIDE"]
+      }
+    },
+    "SLIPPAGE_TOO_HIGH": {
+      "decision_id": null,
+      "plan": {"action": "Market Order", "symbol": "BTC-PERP", "size_usd": 50000, "venue": "hyperliquid", "slippage_tolerance": 0.01},
+      "risk_verdict": {
+        "allowed": false,
+        "reason_code": "SLIPPAGE_TOO_HIGH",
+        "reason": "Estimated slippage 35.2 bps exceeds maximum 25.0 bps for $50000 order",
+        "suggested_adjustment": {"action": "RESIZE", "value": 25000, "note": "Reduce size to limit slippage"}
+      },
+      "execution_risk": {
+        "spread_bps": 0.5,
+        "impact_est_bps": 35.2,
+        "depth_25bp_usd": 800000,
+        "liquidity_score": 0.55,
+        "flags": ["SLIPPAGE_TOO_HIGH"]
+      }
+    },
+    "DEPTH_TOO_THIN": {
+      "decision_id": null,
+      "plan": {"action": "Market Order", "symbol": "SMALL-PERP", "size_usd": 10000, "venue": "hyperliquid", "slippage_tolerance": 0.01},
+      "risk_verdict": {
+        "allowed": false,
+        "reason_code": "DEPTH_TOO_THIN",
+        "reason": "Depth at 25bp ($45000) below minimum ($100000)",
+        "suggested_adjustment": {"action": "RESIZE", "value": 2000, "note": "Reduce size relative to available depth"}
+      },
+      "execution_risk": {
+        "spread_bps": 1.8,
+        "impact_est_bps": 28.5,
+        "depth_25bp_usd": 45000,
+        "liquidity_score": 0.18,
+        "flags": ["DEPTH_TOO_THIN", "LOW_LIQUIDITY"]
+      }
+    },
+    "LIQUIDITY_TOO_LOW": {
+      "decision_id": null,
+      "plan": {"action": "Market Order", "symbol": "ILLIQUID-PERP", "size_usd": 5000, "venue": "hyperliquid", "slippage_tolerance": 0.01},
+      "risk_verdict": {
+        "allowed": false,
+        "reason_code": "LIQUIDITY_TOO_LOW",
+        "reason": "Liquidity score 0.15 below minimum 0.30",
+        "suggested_adjustment": {"action": "WAIT", "condition": "liquidity_score >= 0.30"}
+      },
+      "execution_risk": {
+        "spread_bps": 3.2,
+        "impact_est_bps": 15.0,
+        "depth_25bp_usd": 75000,
+        "liquidity_score": 0.15,
+        "flags": ["LIQUIDITY_TOO_LOW"]
+      }
+    },
+    "MARGIN_STRESS": {
+      "decision_id": null,
+      "plan": {"action": "Market Order", "symbol": "BTC-PERP", "size_usd": 8000, "venue": "hyperliquid", "slippage_tolerance": 0.01},
+      "risk_verdict": {
+        "allowed": false,
+        "reason_code": "MARGIN_STRESS",
+        "reason": "Margin utilization 85% exceeds stress threshold 80%",
+        "suggested_adjustment": {"action": "RESIZE", "value": 3000, "note": "Reduce size to maintain margin buffer"}
+      },
+      "execution_risk": {
+        "spread_bps": 0.5,
+        "impact_est_bps": 1.5,
+        "depth_25bp_usd": 1500000,
+        "liquidity_score": 0.85,
+        "flags": ["MARGIN_STRESS"]
+      },
+      "margin_context": {
+        "current_utilization": 0.85,
+        "free_collateral_usd": 1500,
+        "total_collateral_usd": 10000,
+        "threshold": 0.80
+      }
+    },
+    "EXPOSURE_TOO_HIGH": {
+      "decision_id": null,
+      "plan": {"action": "Market Order", "symbol": "ETH-PERP", "size_usd": 15000, "venue": "hyperliquid", "slippage_tolerance": 0.01},
+      "risk_verdict": {
+        "allowed": false,
+        "reason_code": "EXPOSURE_TOO_HIGH",
+        "reason": "Adding $15000 ETH-PERP would exceed per-symbol exposure limit",
+        "suggested_adjustment": {"action": "RESIZE", "value": 5000, "note": "Reduce to stay within exposure limits"}
+      },
+      "execution_risk": {
+        "spread_bps": 0.8,
+        "impact_est_bps": 2.2,
+        "depth_25bp_usd": 1200000,
+        "liquidity_score": 0.78,
+        "flags": ["EXPOSURE_TOO_HIGH"]
+      },
+      "exposure_context": {
+        "current_eth_exposure_usd": 20000,
+        "proposed_total_usd": 35000,
+        "per_symbol_limit_usd": 25000
+      }
+    }
+  }
+}

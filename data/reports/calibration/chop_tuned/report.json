@@ -1,0 +1,150 @@
+{
+  "metadata": {
+    "name": "real_trade_data",
+    "symbols": [
+      "BTC",
+      "ETH"
+    ],
+    "start": "2026-02-13T11:28:41.304516+00:00",
+    "end": "2026-02-14T11:28:41.304516+00:00",
+    "exported_at": "2026-02-14T11:28:47.342025+00:00",
+    "counts": {
+      "events": 1870,
+      "signals": 1594,
+      "opportunities": 0
+    }
+  },
+  "generated_at": "2026-02-14T11:37:07.642261+00:00",
+  "summary": {
+    "events_processed": 1872,
+    "symbols_processed": [
+      "BTC-PERP",
+      "ETH-PERP"
+    ],
+    "elapsed_seconds": 0.16,
+    "signals": {
+      "total": 2,
+      "direction_counts": {
+        "SHORT": 2
+      },
+      "score_min": -0.5,
+      "score_max": -0.5,
+      "score_mean": -0.5
+    },
+    "opportunities": {
+      "total": 2,
+      "score_min": -2.06,
+      "score_max": -2.06,
+      "score_mean": -2.06,
+      "quality_min": 5.0,
+      "quality_max": 5.0,
+      "quality_mean": 5.0,
+      "micro_penalty_mean": -1.56
+    },
+    "risk": {
+      "total": 2,
+      "passed": 0,
+      "blocked": 2,
+      "pass_rate": 0.0,
+      "reason_breakdown": {
+        "DEPTH_TOO_THIN": {
+          "count": 2,
+          "pct": 100.0
+        }
+      }
+    },
+    "execution_risk_flags": {
+      "THIN_DEPTH": 2,
+      "HIGH_SLIPPAGE": 2,
+      "LOW_LIQUIDITY": 2
+    },
+    "warnings": [
+      "Depth at 25bp ($50,000) below minimum $100,000",
+      "Expected slippage 30.0 bps exceeds limit 25.0 bps",
+      "Liquidity score 0.20 below minimum 0.30",
+      "Depth at 25bp ($50,000) below minimum $100,000",
+      "Expected slippage 30.0 bps exceeds limit 25.0 bps",
+      "Liquidity score 0.20 below minimum 0.30"
+    ]
+  },
+  "results": {
+    "signals": [
+      {
+        "symbol": "BTC-PERP",
+        "score": -0.5,
+        "direction": "SHORT",
+        "confidence": 0.05,
+        "event_count": 936,
+        "ts": "2026-02-14T11:29:00.000000+00:00"
+      },
+      {
+        "symbol": "ETH-PERP",
+        "score": -0.5,
+        "direction": "SHORT",
+        "confidence": 0.05,
+        "event_count": 936,
+        "ts": "2026-02-14T11:29:00.000000+00:00"
+      }
+    ],
+    "opportunities": [
+      {
+        "symbol": "BTC-PERP",
+        "score": -0.5,
+        "enhanced_score": -2.06,
+        "quality": 5.0,
+        "direction": "SHORT",
+        "warnings": [
+          "Depth at 25bp ($50,000) below minimum $100,000",
+          "Expected slippage 30.0 bps exceeds limit 25.0 bps",
+          "Liquidity score 0.20 below minimum 0.30"
+        ],
+        "execution_risk_flags": [
+          "THIN_DEPTH",
+          "HIGH_SLIPPAGE",
+          "LOW_LIQUIDITY"
+        ],
+        "ts": "2026-02-14T11:29:00.000000+00:00"
+      },
+      {
+        "symbol": "ETH-PERP",
+        "score": -0.5,
+        "enhanced_score": -2.06,
+        "quality": 5.0,
+        "direction": "SHORT",
+        "warnings": [
+          "Depth at 25bp ($50,000) below minimum $100,000",
+          "Expected slippage 30.0 bps exceeds limit 25.0 bps",
+          "Liquidity score 0.20 below minimum 0.30"
+        ],
+        "execution_risk_flags": [
+          "THIN_DEPTH",
+          "HIGH_SLIPPAGE",
+          "LOW_LIQUIDITY"
+        ],
+        "ts": "2026-02-14T11:29:00.000000+00:00"
+      }
+    ],
+    "risk_verdicts": [
+      {
+        "symbol": "BTC-PERP",
+        "allowed": false,
+        "reason_code": "DEPTH_TOO_THIN",
+        "reason": "Depth at 25bp ($50,000) below minimum $100,000",
+        "ts": "2026-02-14T11:29:00.000000+00:00"
+      },
+      {
+        "symbol": "ETH-PERP",
+        "allowed": false,
+        "reason_code": "DEPTH_TOO_THIN",
+        "reason": "Depth at 25bp ($50,000) below minimum $100,000",
+        "ts": "2026-02-14T11:29:00.000000+00:00"
+      }
+    ],
+    "events_processed": 1872,
+    "symbols_processed": [
+      "BTC-PERP",
+      "ETH-PERP"
+    ],
+    "elapsed_seconds": 0.16
+  }
+}

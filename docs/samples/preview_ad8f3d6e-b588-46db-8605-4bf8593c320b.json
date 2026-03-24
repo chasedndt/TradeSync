@@ -1,0 +1,17 @@
+﻿{
+    "decision_id":  "a7d3707e-354e-4cbf-9cae-f98ebe08c71c",
+    "plan":  {
+                 "action":  "Market Order",
+                 "symbol":  "ETH-PERP",
+                 "size_usd":  1000.0,
+                 "venue":  "drift",
+                 "slippage_tolerance":  0.01
+             },
+    "risk_verdict":  {
+                         "allowed":  true,
+                         "reason_code":  "OK",
+                         "reason":  "All risk checks passed",
+                         "suggested_adjustment":  null
+                     },
+    "suggested_adjustments":  null
+}

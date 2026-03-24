@@ -8,7 +8,7 @@ Setup and verification results for the TradeSync development environment on Wind
 |-----------|--------|---------|
 | **Claude CLI** | OK | v1.0.51 |
 | **Docker Stack** | OK | all services running in `ops/compose.full.yml` |
-| **Symlink** | FAILED | `C:\TradeSync` (using full path instead) |
+| **Symlink** | OK | `C:\TradeSync` -> Project Root |
 | **NPM CLI** | OK | Execution policy updated to `RemoteSigned` |
 
 ## 2. MCP Servers Configured
@@ -27,7 +27,7 @@ Setup and verification results for the TradeSync development environment on Wind
 | `redis` | OK | Healthy (Up 9 hours) |
 | `state-api` | OK | Running |
 | `ingest-gateway` | OK | Running |
-| `opportunity-builder` | OK | Running |
+| `fusion-engine` | OK | Running |
 | `core-scorer` | OK | Running |
 | `exec-drift-svc` | OK | Running |
 | `exec-hl-svc` | OK | Running |

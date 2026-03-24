@@ -179,8 +179,7 @@ async def execute_hl_order(req: OrderRequest):
         "dry_run": DRY_RUN,
         "execution_enabled": EXECUTION_ENABLED,
         "idempotency_key": idempo_val,
-        "request_payload": req.model_dump(),
-        "response_payload": {}
+        "request_payload": req.model_dump()
     }
 
     # Helper to return and cache

@@ -1,0 +1,64 @@
+{
+  "_comment": "Sample response from POST https://api.hyperliquid.xyz/info with {\"type\": \"metaAndAssetCtxs\"}",
+  "_fetched_at": "2026-01-21T12:00:00Z",
+  "response": [
+    {
+      "universe": [
+        {
+          "name": "BTC",
+          "szDecimals": 5,
+          "maxLeverage": 50
+        },
+        {
+          "name": "ETH",
+          "szDecimals": 4,
+          "maxLeverage": 50
+        },
+        {
+          "name": "SOL",
+          "szDecimals": 2,
+          "maxLeverage": 20
+        }
+      ]
+    },
+    [
+      {
+        "funding": "0.00003125",
+        "openInterest": "12534.52",
+        "dayNtlVlm": "1523456789.50",
+        "markPx": "105250.50",
+        "oraclePx": "105245.00",
+        "premium": "0.00005234",
+        "impactPxs": ["105248.25", "105252.75"]
+      },
+      {
+        "funding": "0.00004512",
+        "openInterest": "85432.10",
+        "dayNtlVlm": "892345678.25",
+        "markPx": "3425.75",
+        "oraclePx": "3424.50",
+        "premium": "0.00003654",
+        "impactPxs": ["3425.50", "3426.00"]
+      },
+      {
+        "funding": "0.00008765",
+        "openInterest": "234567.89",
+        "dayNtlVlm": "456789123.00",
+        "markPx": "185.45",
+        "oraclePx": "185.40",
+        "premium": "0.00002698",
+        "impactPxs": ["185.43", "185.47"]
+      }
+    ]
+  ],
+  "_normalization_notes": {
+    "symbol_mapping": {
+      "BTC": "BTC-PERP",
+      "ETH": "ETH-PERP",
+      "SOL": "SOL-PERP"
+    },
+    "funding_interpretation": "Hourly rate. Annualized = rate * 24 * 365",
+    "oi_unit": "Asset units (e.g., BTC)",
+    "volume_unit": "USD notional (24h rolling)"
+  }
+}

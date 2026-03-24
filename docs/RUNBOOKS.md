@@ -73,37 +73,33 @@ powershell -ExecutionPolicy Bypass -File ops\scripts\bootstrap-db.ps1
 Smoke test: up the core services (local processes)
 Open three terminals:
 
-T1 – state-api + risk-guardian
+T1 – state-api (Standardized Contract)
 
 .\.venv\Scripts\Activate.ps1
-uvicorn services.state_api.app:app --reload --port 8000
-# in another tab:
-python services\risk-guardian\main.py
+uvicorn services.state-api.app.main:app --reload --port 8000
 
 
-T2 – streams + agents
+T2 – fusion-engine + ingest-gateway
 
 .\.venv\Scripts\Activate.ps1
-python services\ingest-gateway\main.py
-python services\agents\funding\main.py
-python services\agents\tech\main.py
-python services\fusion-engine\main.py
+python services\ingest-gateway\app\main.py
+python services\fusion-engine\app\main.py
 
 
 T3 – executors
 
 # Drift (python)
 .\.venv\Scripts\Activate.ps1
-python services\exec-drift-svc\main.py
+python services\exec-drift-svc\app\main.py
 
-# Hyperliquid (node)
-cd services/exec-hl-svc
-npm run dev
+# Hyperliquid (python)
+.\.venv\Scripts\Activate.ps1
+python services\exec-hl-svc\app\main.py
 
 
 Ping health + metrics
 
-Health: http://localhost:8000/healthz
+Health: http://localhost:8000/state/health
 
 Metrics (Prometheus): http://localhost:8000/metrics
 
@@ -120,15 +116,12 @@ Expect: Event → Signal(s) → Opportunity → /opps/latest shows data.
 1) Service Inventory (what runs where)
 Service	Lang	Port	Purpose
 ingest-gateway	Py	8080	accept TV/ideas/metrics → x:events.*
-agents/tech	Py	—	produce tech/structure signals
-agents/funding	Py	—	produce funding/OI/liquidity signals
-agents/sentiment	Py	—	produce narrative signals (RAG)
-agents/rotation	Py	—	rotation/macro
-fusion-engine	Py	—	merge signals → opportunities
-risk-guardian	Py	8090	evaluate policy / plan
-state-api	Py	8000	REST: opps, preview/execute, telemetry
-exec-drift-svc	Py	7010	Drift executor
-exec-hl-svc	TS	7000	Hyperliquid executor (WS/REST)
+core-scorer	Py	8001	produce technical bias & confidence
+fusion-engine	Py	8002	merge signals → opportunities
+state-api	Py	8000	REST: state, risk-guarded actions, telemetry
+exec-drift-svc	Py	8003	Drift executor
+exec-hl-svc	Py	8004	Hyperliquid executor
+cockpit-ui	TS/JS	3000	Main management dashboard
 Infra	—	—	Postgres, Redis Streams, Qdrant
 2) Local Dev (per service)
 Python services (common)
@@ -148,6 +141,11 @@ npm run dev     # ts-node-dev / nodemon
 
 
 HL keys go in services/exec-hl-svc/.env and never committed.
+
+Cockpit UI (Dashboard)
+cd services/cockpit-ui
+npm install
+npm run dev
 
 3) Containerized Dev (one command)
 
@@ -237,11 +235,25 @@ Latency budgets: P95 < 50ms per Event per agent; verify in test output.
 
 8) Health, Metrics, Tracing
 
-Health: GET /healthz on each API service
+Health: GET /state/health (Standardized)
 
-Metrics: GET /metrics (Prometheus text)
+Metrics: GET /state/snapshot (Internal stats)
 
 Trace IDs: logged at ingest; propagated via headers to all downstream services.
+
+8a) Step 0 Verification (API Contract)
+
+To verify alias compatibility:
+```bash
+curl -I http://localhost:8000/opps
+# Expect: 200 OK + Deprecation Header
+```
+
+To verify symbol normalization:
+```bash
+curl "http://localhost:8000/state/opportunities?symbol=BTCUSDT"
+# Response should contain "symbol": "BTC-PERP"
+```
 
 9) Webhooks (TradingView & Ops)
 
@@ -311,10 +323,47 @@ Verify nonce/time drift, API perms, and WS connectivity in exec-hl-svc logs.
 docker compose -f ops/compose.full.yml down -v   # remove volumes (dev only)
 deactivate  # python venv
 
-14) Appendix
+14) Phase 3C: Market Microstructure Verification
 
-Ports: Postgres 5432, Redis 6379, Qdrant 6333, state-api 8000, ingest 8080, risk 8090, HL exec 7000, Drift exec 7010.
+Verify microstructure data in market snapshots:
+```bash
+curl -s http://localhost:8005/snapshots | jq '.snapshots[0].microstructure'
+```
+
+Verify confluence scoring in opportunities:
+```bash
+curl -s http://localhost:8000/state/opportunities | jq '.[0].confluence'
+```
+
+Verify macro feed:
+```bash
+curl -s http://localhost:8000/state/macro/headlines | jq '.headlines[:3]'
+```
+
+Test preview with microstructure checks:
+```bash
+OPP_ID=$(curl -s http://localhost:8000/state/opportunities?status=new | jq -r '.[0].id')
+curl -s http://localhost:8000/actions/preview \
+  -H "Content-Type: application/json" \
+  -d "{\"opportunity_id\": \"$OPP_ID\", \"size_usd\": 1000, \"venue\": \"hyperliquid\"}" | jq '.risk_verdict'
+```
+
+Run Phase 3C tests:
+```bash
+pytest tests/test_phase3c.py -v
+```
+
+See `docs/runbooks/Phase3C_Verification.md` for comprehensive verification steps.
+
+15) Appendix
+
+Ports: Postgres 5432, Redis 6379, Qdrant 6333, state-api 8000, core-scorer 8001, fusion-engine 8002, exec-drift 8003, exec-hl 8004, market-data 8005, ingest 8080.
 
 Diagrams: see docs/SYSTEM_DESIGN.md (links to SVGs).
 
 Specs: see docs/AGENT_INTERFACE.md (canonical contracts).
+
+Phase Reports:
+- docs/phase3A_report.md - Core pipeline hardening
+- docs/phase3B_report.md - Market data expansion
+- docs/phase3C_report.md - Market microstructure & risk intelligence

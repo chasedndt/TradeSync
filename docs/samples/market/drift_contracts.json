@@ -1,0 +1,57 @@
+{
+  "_comment": "Sample response from GET https://data.api.drift.trade/contracts",
+  "_fetched_at": "2026-01-21T12:00:00Z",
+  "response": [
+    {
+      "ticker_id": "BTC-PERP",
+      "base_currency": "BTC",
+      "quote_currency": "USDC",
+      "last_price": "105050.25",
+      "index_price": "105045.00",
+      "mark_price": "105052.50",
+      "funding_rate": "0.00004567",
+      "open_interest": "5234567.89",
+      "24h_volume": "256789012.50",
+      "24h_high": "106500.00",
+      "24h_low": "104200.00",
+      "market_index": 0,
+      "max_leverage": 20
+    },
+    {
+      "ticker_id": "ETH-PERP",
+      "base_currency": "ETH",
+      "quote_currency": "USDC",
+      "last_price": "3425.50",
+      "index_price": "3424.00",
+      "mark_price": "3426.00",
+      "funding_rate": "0.00005234",
+      "open_interest": "12345678.90",
+      "24h_volume": "189012345.75",
+      "24h_high": "3480.00",
+      "24h_low": "3390.00",
+      "market_index": 1,
+      "max_leverage": 20
+    },
+    {
+      "ticker_id": "SOL-PERP",
+      "base_currency": "SOL",
+      "quote_currency": "USDC",
+      "last_price": "185.45",
+      "index_price": "185.40",
+      "mark_price": "185.48",
+      "funding_rate": "0.00008765",
+      "open_interest": "8901234.56",
+      "24h_volume": "123456789.00",
+      "24h_high": "189.50",
+      "24h_low": "182.25",
+      "market_index": 2,
+      "max_leverage": 10
+    }
+  ],
+  "_normalization_notes": {
+    "symbol_format": "Already canonical (BASE-PERP)",
+    "oi_unit": "USD notional",
+    "volume_unit": "USD (24h)",
+    "funding_interpretation": "Continuous funding rate"
+  }
+}

@@ -136,13 +136,22 @@ class ReplayEngine:
 
             # Convert to CoreEvent objects
             core_events = []
+            latest_micro: Optional[Dict[str, Any]] = None
+            latest_regime: Optional[Dict[str, Any]] = None
+
             for evt in symbol_events:
+                payload = evt.get("payload", {})
                 core_events.append(Event(
                     ts=datetime.fromisoformat(evt["ts"]),
                     source=evt["source"],
                     kind=evt["kind"],
-                    payload=evt.get("payload", {}),
+                    payload=payload,
                 ))
+                # Capture latest microstructure/regime if provided in event
+                if "microstructure" in payload:
+                    latest_micro = payload["microstructure"]
+                if "regime_data" in payload:
+                    latest_regime = payload["regime_data"]
 
             # Phase 1: Core scoring
             score = calculate_score(core_events)
@@ -170,6 +179,8 @@ class ReplayEngine:
                 raw_score=score,
                 signal_confidence=confidence,
                 symbol=symbol,
+                microstructure=latest_micro,
+                regime_data=latest_regime,
             )
             final_score = enhanced.score_breakdown.final_score
 
@@ -190,6 +201,7 @@ class ReplayEngine:
                 symbol=symbol,
                 size_usd=1000.0,
                 opportunity={"status": "new", "quality": confidence * 100},
+                microstructure=latest_micro,
             )
 
             risk_result = RiskResult(

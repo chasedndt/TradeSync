@@ -1,0 +1,134 @@
+{
+  "_comment": "GET /state/market/snapshot?venue=hyperliquid&symbol=BTC-PERP - Sample response showing current structure + Phase 3C additions",
+  "venue": "hyperliquid",
+  "symbol": "BTC-PERP",
+  "ts": 1737590400000,
+  "data_age_ms": 1234,
+  "available_metrics": [
+    {"metric": "funding", "status": "REAL", "source": "hyperliquid", "last_updated": 1737590398000},
+    {"metric": "oi", "status": "REAL", "source": "hyperliquid", "last_updated": 1737590398000},
+    {"metric": "volume", "status": "REAL", "source": "hyperliquid", "last_updated": 1737590398000},
+    {"metric": "orderbook", "status": "REAL", "source": "hyperliquid", "last_updated": 1737590399000},
+    {"metric": "liquidations", "status": "PROXY", "source": "oi_delta_estimate", "note": "Estimated from OI deltas"},
+    {"metric": "microstructure", "status": "DERIVED", "source": "orderbook", "note": "Phase 3C: Derived from orderbook"}
+  ],
+  "funding": {
+    "horizons": {
+      "now": 0.0001,
+      "h8": 0.00012,
+      "h24": 0.00015,
+      "d3": 0.00008,
+      "d7": 0.00006
+    },
+    "annualized_24h": 13.14,
+    "regime": "neutral",
+    "source": {
+      "provider": "hyperliquid",
+      "endpoint": "/info/metaAndAssetCtxs",
+      "raw_rate": 0.0001
+    }
+  },
+  "oi": {
+    "current_usd": 1234567890,
+    "horizons": {
+      "5m": {"value": 1234000000, "delta_pct": 0.05, "delta_usd": 617283},
+      "1h": {"value": 1230000000, "delta_pct": 0.37, "delta_usd": 4567890},
+      "4h": {"value": 1220000000, "delta_pct": 1.19, "delta_usd": 14567890},
+      "24h": {"value": 1180000000, "delta_pct": 4.62, "delta_usd": 54567890}
+    },
+    "regime": "build"
+  },
+  "volume": {
+    "horizons": {
+      "1h": 123456789,
+      "4h": 456789012,
+      "24h": 1234567890
+    },
+    "avg_7d_daily": 987654321,
+    "cvd": {
+      "1h": 12345678,
+      "4h": 34567890,
+      "24h": 56789012
+    },
+    "cvd_method": "taker_aggressor",
+    "regime": "normal"
+  },
+  "liquidations": {
+    "horizons": {
+      "1h": {"longs_usd": 1234567, "shorts_usd": 876543, "total_usd": 2111110, "dominant_side": "longs"},
+      "4h": {"longs_usd": 5678901, "shorts_usd": 4567890, "total_usd": 10246791, "dominant_side": "longs"},
+      "24h": {"longs_usd": 23456789, "shorts_usd": 19876543, "total_usd": 43333332, "dominant_side": "longs"}
+    },
+    "source_note": "Estimated from OI deltas (real feed unavailable)",
+    "method": "proxy"
+  },
+  "orderbook": {
+    "spread_bps": 0.5,
+    "spread_usd": 0.50,
+    "depth": {
+      "bid_1pct_usd": 5000000,
+      "ask_1pct_usd": 4800000,
+      "bid_2pct_usd": 12000000,
+      "ask_2pct_usd": 11500000
+    },
+    "imbalance_1pct": 0.02,
+    "best_bid": 99950.0,
+    "best_ask": 100000.5,
+    "mid_price": 99975.25,
+    "book_age_ms": 234
+  },
+  "regimes": {
+    "funding": "neutral",
+    "oi": "build",
+    "volume": "normal",
+    "trend": "weak_trend",
+    "market_condition": "trending_healthy",
+    "confidence": "medium",
+    "confidence_note": "OI building with neutral funding suggests continuation potential"
+  },
+  "sources": [
+    {
+      "provider": "hyperliquid",
+      "endpoint": "/info/metaAndAssetCtxs",
+      "fetched_at": 1737590398000,
+      "metrics_provided": ["funding", "oi", "volume"]
+    },
+    {
+      "provider": "hyperliquid",
+      "endpoint": "/info/l2Book",
+      "fetched_at": 1737590399000,
+      "metrics_provided": ["orderbook"]
+    }
+  ],
+  "_phase3C_additions": {
+    "microstructure": {
+      "spread_bps": 0.5,
+      "mid_price": 99975.25,
+      "depth_usd": {
+        "10bp": 500000,
+        "25bp": 1500000,
+        "50bp": 5000000
+      },
+      "impact_est_bps": {
+        "1000": 0.2,
+        "5000": 1.1,
+        "10000": 2.5
+      },
+      "liquidity_score": 0.85,
+      "book_heatmap": {
+        "levels": [
+          {"price": 99950.0, "side": "bid", "size_usd": 120000},
+          {"price": 99940.0, "side": "bid", "size_usd": 250000},
+          {"price": 99930.0, "side": "bid", "size_usd": 180000},
+          {"price": 99920.0, "side": "bid", "size_usd": 320000},
+          {"price": 99910.0, "side": "bid", "size_usd": 150000},
+          {"price": 100000.5, "side": "ask", "size_usd": 180000},
+          {"price": 100010.0, "side": "ask", "size_usd": 220000},
+          {"price": 100020.0, "side": "ask", "size_usd": 175000},
+          {"price": 100030.0, "side": "ask", "size_usd": 280000},
+          {"price": 100040.0, "side": "ask", "size_usd": 195000}
+        ]
+      }
+    }
+  }
+}

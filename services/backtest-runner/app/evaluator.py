@@ -47,6 +47,7 @@ def _build_summary(results: ReplayResults) -> Dict[str, Any]:
     # Opportunity distribution
     opp_scores = [o.enhanced_score for o in results.opportunities]
     opp_quality = [o.quality for o in results.opportunities]
+    opp_penalties = [o.enhanced_score - o.score for o in results.opportunities]
 
     opportunity_stats = {
         "total": len(results.opportunities),
@@ -56,6 +57,7 @@ def _build_summary(results: ReplayResults) -> Dict[str, Any]:
         "quality_min": min(opp_quality) if opp_quality else 0,
         "quality_max": max(opp_quality) if opp_quality else 0,
         "quality_mean": sum(opp_quality) / len(opp_quality) if opp_quality else 0,
+        "micro_penalty_mean": sum(opp_penalties) / len(opp_penalties) if opp_penalties else 0,
     }
 
     # Risk verdict breakdown
@@ -138,6 +140,7 @@ def _build_markdown(report: Dict[str, Any]) -> str:
         f"| Enhanced Score Mean | {s['opportunities']['score_mean']:.2f} |",
         f"| Quality Range | [{s['opportunities']['quality_min']:.1f}, {s['opportunities']['quality_max']:.1f}] |",
         f"| Quality Mean | {s['opportunities']['quality_mean']:.1f} |",
+        f"| Micro Penalty Mean | {s['opportunities']['micro_penalty_mean']:.2f} |",
         "",
         "## Risk Verdict Breakdown",
         "",

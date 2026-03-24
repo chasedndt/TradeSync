@@ -100,19 +100,22 @@ You can **plug in any protocol** as long as it respects the `exec_interface.py` 
 
 ```bash
 tradesync/
-├── services/                 # Microservices
-│   ├── ingest-gateway/       # Data ingestion service
-│   ├── core-scorer/          # Scoring and signal logic
-│   └── state-api/            # API for state management
+├── services/                  # Microservices
+│   ├── ingest-gateway/        # Data ingestion service (8080)
+│   ├── core-scorer/           # Technical bias & confidence (8001)
+│   ├── fusion-engine/         # Confluence scoring & opps (8002)
+│   ├── state-api/             # System state & action routing (8000)
+│   ├── exec-drift-svc/        # Drift protocol execution (8003)
+│   └── exec-hl-svc/           # Hyperliquid execution (8004)
 │
-├── core/                     # Shared core logic
-│   ├── agent.py              # Agent base classes
-│   ├── processor.py          # Data processing utils
-│   └── scoring.py            # Scoring algorithms
+├── core/                      # Shared core logic
+│   ├── agent.py               # Agent base classes
+│   ├── processor.py           # Data processing utils
+│   └── scoring.py             # Scoring algorithms
 │
-├── executor/                 # Trade execution logic
-│   ├── drift_exec.py         # Drift protocol executor
-│   ├── hyper_exec.py         # Hyperliquid executor
+├── executor/                  # Legacy trade execution logic (Deprecated)
+│   ├── drift_exec.py          # Drift protocol executor
+│   ├── hyper_exec.py          # Hyperliquid executor
 │   └── exec_interface.py     # Unified method signature
 │
 ├── alerts/                   # Alerting system
@@ -129,6 +132,26 @@ tradesync/
 ├── requirements.txt          # Python dependencies
 └── README.md                 # This file
 ```
+## 🎛️ Environment Configuration (Phase 3C)
+
+TradeSync uses a `.env` file for configuration. Below are the key Phase 3C variables that control safety guardrails and the news feed:
+
+```bash
+# Phase 3C - Market Microstructure & Risk Guardian
+MAX_SPREAD_BPS=50.0            # Max bid-ask spread in bps for hard block
+OPTIMAL_SPREAD_BPS=2.0         # Spread below which no penalty is applied
+MIN_DEPTH_25BP_USD=100000      # Min USD depth required within 25bp of mid
+MAX_IMPACT_BPS_5K=25.0         # Max price impact for $5k order in bps
+MIN_LIQUIDITY_SCORE=0.3        # Min composite liquidity score (0-1)
+MARGIN_STRESS_THRESHOLD=0.8    # Max margin utilization before block
+MAX_EXPOSURE_PER_SYMBOL_USD=25000 # Max USD exposure per individual symbol
+
+# Phase 3C - Macro Feed
+MACRO_FEED_CACHE_TTL=300       # Cache headlines for 5 minutes
+MACRO_RSS_SOURCES='[...]'      # JSON array of RSS news sources
+```
+
+---
 
 ## 🛠 How to Run TradeSync
 
@@ -137,12 +160,51 @@ tradesync/
 pip install -r requirements.txt
 ```
 
-### 2. 🚀 Start the Agent
+### 3. Start the Services (Full Stack)
 ```bash
-python main.py
+docker compose -f ops/compose.full.yml --env-file .env up -d --build
 ```
 
-You will receive alerts via Discord (or Telegram if configured), based on live scored signals.
+### 4. Start the Dashboard (Cockpit UI)
+```bash
+cd services/cockpit-ui
+npm install
+npm run dev
+```
+The dashboard will be available at `http://localhost:3000`.
+
+---
+
+## 🎛️ Cockpit UI & Mock Data
+As of **Step 0 / Phase 3A**, the Cockpit UI is fully operational but runs in **Mock/Dry-Run mode**:
+- **Execution**: The backend executors (`exec-*-svc`) are configured with `DRY_RUN=true`.
+- **Wallets**: No real Solana/Hyperliquid private keys are configured yet.
+- **Positions**: The "Live Positions" seen in the UI are generated mock data to demonstrate the dashboard's capabilities.
+
+---
+
+## 📡 API & Compatibility (Step 0)
+
+TradeSync uses a standardized API contract for all clients.
+
+### Canonical Routes (state-api)
+- `GET /state/health` - Aggregated health
+- `GET /state/snapshot` - High-level summary
+- `GET /state/opportunities` - Actionable signals
+- `GET /state/evidence` - Signals/Events for an opportunity
+- `POST /actions/preview` - Risk-guarded execution plan
+- `POST /actions/execute` - Confirm and route order
+
+### Legacy Aliases (Backward Compatible)
+| Legacy Path | Canonical Successor |
+| :--- | :--- |
+| `/opps` | `/state/opportunities` |
+| `/preview` | `/actions/preview` |
+| `/execute` | `/actions/execute` |
+| `/execution/status` | `/state/execution/status` |
+
+> [!IMPORTANT]
+> Legacy aliases return `Deprecation: true` headers and point to successors in the `Link` header.
 
 ---
 

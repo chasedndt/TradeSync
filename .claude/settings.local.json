@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__tradesync_fs__read_multiple_files",
+      "mcp__tradesync_fs__read_text_file",
+      "Bash(if [ -f .env ])",
+      "Bash(then echo \".env exists\")",
+      "Bash(else echo \".env missing\")",
+      "Bash(fi)",
+      "Bash(curl:*)",
+      "Bash(docker logs:*)",
+      "Bash(docker exec:*)",
+      "Bash(docker compose:*)",
+      "Bash(docker ps:*)",
+      "Bash(findstr:*)",
+      "Bash(for i in 1 2 3 4 5)",
+      "Bash(do curl -s -X POST http://localhost:8004/exec/hl/order -H \"Content-Type: application/json\" -d \"{\"\"symbol\"\":\"\"BTC-PERP\"\",\"\"side\"\":\"\"buy\"\",\"\"order_type\"\":\"\"market\"\",\"\"size_usd\"\":100,\"\"venue\"\":\"\"hyperliquid\"\",\"\"idempotency_key\"\":\"\"cb-test-$i\"\"}\")",
+      "Bash(done)",
+      "Bash(dir /b \"C:\\\\Users\\\\johno\\\\Documents\\\\Techno Ubermensch\\\\Full Stack Developing\\\\Projects\\\\TradeSync\\\\services\")",
+      "Bash(docker rm:*)",
+      "mcp__tradesync_fs__directory_tree",
+      "mcp__tradesync_fs__list_directory",
+      "mcp__tradesync_fs__create_directory",
+      "mcp__tradesync_fs__write_file",
+      "Bash(python:*)",
+      "Bash(test:*)",
+      "Bash(npm run build:*)",
+      "WebSearch",
+      "WebFetch(domain:hyperliquid.gitbook.io)",
+      "Bash(dir /b \"C:\\\\Users\\\\johno\\\\Documents\\\\Techno Ubermensch\\\\Full Stack Developing\\\\Projects\\\\TradeSync\\\\services\\\\cockpit-ui\\\\src\\\\pages\")",
+      "Bash(dir /s /b \"C:\\\\Users\\\\johno\\\\Documents\\\\Techno Ubermensch\\\\Full Stack Developing\\\\Projects\\\\TradeSync\\\\services\\\\cockpit-ui\\\\src\\\\api\")",
+      "Bash(ls \"C:\\\\Users\\\\johno\\\\Documents\\\\Techno Ubermensch\\\\Full Stack Developing\\\\Projects\\\\TradeSync\\\\docs\\\\architecture\"\" 2>nul && echo \"---EXISTS---\" || echo \"---MISSING--- \")",
+      "Bash(dir:*)",
+      "Bash(cd:*)",
+      "Bash(pip install:*)",
+      "mcp__tradesync_fs__list_directory_with_sizes",
+      "Bash(git status:*)"
+    ]
+  }
+}

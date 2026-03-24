@@ -1,0 +1,91 @@
+{
+  "_comment": "GET /state/evidence?opportunity_id=<id> - Sample response showing full evidence trail",
+  "opportunity": {
+    "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "symbol": "BTC-PERP",
+    "timeframe": "1h",
+    "bias": 3.5,
+    "quality": 72.5,
+    "dir": "LONG",
+    "status": "previewed",
+    "snapshot_ts": "2025-01-22T18:00:00Z",
+    "links": {
+      "signal_id": "s1g2n3a4-l5i6-d789-0abc-def123456789",
+      "event_ids": [
+        "e1v2e3n4-t5i6-d789-0abc-def123456789",
+        "e1v2e3n4-t5i6-d789-0abc-def123456788"
+      ]
+    }
+  },
+  "signals": [
+    {
+      "id": "s1g2n3a4-l5i6-d789-0abc-def123456789",
+      "created_at": "2025-01-22T17:58:00Z",
+      "agent": "funding-oi-agent",
+      "symbol": "BTC-PERP",
+      "timeframe": "1h",
+      "kind": "funding_squeeze_risk",
+      "confidence": 0.725,
+      "dir": "LONG",
+      "features": {
+        "funding_rate": -0.0002,
+        "funding_regime": "elevated_negative",
+        "oi_delta_1h_pct": 1.5,
+        "oi_regime": "build",
+        "squeeze_probability": 0.68,
+        "position_bias": "heavy_short"
+      }
+    }
+  ],
+  "events": [
+    {
+      "id": "e1v2e3n4-t5i6-d789-0abc-def123456789",
+      "ts": "2025-01-22T17:55:00Z",
+      "source": "metrics",
+      "kind": "market_snapshot",
+      "symbol": "BTC-PERP",
+      "timeframe": "1h",
+      "payload": {
+        "mark": 99975.25,
+        "funding": -0.0002,
+        "oi": 1234567890,
+        "volume_24h": 1234567890,
+        "venue": "hyperliquid"
+      }
+    },
+    {
+      "id": "e1v2e3n4-t5i6-d789-0abc-def123456788",
+      "ts": "2025-01-22T17:50:00Z",
+      "source": "tradingview",
+      "kind": "alert",
+      "symbol": "BTC-PERP",
+      "timeframe": "1h",
+      "payload": {
+        "alert_name": "EMA 21x55 Cross",
+        "direction": "LONG",
+        "price": 99850.00,
+        "notes": "Bullish EMA cross confirmed"
+      }
+    }
+  ],
+  "decisions": [
+    {
+      "id": "d1e2c3i4-s5i6-o789-nabc-def123456789",
+      "venue": "hyperliquid",
+      "requested": {
+        "action": "Market Order",
+        "symbol": "BTC-PERP",
+        "size_usd": 1000,
+        "venue": "hyperliquid",
+        "slippage_tolerance": 0.01
+      },
+      "risk": {
+        "allowed": true,
+        "reason_code": "OK",
+        "reason": "All risk checks passed",
+        "suggested_adjustment": null
+      }
+    }
+  ],
+  "exec_orders": []
+}

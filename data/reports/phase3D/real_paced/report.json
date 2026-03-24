@@ -1,0 +1,122 @@
+{
+  "metadata": {
+    "name": "real_trade_data",
+    "symbols": [
+      "BTC",
+      "ETH"
+    ],
+    "start": "2026-02-13T11:28:41.304516+00:00",
+    "end": "2026-02-14T11:28:41.304516+00:00",
+    "exported_at": "2026-02-14T11:28:47.342025+00:00",
+    "counts": {
+      "events": 1870,
+      "signals": 1594,
+      "opportunities": 0
+    }
+  },
+  "generated_at": "2026-02-14T11:29:47.928700+00:00",
+  "summary": {
+    "events_processed": 1870,
+    "symbols_processed": [
+      "BTC-PERP",
+      "ETH-PERP"
+    ],
+    "elapsed_seconds": 0.154,
+    "signals": {
+      "total": 2,
+      "direction_counts": {
+        "SHORT": 2
+      },
+      "score_min": -0.5,
+      "score_max": -0.5,
+      "score_mean": -0.5
+    },
+    "opportunities": {
+      "total": 2,
+      "score_min": -0.5,
+      "score_max": -0.5,
+      "score_mean": -0.5,
+      "quality_min": 5.0,
+      "quality_max": 5.0,
+      "quality_mean": 5.0
+    },
+    "risk": {
+      "total": 2,
+      "passed": 0,
+      "blocked": 2,
+      "pass_rate": 0.0,
+      "reason_breakdown": {
+        "EXEC_DISABLED": {
+          "count": 2,
+          "pct": 100.0
+        }
+      }
+    },
+    "execution_risk_flags": {},
+    "warnings": []
+  },
+  "results": {
+    "signals": [
+      {
+        "symbol": "BTC-PERP",
+        "score": -0.5,
+        "direction": "SHORT",
+        "confidence": 0.05,
+        "event_count": 935,
+        "ts": "2026-02-14T11:28:32.581646+00:00"
+      },
+      {
+        "symbol": "ETH-PERP",
+        "score": -0.5,
+        "direction": "SHORT",
+        "confidence": 0.05,
+        "event_count": 935,
+        "ts": "2026-02-14T11:28:33.668592+00:00"
+      }
+    ],
+    "opportunities": [
+      {
+        "symbol": "BTC-PERP",
+        "score": -0.5,
+        "enhanced_score": -0.5,
+        "quality": 5.0,
+        "direction": "SHORT",
+        "warnings": [],
+        "execution_risk_flags": [],
+        "ts": "2026-02-14T11:28:32.581646+00:00"
+      },
+      {
+        "symbol": "ETH-PERP",
+        "score": -0.5,
+        "enhanced_score": -0.5,
+        "quality": 5.0,
+        "direction": "SHORT",
+        "warnings": [],
+        "execution_risk_flags": [],
+        "ts": "2026-02-14T11:28:33.668592+00:00"
+      }
+    ],
+    "risk_verdicts": [
+      {
+        "symbol": "BTC-PERP",
+        "allowed": false,
+        "reason_code": "EXEC_DISABLED",
+        "reason": "Global execution gate is DISABLED",
+        "ts": "2026-02-14T11:28:32.581646+00:00"
+      },
+      {
+        "symbol": "ETH-PERP",
+        "allowed": false,
+        "reason_code": "EXEC_DISABLED",
+        "reason": "Global execution gate is DISABLED",
+        "ts": "2026-02-14T11:28:33.668592+00:00"
+      }
+    ],
+    "events_processed": 1870,
+    "symbols_processed": [
+      "BTC-PERP",
+      "ETH-PERP"
+    ],
+    "elapsed_seconds": 0.154
+  }
+}
