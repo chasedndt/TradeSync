@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { apiClient } from '../client'
+import { apiGet } from '../client'
 
 export interface MacroHeadline {
   title: string
@@ -39,8 +39,7 @@ export function useMacroHeadlines(options?: {
       if (options?.category) params.append('category', options.category)
 
       const url = `/state/macro/headlines${params.toString() ? '?' + params.toString() : ''}`
-      const response = await apiClient.get<MacroFeedResponse>(url)
-      return response.data
+      return apiGet<MacroFeedResponse>(url)
     },
     refetchInterval: 60000, // Refetch every minute
     staleTime: 30000, // Consider data stale after 30 seconds
@@ -50,10 +49,7 @@ export function useMacroHeadlines(options?: {
 export function useMacroStatus() {
   return useQuery({
     queryKey: ['macro-status'],
-    queryFn: async () => {
-      const response = await apiClient.get('/state/macro/status')
-      return response.data
-    },
+    queryFn: () => apiGet('/state/macro/status'),
     refetchInterval: 300000, // Refetch every 5 minutes
   })
 }

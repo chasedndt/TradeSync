@@ -1,7 +1,10 @@
 import { useState, useMemo } from 'react'
 import { useOpportunities } from '../api/hooks'
 import { OpportunityCard, DryRunBanner } from '../components'
-import { Search, Filter } from 'lucide-react'
+import { Search, Filter, Clock } from 'lucide-react'
+
+// Must match fusion-engine OPPORTUNITY_TTL_SECONDS (compose.full.yml)
+const OPPORTUNITY_TTL_MS = 900_000 // 15 minutes
 
 const statusOptions = ['new', 'previewed', 'executed', 'expired']
 const timeframeOptions = ['all', '1m', '5m', '15m', '1h', '4h', '1d']
@@ -14,13 +17,23 @@ export function Opportunities() {
 
   const { data: opportunities, isLoading, error } = useOpportunities(status, 100)
 
+  const now = Date.now()
+
   const filtered = useMemo(() => {
     if (!opportunities) return []
 
-    let list = opportunities.filter(o =>
-      (timeframe === 'all' || o.timeframe === timeframe) &&
-      (o.symbol.toLowerCase().includes(search.toLowerCase()))
-    )
+    let list = opportunities.filter(o => {
+      // Client-side expiry guard: hide 'new' items older than TTL.
+      // The backend may not have marked them expired yet if fusion-engine is quiet.
+      if (status === 'new') {
+        const ageMs = now - new Date(o.created_at).getTime()
+        if (ageMs > OPPORTUNITY_TTL_MS) return false
+      }
+      return (
+        (timeframe === 'all' || o.timeframe === timeframe) &&
+        (o.symbol.toLowerCase().includes(search.toLowerCase()))
+      )
+    })
 
     if (dedup) {
       // Keep only the newest for each (symbol, timeframe, direction)
@@ -34,7 +47,15 @@ export function Opportunities() {
     }
 
     return list
-  }, [opportunities, timeframe, search, dedup])
+  }, [opportunities, timeframe, search, dedup, status, now])
+
+  // Count items hidden by TTL so we can surface the info
+  const expiredCount = useMemo(() => {
+    if (status !== 'new' || !opportunities) return 0
+    return opportunities.filter(o =>
+      now - new Date(o.created_at).getTime() > OPPORTUNITY_TTL_MS
+    ).length
+  }, [opportunities, status, now])
 
   return (
     <div className="space-y-6">
@@ -99,6 +120,15 @@ export function Opportunities() {
 
       {isLoading && <div className="text-gray-400">Scanning data streams...</div>}
       {error && <div className="text-red-400">Error loading opportunities</div>}
+
+      {/* Expiry notice: backend items older than TTL are filtered client-side */}
+      {expiredCount > 0 && (
+        <div className="flex items-center gap-2 text-xs text-yellow-600 bg-yellow-900/20 border border-yellow-900/40 rounded px-3 py-2">
+          <Clock size={12} />
+          {expiredCount} item{expiredCount !== 1 ? 's' : ''} hidden — older than 15 min TTL.
+          Switch to the <strong className="mx-1">Expired</strong> tab to review them.
+        </div>
+      )}
 
       {!isLoading && filtered.length === 0 && (
         <div className="card text-center py-12 text-gray-500 border-dashed">

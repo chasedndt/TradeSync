@@ -464,7 +464,7 @@ async def get_state_snapshot():
                     pass
                 
                 try:
-                    resp = await client.get("http://ingest-gateway:8001/ingest/sources", timeout=1.0)
+                    resp = await client.get("http://ingest-gateway:8080/ingest/sources", timeout=1.0)
                     if resp.status_code == 200:
                         ingest_sources = resp.json()
                 except Exception:

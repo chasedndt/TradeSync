@@ -282,8 +282,12 @@ export function Overview() {
             <Zap size={20} />
           </div>
           <div>
-            <div className="text-xs text-gray-400">Flow Rate</div>
-            <div className="text-sm font-bold">142 ev/min</div>
+            <div className="text-xs text-gray-400">Events in Stream</div>
+            <div className="text-sm font-bold">
+              {snapshot?.stream_lengths?.['x:events.norm'] != null
+                ? `${snapshot.stream_lengths['x:events.norm'].toLocaleString()}`
+                : <span className="text-gray-500">—</span>}
+            </div>
           </div>
         </div>
         <div className="card flex items-center gap-4">
@@ -312,8 +316,14 @@ export function Overview() {
             <AlertTriangle size={20} />
           </div>
           <div>
-            <div className="text-xs text-gray-400">Data Lag</div>
-            <div className="text-sm font-bold text-green-500">0.2s</div>
+            <div className="text-xs text-gray-400">Last Event</div>
+            <div className={`text-sm font-bold ${
+              eventAgeSec === null ? 'text-gray-500' :
+              eventAgeSec < 30 ? 'text-green-500' :
+              eventAgeSec < 120 ? 'text-yellow-500' : 'text-red-500'
+            }`}>
+              {eventAgeSec === null ? '—' : eventAgeSec < 60 ? `${eventAgeSec}s ago` : `${Math.floor(eventAgeSec / 60)}m ago`}
+            </div>
           </div>
         </div>
       </div>
@@ -343,16 +353,52 @@ export function Overview() {
           </section>
 
           <section>
-            <h3 className="text-sm font-medium text-gray-400 mb-3">Recent System Events</h3>
+            <h3 className="text-sm font-medium text-gray-400 mb-3">System State</h3>
             <div className="card p-0 overflow-hidden">
-              <div className="bg-gray-900/50 p-2 text-xs text-gray-500 border-b border-gray-800">
-                Telemetry Stream
+              <div className="bg-gray-900/50 p-2 text-xs text-gray-500 border-b border-gray-800 flex items-center justify-between">
+                <span>Telemetry Stream</span>
+                {snapshot?.stream_lengths && (
+                  <span className="text-gray-600">
+                    norm:{snapshot.stream_lengths['x:events.norm'] ?? '?'} &nbsp;
+                    sig:{snapshot.stream_lengths['x:signals.funding'] ?? '?'}
+                  </span>
+                )}
               </div>
-              <div className="p-4 space-y-2 font-mono text-xs">
-                <div className="text-blue-400">[03:01:39] Funding convergence detected on ETH-PERP (-0.002% &rarr; -0.001%)</div>
-                <div className="text-gray-500">[03:01:35] Drift circuit breaker: health check passed</div>
-                <div className="text-yellow-500">[03:01:17] NEW OPPORTUNITY: BTC-PERP 1m SHORT (Strength 84%)</div>
-                <div className="text-gray-500">[03:01:05] Synced ingest source: hyperliquid-perp</div>
+              <div className="p-4 space-y-2 text-xs">
+                {snapshot ? (
+                  <>
+                    <div className="flex justify-between text-gray-400">
+                      <span>Execution gate</span>
+                      <span className={snapshot.execution_gate === 'true' ? 'text-green-400' : 'text-yellow-400'}>
+                        {snapshot.execution_gate === 'true' ? 'ARMED' : 'DISARMED'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-gray-400">
+                      <span>Drift circuit</span>
+                      <span className={snapshot.circuit_drift === false ? 'text-green-400' : snapshot.circuit_drift === true ? 'text-red-400' : 'text-gray-500'}>
+                        {snapshot.circuit_drift === false ? 'CLOSED' : snapshot.circuit_drift === true ? 'OPEN (tripped)' : 'UNKNOWN'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-gray-400">
+                      <span>HL circuit</span>
+                      <span className={snapshot.circuit_hl === false ? 'text-green-400' : snapshot.circuit_hl === true ? 'text-red-400' : 'text-gray-500'}>
+                        {snapshot.circuit_hl === false ? 'CLOSED' : snapshot.circuit_hl === true ? 'OPEN (tripped)' : 'UNKNOWN'}
+                      </span>
+                    </div>
+                    {snapshot.latest_signal_ts && (
+                      <div className="flex justify-between text-gray-400">
+                        <span>Last signal</span>
+                        <span className="text-gray-500">
+                          {Math.floor((Date.now() - new Date(snapshot.latest_signal_ts).getTime()) / 1000)}s ago
+                        </span>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-gray-600 text-center py-4 italic">
+                    Awaiting backend connection…
+                  </div>
+                )}
               </div>
             </div>
           </section>
