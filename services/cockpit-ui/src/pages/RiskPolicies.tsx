@@ -92,10 +92,22 @@ export function RiskPolicies() {
           </div>
 
           {/* Info */}
-          <div className="card text-sm text-gray-400">
+          <div className="card text-sm text-gray-400 space-y-2">
             <p>
-              These risk policies are enforced by the RiskGuardian before any execution.
-              Modify environment variables or the risk engine configuration to adjust limits.
+              These policies are enforced by the RiskGuardian on every preview and execute call.
+              They are read-only here — edit the corresponding environment variables and restart the service to change them.
+            </p>
+            <div className="font-mono text-xs bg-gray-900 rounded p-3 space-y-1 text-gray-500">
+              <div>MAX_LEVERAGE=<span className="text-gray-400">{limits.max_leverage}</span></div>
+              <div>MIN_QUALITY_THRESHOLD=<span className="text-gray-400">{limits.min_quality}</span></div>
+              <div>MAX_OPEN_POSITIONS=<span className="text-gray-400">{limits.max_open_positions}</span></div>
+              <div>MIN_SIZE_USD=<span className="text-gray-400">{limits.min_size_usd}</span></div>
+              <div>MAX_EVENT_AGE_SECONDS=<span className="text-gray-400">{limits.max_event_age}</span></div>
+              <div>MAX_SIGNAL_AGE_SECONDS=<span className="text-gray-400">{limits.max_signal_age}</span></div>
+              <div>DAILY_NOTIONAL_LIMIT=<span className="text-gray-400">{limits.daily_notional_limit}</span></div>
+            </div>
+            <p className="text-xs text-gray-600">
+              Editable policy UI (without restart) is planned for a future release.
             </p>
           </div>
         </>

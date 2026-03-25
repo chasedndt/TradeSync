@@ -10,19 +10,19 @@ export function Sources() {
         </span>
       </div>
 
-      {/* Upload Zone */}
-      <div className="card border-dashed border-2 border-gray-700 hover:border-gray-600 transition-colors cursor-pointer">
+      {/* Upload Zone — disabled, Phase 4 not implemented */}
+      <div className="card border-dashed border-2 border-gray-800 opacity-40 pointer-events-none select-none">
         <div className="flex flex-col items-center justify-center py-8 text-center">
-          <Upload size={32} className="text-gray-600 mb-3" />
-          <p className="text-gray-400 mb-1">Drag & drop files here</p>
-          <p className="text-xs text-gray-600">
-            PDFs, research papers, trading journals, markdown notes
+          <Upload size={32} className="text-gray-700 mb-3" />
+          <p className="text-gray-600 mb-1">Drag & drop files here</p>
+          <p className="text-xs text-gray-700">
+            Not available — Phase 4 feature
           </p>
         </div>
       </div>
 
       {/* Source Types Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 opacity-40 pointer-events-none select-none">
         <div className="card bg-gray-900/50">
           <div className="flex items-center gap-3 mb-3">
             <FileText size={20} className="text-blue-500" />

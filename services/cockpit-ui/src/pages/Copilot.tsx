@@ -26,38 +26,14 @@ export function Copilot() {
       {/* Chat Area */}
       <div className="flex-1 card bg-gray-900/30 flex flex-col min-h-[400px]">
         {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {/* System Message */}
-          <div className="flex gap-3">
-            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
-              <MessageSquare size={14} />
-            </div>
-            <div className="bg-gray-800 rounded-lg p-3 max-w-[80%]">
-              <p className="text-sm text-gray-300">
-                I'm your trading copilot. I can help you analyze opportunities,
-                verify entry conditions, explain risk policies, and provide
-                context from your sources library.
-              </p>
-              <p className="text-xs text-gray-500 mt-2">
-                Ask me things like:
-              </p>
-              <ul className="text-xs text-gray-400 mt-1 space-y-1">
-                <li>"Why is this opportunity rated HIGH quality?"</li>
-                <li>"What's the HTF bias for BTC right now?"</li>
-                <li>"Check my risk exposure across venues"</li>
-                <li>"Summarize my trading notes on funding plays"</li>
-              </ul>
-            </div>
-          </div>
-
-          {/* Placeholder State */}
-          <div className="flex-1 flex flex-col items-center justify-center text-center py-8">
-            <AlertCircle size={32} className="text-gray-700 mb-3" />
-            <p className="text-gray-500 text-sm">Copilot backend not connected</p>
-            <p className="text-gray-600 text-xs mt-1">
-              Configure LLM endpoint in settings to enable chat
-            </p>
-          </div>
+        <div className="flex-1 overflow-y-auto p-4 flex flex-col items-center justify-center text-center">
+          <AlertCircle size={36} className="text-gray-700 mb-3" />
+          <p className="text-gray-400 text-sm font-medium">Copilot not available</p>
+          <p className="text-gray-600 text-xs mt-2 max-w-xs">
+            The AI Copilot backend has not been implemented yet. This feature is
+            planned for Phase 4 and requires an LLM endpoint, Qdrant vector store,
+            and the Sources Library to be populated first.
+          </p>
         </div>
 
         {/* Input Area */}

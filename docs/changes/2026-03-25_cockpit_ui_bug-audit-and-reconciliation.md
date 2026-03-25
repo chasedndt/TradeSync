@@ -1,178 +1,252 @@
 # Cockpit UI Bug Audit & Reconciliation
 **Date:** 2026-03-25
-**Scope:** Read-only audit + targeted bug fixes only. No feature development.
+**Sessions:** 2 (7 fixes first pass, 6 fixes second pass)
+**Scope:** Confirmed bug fixes and truthfulness corrections only. No feature development.
 
 ---
 
-## A. EXECUTIVE SUMMARY
+## A. EXECUTIVE SUMMARY — ALL 13 BUGS
 
-The TradeSync cockpit is structurally sound — real API calls throughout, graceful degradation, proper context management. However six confirmed bugs were causing misleading or broken behavior:
-
-1. **Runtime crash** on any Macro Feed request (`apiClient` undefined)
-2. **Static "DRY RUN MODE" header** that never updated regardless of actual backend state
-3. **Wrong service port** in state-api causing `/state/snapshot` to 500 on `ingest/sources` calls
-4. **Hardcoded fake metrics** on Overview ("142 ev/min", "0.2s") and four hardcoded fake telemetry log lines
-5. **"All Venues" showing only first venue** silently — no aggregation, no indication
-6. **Expired opportunities leaking** into the "new" tab when fusion-engine hasn't marked them expired yet
-7. **"Volume Profile" label** — the card shows volume summary + CVD, not a real volume profile
+| # | Bug | File(s) | Severity | Fixed |
+|---|-----|---------|----------|-------|
+| 01 | `apiClient` import undefined — runtime crash on Macro Feed | `useMacroFeed.ts` | CRITICAL | ✅ |
+| 02 | Header shows hardcoded "DRY RUN MODE" regardless of real state | `Header.tsx` | HIGH | ✅ |
+| 03 | state-api calls ingest-gateway on wrong port (8001 vs 8080) | `main.py` | HIGH | ✅ |
+| 04 | Overview shows hardcoded "142 ev/min" and "0.2s" fake metrics | `Overview.tsx` | MEDIUM | ✅ |
+| 05 | Overview "Recent System Events" contained 4 hardcoded fake log lines | `Overview.tsx` | MEDIUM | ✅ |
+| 06 | Market "All Venues" shows only first snapshot, no aggregation/notice | `Market.tsx` | MEDIUM | ✅ |
+| 07 | "Volume Profile" card mislabeled (shows summary, not price-volume profile) | `Market.tsx` | LOW | ✅ |
+| 08 | Settings localStorage key mismatch — API keys silently ignored | `Settings.tsx`, `client.ts` | HIGH | ✅ |
+| 09 | `useBackendSync` conflates demo and dry-run; PAPER mode never shows | `useBackendSync.ts` | MEDIUM | ✅ |
+| 10 | Autonomy page: hardcoded "OBSERVE MODE ACTIVE", duplicates Execution | `Autonomy.tsx` | MEDIUM | ✅ |
+| 11 | Settings "Mode: Live/Demo" binary — hides dry-run (PAPER) state | `Settings.tsx` | MEDIUM | ✅ |
+| 12 | Copilot fake AI system message implies live copilot exists | `Copilot.tsx` | MEDIUM | ✅ |
+| 13 | Sources upload zone has hover/cursor-pointer but does nothing | `Sources.tsx` | LOW | ✅ |
+| + | RiskPolicies info note too vague — no specific env var names | `RiskPolicies.tsx` | LOW | ✅ |
 
 ---
 
-## B. BUG TRIAGE — CONFIRMED FIXES
+## B. BUG DETAILS — FIRST PASS (7 fixes)
 
 ### BUG-01 · `useMacroFeed.ts` — Runtime crash (CRITICAL)
-**File:** `services/cockpit-ui/src/api/hooks/useMacroFeed.ts`
-**Root cause:** Imported `{ apiClient }` from `'../client'` but `client.ts` only exports `apiGet` / `apiPost`. `apiClient` does not exist — calling `.get()` on undefined throws at runtime.
-**Fix:** Replaced `apiClient.get<T>(url)` → `apiGet<T>(url)` and removed the bad import. `apiGet` returns data directly (no `.data` wrapper), so `return response.data` was also dropped.
-**Impact:** MacroFeedCard on Overview was silently broken. Any component using `useMacroHeadlines` or `useMacroStatus` would crash.
+**Root cause:** Imported `{ apiClient }` from `'../client'` but `client.ts` only exports `apiGet`/`apiPost`. `apiClient` is undefined — calling `.get()` throws immediately.
+**Fix:** Replaced `apiClient.get<T>(url)` → `apiGet<T>(url)`. Removed `.data` wrapper since `apiGet` returns data directly.
+**Impact:** MacroFeedCard on Overview was crashing silently. Every component using `useMacroHeadlines` or `useMacroStatus` failed.
 
 ---
 
-### BUG-02 · `Header.tsx` — Static mode badge (HIGH)
-**File:** `services/cockpit-ui/src/components/layout/Header.tsx`
-**Root cause:** Hard-coded `<div>DRY RUN MODE (Mock Execution)</div>` — completely static, never read from `ExecutionContext`. If backend reported live mode the header still showed "DRY RUN".
-**Fix:** Replaced with `<SystemModeBadge />` component that reads `{ isDryRun, isDemo, mode }` from `useExecution()` and renders one of four states:
-- `DEMO MODE — no venue connectivity` (gray)
-- `DRY RUN — orders simulated, no real capital` (yellow)
-- `OBSERVE — read-only, execution disarmed` (blue)
-- `MANUAL — live execution armed` (orange)
-**Impact:** Header now consistently reflects actual backend/context state.
+### BUG-02 · `Header.tsx` — Static mode badge
+**Root cause:** Hard-coded `<div>DRY RUN MODE (Mock Execution)</div>` never reads from ExecutionContext.
+**Fix:** Replaced with dynamic `<SystemModeBadge />` reading `{ isDryRun, isDemo, mode }` from `useExecution()`.
+Four states: DEMO (gray) / DRY RUN (yellow) / OBSERVE (blue) / MANUAL (orange).
 
 ---
 
-### BUG-03 · `state-api/app/main.py` — Wrong ingest-gateway port (HIGH)
-**File:** `services/state-api/app/main.py` line ~467
-**Root cause:** `GET http://ingest-gateway:8001/ingest/sources` — port 8001 is `core-scorer`. `ingest-gateway` binds to **8080** per `ops/compose.full.yml`.
+### BUG-03 · `state-api/app/main.py` — Wrong ingest-gateway port
+**Root cause:** `GET http://ingest-gateway:8001/ingest/sources` — port 8001 is core-scorer. ingest-gateway is on **8080**.
 **Fix:** `8001` → `8080`.
-**Impact:** Every `/state/snapshot` call attempted a connection to the wrong service. The exception was caught silently, but `ingest_sources` was always empty in snapshot responses.
+**Impact:** Every `/state/snapshot` silently returned empty `ingest_sources`.
 
 ---
 
-### BUG-04 · `Overview.tsx` — Hardcoded fake metrics (MEDIUM)
-**File:** `services/cockpit-ui/src/pages/Overview.tsx`
+### BUG-04 & 05 · `Overview.tsx` — Hardcoded fake metrics and events
 **Root cause:**
-- "Flow Rate" card showed hardcoded `142 ev/min` — a placeholder never wired to any real source
-- "Data Lag" card showed hardcoded `0.2s` — a placeholder, never computed from timestamps
-- "Recent System Events" section contained four hardcoded fake log lines (timestamps `[03:01:xx]`, fabricated events)
+- "Flow Rate" hardcoded `142 ev/min`
+- "Data Lag" hardcoded `0.2s`
+- "Recent System Events" had 4 hardcoded fake log lines with fake timestamps
+**Fix:**
+- Flow Rate → "Events in Stream" showing `snapshot.stream_lengths['x:events.norm']`
+- Data Lag → "Last Event" computing age from `snapshot.latest_event_ts` with color threshold
+- Fake events → "System State" panel showing execution gate, circuit breaker states, last signal time from real snapshot
+
+---
+
+### BUG-06 · `Market.tsx` — "All Venues" shows only first snapshot
+**Root cause:** `activeSnapshot = filteredSnapshots[0]` — always just the first venue, no indication.
+**Fix:** Added `isMultiVenue` flag. When true, renders per-venue comparison grid (funding rate, OI, regime) with "View detailed panels →" shortcut. Added informational banner explaining no cross-venue aggregation exists.
+
+---
+
+### BUG-07 · `Market.tsx` — "Volume Profile" mislabeled
+**Root cause:** Card shows 24h volume + CVD, not a price-by-volume profile.
+**Fix:** Renamed to "Volume Summary", subtitle: "24h volume and cumulative delta".
+
+---
+
+## C. BUG DETAILS — SECOND PASS (6 fixes)
+
+### BUG-08 · `Settings.tsx` — localStorage key mismatch (CRITICAL)
+**Root cause:**
+- `Settings.tsx` saved: `localStorage.setItem('tradesync_api_key', ...)` and `localStorage.setItem('tradesync_api_url', ...)`
+- `client.ts` read: `localStorage.getItem('apiKey')` and `localStorage.getItem('apiBaseUrl')`
+- Different key names → any API key or custom URL set in Settings was **completely ignored** by all HTTP requests.
 
 **Fix:**
-- "Flow Rate" card → "Events in Stream" showing `snapshot.stream_lengths['x:events.norm']` (real Redis stream depth) or `—` if unavailable
-- "Data Lag" card → "Last Event" showing computed age from `snapshot.latest_event_ts` with green/yellow/red color coding
-- Fake telemetry events → replaced with a real "System State" panel showing execution gate, circuit breaker states, and last signal timestamp from actual snapshot data
+- `Settings.tsx` now imports and calls `setApiKey()`, `clearApiKey()`, `setApiBaseUrl()`, `getApiBaseUrl()` from `client.ts` directly.
+- The localStorage keys are now consistent across the whole app.
+- Load path fixed: now reads from `apiKey` (not `tradesync_api_key`) on mount.
 
 ---
 
-### BUG-05 · `Market.tsx` — "All Venues" shows only first snapshot (MEDIUM)
-**File:** `services/cockpit-ui/src/pages/Market.tsx`
-**Root cause:** When "All Venues" is selected, `filteredSnapshots` contains all venues but `activeSnapshot = filteredSnapshots[0]` — only the first is shown with no indication. No aggregation exists anywhere.
+### BUG-09 · `useBackendSync.ts` — isDemo conflates two states
+**Root cause:** `isDemo = hasUnknownVenues || isDryRun`
+- Since `isDryRun` implies `isDemo`, the PAPER mode branch in Positions.tsx never triggered
+- `hasUnknownVenues` used `some()` — a single unreachable venue flipped the entire UI to DEMO even when the other venue was fully operational
+
 **Fix:**
-- Added `isMultiVenue` flag (true when `selectedVenue === 'all'` and multiple snapshots exist)
-- When `isMultiVenue`: renders a per-venue comparison grid showing funding rate, OI, and trend regime per venue, with a "View detailed panels →" shortcut to drill into a specific venue
-- Added blue info banner explaining: "Values are per-venue — no cross-venue aggregation. Select a specific venue for detailed panels."
-- Single-venue detailed panel grid only renders when `!isMultiVenue`
+```typescript
+// Before (broken):
+const hasUnknownVenues = status.venues?.some(v => v.circuit_open === 'unknown')
+const isDemo = hasUnknownVenues || isDryRun
+
+// After (correct):
+const allVenuesUnknown = !status.venues?.length || status.venues.every(v => v.circuit_open === 'unknown')
+const isDemo = allVenuesUnknown  // only when ZERO venue connectivity
+```
+Now: DRY_RUN=true + venues connected → shows **PAPER DATA** (not DEMO). All venues unreachable → shows **DEMO DATA**.
 
 ---
 
-### BUG-06 · `Opportunities.tsx` — Expired items leak into 'new' tab (MEDIUM)
-**File:** `services/cockpit-ui/src/pages/Opportunities.tsx`
-**Root cause:** Backend `state-api` fetches `WHERE status = 'new'` — no TTL check. The fusion-engine sets `OPPORTUNITY_TTL_SECONDS=900` but only marks items expired when it actively processes them. If fusion-engine is quiet, stale 'new' items accumulate.
-**Fix:**
-- Added client-side TTL filter: when tab is `status === 'new'`, items older than 900 seconds are hidden from the list
-- Added `expiredCount` memo that tracks how many items were hidden
-- Renders a dismissible notice: "N items hidden — older than 15 min TTL. Switch to the Expired tab to review them."
-- `Clock` icon imported from lucide-react for the notice
+### BUG-10 · `Autonomy.tsx` — Hardcoded badge + duplicates Execution
+**Root cause:**
+- `OBSERVE MODE ACTIVE` badge was hardcoded — never updated when mode changed on Execution page
+- Page duplicated the mode state machine and capability cards already on Execution
+- No governance-specific content existed
+
+**Fix:** Complete rewrite of Autonomy page:
+- Mode badge reads from `useExecution()` context — always matches real state
+- Removed duplicate mode switching (lives on Execution page only)
+- Added live readiness checklists for Manual and Autonomous mode (infrastructure checks from backend status)
+- Added capability table showing what each mode permits
+- Added Demo/DryRun context banner
+- Added clear link: "To change mode, go to Execution Control"
 
 ---
 
-### BUG-07 · `Market.tsx` — "Volume Profile" mislabeled (LOW)
-**File:** `services/cockpit-ui/src/pages/Market.tsx`
-**Root cause:** Card title says "Volume Profile" but the `VolumePanel` component shows 24h volume and Cumulative Volume Delta (CVD) — which is a volume *summary*, not a price-by-volume profile.
-**Fix:** Renamed card title to "Volume Summary" and subtitle to "24h volume and cumulative delta".
+### BUG-11 · `Settings.tsx` — Binary "Mode: Live/Demo" hides PAPER state
+**Root cause:** `isDemo ? 'Demo' : 'Live'` — with old BUG-09 logic, always showed Demo when DRY_RUN=true, hiding the operational dry-run distinction.
+**Fix (tied to BUG-09 fix):** Environment panel now shows three states:
+- **DEMO**: No venue connectivity. All data disconnected.
+- **PAPER (DRY RUN)**: Orders simulated. DRY_RUN=true on backend.
+- **LIVE**: Live execution enabled.
+Added note clarifying that Backend Execution Gate and System Mode are independent.
 
 ---
 
-## C. PAGE-BY-PAGE RESPONSIBILITY DEFINITIONS (POST-FIX)
+### MISLEADING-01 · `Copilot.tsx` — Fake AI system message
+**Root cause:** Chat bubble said "I'm your trading copilot. I can help you analyze opportunities..." — implied a live AI response capability that does not exist.
+**Fix:** Removed the fake system message. Replaced with honest empty state: "Copilot not available — Phase 4 feature, requires LLM endpoint + Qdrant + Sources Library."
 
-| Page | Responsibility | Data Source | Status |
+---
+
+### MISLEADING-02 · `Sources.tsx` — Interactive upload zone
+**Root cause:** Upload zone had `hover:border-gray-600`, `transition-colors`, `cursor-pointer` — looked interactive but had no handler.
+**Fix:** Added `opacity-40 pointer-events-none select-none` to upload zone and entire Source Types grid. Upload card text updated to "Not available — Phase 4 feature".
+
+---
+
+### IMPROVEMENT · `RiskPolicies.tsx` — Vague env var note
+**Root cause:** Info note said "Modify environment variables" without naming them.
+**Fix:** Added a live code block showing the exact env var names and current values read from the backend:
+```
+MAX_LEVERAGE=10
+MIN_QUALITY_THRESHOLD=0.6
+MAX_OPEN_POSITIONS=5
+...
+```
+
+---
+
+## D. PAGE-BY-PAGE RESPONSIBILITY MODEL (POST-FIX)
+
+| Page | Responsibility | Truth Level | Status |
 |------|---------------|-------------|--------|
-| **Overview** | System health, active LTF opps, HTF thesis, macro context | `/state/snapshot`, `/state/opportunities`, `/state/market/snapshots`, `/state/macro/headlines` | ✅ Live data, fake metrics removed |
-| **Market Intel** | Per-venue market microstructure, regimes, liquidity | `/state/market/snapshots`, `/state/market/status` | ✅ Fixed multi-venue display |
-| **Opportunities** | Browse/filter signals by status/symbol/timeframe | `/state/opportunities?status=X` | ✅ TTL expiry filter added |
-| **Opportunity Detail** | Evidence trail, execution risk context, preview/execute | `/state/evidence`, `/state/market/snapshot`, `POST /actions/preview`, `POST /actions/execute` | ✅ No changes needed |
-| **Execution** | Mode control, kill switches, circuit breakers | `/state/execution/status` | ✅ No changes needed |
-| **Positions** | Exposure snapshot, margin/PnL context | `/state/positions`, `/state/risk/limits` | ✅ No changes needed — DEMO/PAPER/LIVE badge already correct |
-| **Risk Policies** | Current policy display, daily notional usage | `/state/risk/limits` | ⚠️ Deferred: needs editable policy surface (Phase 4) |
-| **Autonomy** | Governance mode state machine | ExecutionContext | ✅ Correctly phase-gated. No changes needed. |
-| **Decisions & Orders** | Audit trail for decisions and exec_orders | (future: `/state/decisions`) | 🔜 Currently empty because execution pipeline not active |
-| **Settings** | Technical config (API URL, API key) | localStorage | ⚠️ Deferred: too thin, needs env display |
-| **Sources / Copilot** | Future RAG/ingestion features | Not implemented | 🔒 Correctly phase-gated |
-
----
-
-## D. WHAT WAS DEFERRED (INTENTIONALLY OUT OF SCOPE)
-
-| Item | Reason deferred |
-|------|----------------|
-| Risk Policies editing (form-based) | Requires backend policy write endpoint. Phase 4 feature. |
-| Decisions & Orders page content | Awaiting active execution pipeline. Empty = correct. |
-| Settings page depth | Needs design decision on what belongs here vs Risk Policies. |
-| Wallet/signing authority | Phase 3E/4 — autonomous mode intentionally locked. |
-| Source Library / Copilot | Phase 4/5 — correctly labeled as future. |
-| Backend-side TTL expiry job | Server-side fix in fusion-engine or state-api to actively mark opportunities expired. Client-side filter is a stopgap. |
-| Cross-venue OI aggregation | True aggregation requires unit normalization. Multi-venue comparison grid is the honest interim solution. |
-| `/state/events/latest` live feed on Overview | Requires a symbol param — not usable as a generic feed without backend change. Real system state shown instead. |
+| **Overview** | System health + active LTF opps + HTF thesis + macro context | ✅ All real data | Fixed |
+| **Market Intel** | Per-venue microstructure, regimes, liquidity | ✅ Real data with metric status badges | Fixed |
+| **Opportunities** | Browse signals by status/symbol/tf with TTL filter | ✅ Real data, client TTL guard | Fixed |
+| **Opportunity Detail** | Evidence trail, execution risk, preview/execute | ✅ Real data | No change needed |
+| **Execution Control** | Mode control, kill switches, circuit breakers | ✅ Real backend status | No change needed |
+| **Positions** | Exposure, margin/PnL with DEMO/PAPER/LIVE badge | ✅ Now correctly 3-state | Fixed via BUG-09 |
+| **Risk Policies** | Read-only policy display + env var reference | ✅ With env var names | Improved |
+| **Autonomy** | Governance readiness — prerequisites per mode | ✅ Live context + backend checks | Rewritten |
+| **Decisions & Orders** | Audit trail (empty until pipeline active) | ✅ Honest empty state | No change needed |
+| **Settings** | API config + venue status + runtime environment | ✅ Key bug fixed, 3-state mode | Fixed |
+| **Sources** | Phase 4 RAG library | ✅ Disabled, phase-gated | Fixed |
+| **Copilot** | Phase 4 AI assistant | ✅ Honest not-available state | Fixed |
 
 ---
 
 ## E. BACKEND / API DEPENDENCIES
 
-| Endpoint | Used by | Status |
-|----------|---------|--------|
-| `GET /state/snapshot` | Overview, header sync | ✅ Fixed (port bug resolved) |
-| `GET /state/market/snapshots` | Market, Overview | ✅ Working |
-| `GET /state/macro/headlines` | Overview MacroFeedCard | ✅ Fixed (apiClient crash resolved) |
-| `GET /state/opportunities` | Opportunities, Overview | ✅ Working (TTL guard added client-side) |
-| `GET /state/execution/status` | Execution, Header | ✅ Working |
-| `POST /actions/preview` | OpportunityDetail | ✅ Working |
-| `POST /actions/execute` | OpportunityDetail | ✅ Working (dry-run safe) |
-| `GET /state/positions` | Positions | ⚠️ Returns empty until venue position fetch is wired |
-| `GET /state/risk/limits` | RiskPolicies, Positions | ✅ Working |
+| Endpoint | Used by | Fix Applied |
+|----------|---------|-------------|
+| `GET /state/snapshot` | Overview, Header | ✅ Port bug resolved (8001→8080) |
+| `GET /state/market/snapshots` | Market, Overview | ✅ Multi-venue display |
+| `GET /state/macro/headlines` | Overview MacroFeedCard | ✅ apiClient crash fixed |
+| `GET /state/opportunities` | Opportunities, Overview | ✅ TTL client guard |
+| `GET /state/execution/status` | Execution, Header, Autonomy, Settings | ✅ Used for live readiness checks |
+| `POST /actions/preview` | OpportunityDetail | No change needed |
+| `POST /actions/execute` | OpportunityDetail | No change needed |
+| `GET /state/positions` | Positions | ⚠️ Empty until venue connectivity is real |
+| `GET /state/risk/limits` | RiskPolicies, Positions | ✅ Env vars now shown |
 
 ---
 
-## F. VERIFICATION STEPS
+## F. WHAT WAS INTENTIONALLY DEFERRED
 
-1. **Macro Feed** — Open Overview. MacroFeedCard should load (or show "Feed error" if RSS fetch fails). It should no longer throw a JS runtime error. Check browser console — no `TypeError: Cannot read properties of undefined (reading 'get')`.
-
-2. **Header badge** — Start the stack. While both exec services are down, header should show `DEMO MODE`. With stack up and `DRY_RUN=true`, header should show `DRY RUN`. Toggle kill switches and confirm mode label tracks context.
-
-3. **Snapshot port fix** — `docker compose logs state-api` should no longer show `Connection refused: exec-hl-svc` cascading from `ingest-gateway:8001` errors. Snapshot response should now include `ingest_sources`.
-
-4. **Overview metrics** — "Events in Stream" should show a number (Redis stream depth) or `—`. "Last Event" should show a live age like `3s ago` or `2m ago`. No static values visible.
-
-5. **Overview system state** — The telemetry panel now shows execution gate, circuit breaker state, and last signal time from real snapshot data.
-
-6. **Market — All Venues** — Select "All Venues" + "BTC-PERP". Should see the multi-venue comparison grid with funding, OI, and regime per venue. Click "View detailed panels →" should switch selector to that venue.
-
-7. **Opportunities TTL** — If any 'new' items exist older than 15 min, they should be hidden and a yellow notice should appear counting them. Switching to "Expired" tab should still show them (fetched from backend with `?status=expired`).
-
-8. **Market labels** — "Volume Profile" card is now titled "Volume Summary".
+| Item | Reason |
+|------|--------|
+| Risk Policies editing (form / API) | Requires `PATCH /state/risk/limits` backend endpoint — Phase 4 |
+| Decisions & Orders live data | Requires active execution pipeline — empty state is honest |
+| Server-side TTL expiry job | Backend change in fusion-engine/state-api — client guard is stopgap |
+| Wallet/signing authority | Phase 3E — autonomous mode correctly locked |
+| Source Library + Copilot | Phase 4/5 — both correctly phase-gated and disabled |
+| True cross-venue OI aggregation | Requires unit normalization — per-venue comparison is honest interim |
+| `/state/events/latest` live feed | Requires symbol param — not usable as a generic feed without backend change |
 
 ---
 
-## G. RECOMMENDED NEXT DEVELOPMENT ORDER
+## G. VERIFICATION STEPS
 
-### 1. Must-fix (not done here — backend changes required)
-- [ ] State-api: add server-side TTL expiry job (mark `new` opportunities as `expired` after 900s)
-- [ ] State-api: ensure snapshot doesn't 500 when optional services are down — return partial data with clear status flags
+1. **Macro Feed (BUG-01):** Open Overview. No JS runtime error. MacroFeedCard loads or shows "Feed error" (not crash).
 
-### 2. Next implementation wave
-- [ ] Risk Policies: make limits editable via form (needs `PATCH /state/risk/limits` endpoint)
-- [ ] Settings page: show current env/config values read-only, API key management
-- [ ] Decisions & Orders: wire up to real `exec_orders` table query
+2. **Header badge (BUG-02):** With stack up + DRY_RUN=true → shows "DRY RUN — orders simulated". With both exec services down → shows "DEMO MODE". Switch mode on Execution page → Header updates within 10s polling cycle.
 
-### 3. Later (Phase 4+)
-- [ ] Wallet/signing authority → unlocks Manual and Autonomous execution modes
-- [ ] True cross-venue OI aggregation with unit normalization
-- [ ] Source Library + Copilot RAG pipeline
-- [ ] `/state/events/latest` live feed (make symbol optional for system-wide feed)
+3. **Snapshot port (BUG-03):** `docker compose logs state-api | grep ingest` should show successful call to port 8080, not "Connection refused" to 8001.
+
+4. **Overview metrics (BUG-04/05):** "Events in Stream" shows number or `—`. "Last Event" shows `Xs ago`. System State panel shows live circuit breaker states. No `[03:01:xx]` hardcoded lines.
+
+5. **Market All Venues (BUG-06):** Select "All Venues" + "BTC-PERP" → multi-venue comparison grid appears with per-venue funding/OI/regime. Click "View detailed panels →" → selector changes to that venue.
+
+6. **Settings API key (BUG-08):** Set an API key in Settings, save. Then in browser console: `localStorage.getItem('apiKey')` should return the key (not null). Previously only `tradesync_api_key` was set, not `apiKey`.
+
+7. **PAPER mode (BUG-09):** With DRY_RUN=true + exec services running → Positions should show "PAPER DATA" badge (yellow), not "DEMO DATA" (gray).
+
+8. **Autonomy mode badge (BUG-10):** Go to Execution, switch to Manual mode. Go to Autonomy — badge should show "MANUAL MODE". Readiness checklist items should reflect live backend state.
+
+9. **Settings Mode display (BUG-11):** With DRY_RUN=true + venues connected → "System Mode: PAPER (DRY RUN)" in Settings environment panel.
+
+10. **Copilot (MISLEADING-01):** No chat bubble saying "I'm your trading copilot". Only shows "Copilot not available" empty state + Phase 4 explanation.
+
+11. **Sources (MISLEADING-02):** Upload zone is visually dimmed, no cursor-pointer, no hover effect. Clicking does nothing.
+
+---
+
+## H. RECOMMENDED NEXT BUILD ORDER
+
+### Must-fix (backend changes required — client cannot solve alone)
+1. Server-side TTL expiry: mark `new` opportunities as `expired` after OPPORTUNITY_TTL_SECONDS (state-api or fusion-engine)
+2. `/state/snapshot` should not 500 when optional services are down — return partial response with per-service status flags
+3. Ensure `ingest-gateway` responds to `/ingest/sources` or state-api removes the optional call gracefully
+
+### Next implementation wave
+4. Risk Policies: `PATCH /state/risk/limits` backend endpoint + form-based editing in RiskPolicies.tsx
+5. Settings: expose read-only env config panel showing all current service config
+6. Decisions & Orders: wire up real `decisions` table query via state-api endpoint
+
+### Later (Phase 4+)
+7. Wallet/signing authority → unlocks Manual and Autonomous execution
+8. Source Library + Qdrant RAG pipeline
+9. Copilot LLM backend
+10. True cross-venue OI/funding aggregation with unit normalization
+11. `/state/events/latest` as a symbol-optional system-wide feed
