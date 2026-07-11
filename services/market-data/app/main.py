@@ -18,7 +18,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
 from .redis_client import redis_client
-from .providers import HyperliquidProvider, DriftProvider
+from .providers import HyperliquidProvider
 from .processors import MarketNormalizer, MarketSnapshotter
 from .rate_limiter import rate_limiters
 
@@ -32,7 +32,6 @@ logger = logging.getLogger(__name__)
 # Configuration
 SYMBOLS = os.getenv("MARKET_SYMBOLS", "BTC-PERP,ETH-PERP,SOL-PERP").split(",")
 ENABLE_HYPERLIQUID = os.getenv("ENABLE_HYPERLIQUID", "true").lower() == "true"
-ENABLE_DRIFT = os.getenv("ENABLE_DRIFT", "true").lower() == "true"
 
 # Polling intervals (ms)
 POLL_INTERVAL_CONTEXT = int(os.getenv("POLL_INTERVAL_CONTEXT", "5000"))
@@ -218,9 +217,6 @@ async def lifespan(app: FastAPI):
         providers.append(HyperliquidProvider())
         logger.info("Hyperliquid provider enabled")
 
-    if ENABLE_DRIFT:
-        providers.append(DriftProvider())
-        logger.info("Drift provider enabled")
 
     if not providers:
         logger.warning("No providers enabled!")

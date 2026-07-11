@@ -4,7 +4,7 @@ import { DirectionBadge, DryRunBanner } from '../components'
 import { useExecution } from '../context/ExecutionContext'
 import { AlertTriangle, TrendingUp, Shield, DollarSign, Percent, Activity } from 'lucide-react'
 
-const venueOptions = ['all', 'drift', 'hyperliquid']
+const venueOptions = ['all', 'hyperliquid']
 
 export function Positions() {
   const [venue, setVenue] = useState('all')

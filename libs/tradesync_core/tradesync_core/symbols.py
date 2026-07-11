@@ -35,14 +35,12 @@ def normalize_symbol(symbol: str) -> str:
 
 
 def normalize_venue(venue: str) -> str:
-    """
-    Normalizes venue names.
-    Accepts: hl, hyperliquid, drift
-    Returns: hyperliquid, drift
-    """
+    """Normalize and enforce the sole supported venue."""
     if not venue:
         return venue
     v = venue.lower().strip()
     if v == "hl":
         return "hyperliquid"
+    if v != "hyperliquid":
+        raise ValueError(f"Unsupported venue: {venue}")
     return v

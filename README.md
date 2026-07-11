@@ -10,7 +10,7 @@
 
 It collects key market signals (funding, open interest, CVD, price structure, etc.), scores them using custom rule-weighting models, and outputs high-quality **long/short bias alerts** to platforms like Discord or Telegram. These alerts include **confidence scores**, **natural-language rationale**, and optional signal modifiers like SL/TP targets or PnL zones.
 
-> In future versions, TradeSync will also auto-execute trades across **Drift (Solana)** and **Hyperliquid (Custom L2)** using smart wallet logic, execution guards, and LLM-based override systems.
+> In future versions, TradeSync will also auto-execute trades across **retired protocol (Solana)** and **Hyperliquid (Custom L2)** using smart wallet logic, execution guards, and LLM-based override systems.
 
 ---
 
@@ -22,7 +22,7 @@ TradeSync is built on four key pillars:
    We don't guess. We evaluate. The system ingests real-time funding, delta, trend structure, and technical indicators — then computes a **bias score** based on configurable rules.
 
 2. **Modular Execution Layer**
-   Our system will support multiple backends (Drift, Hyperliquid, Base) using a **swappable execution interface** to stay flexible across chains and future infrastructure.
+   Our system will support multiple backends (retired protocol, Hyperliquid, Base) using a **swappable execution interface** to stay flexible across chains and future infrastructure.
 
 3. **AI Interpretation & Natural Language Alerts**
    All outputs are human-readable, LLM-ready, and structured for social and Discord delivery. No vague signals — only full rationale.
@@ -53,7 +53,7 @@ TradeSync is built on four key pillars:
   - 🔺 Long / 🔻 Short
   - 📊 Confidence score
   - 💡 Signal reason summary
-  - ⛓️ Chain reference (e.g., Drift vs Hyperliquid)
+  - ⛓️ Chain reference (e.g., retired protocol vs Hyperliquid)
   - 📉 Funding / CVD / OI summary
 - Optionally includes SL/TP suggestions or Notion journal embeds
 
@@ -61,8 +61,8 @@ TradeSync is built on four key pillars:
 
 ## 🚀 Future Roadmap
 
-### ✅ Drift Protocol Integration (Solana)
-- TradeSync will use `driftpy` SDK for order execution
+### ✅ retired protocol Protocol Integration (Solana)
+- TradeSync will use `retired protocolpy` SDK for order execution
 - Phantom wallet auth
 - Stop loss, TP, order type selection
 - Real trade journaling + auto-PnL detection
@@ -77,7 +77,7 @@ All future execution layers will follow this folder logic:
 
 ```
 executor/
-├── drift_exec.py # Drift trade logic
+├── retired protocol_exec.py # retired protocol trade logic
 ├── hyper_exec.py # Hyperliquid trade logic
 ├── exec_interface.py # Common interface wrapper
 ```
@@ -105,7 +105,7 @@ tradesync/
 │   ├── core-scorer/           # Technical bias & confidence (8001)
 │   ├── fusion-engine/         # Confluence scoring & opps (8002)
 │   ├── state-api/             # System state & action routing (8000)
-│   ├── exec-drift-svc/        # Drift protocol execution (8003)
+│   ├── exec-retired protocol-svc/        # retired protocol protocol execution (8003)
 │   └── exec-hl-svc/           # Hyperliquid execution (8004)
 │
 ├── core/                      # Shared core logic
@@ -114,7 +114,7 @@ tradesync/
 │   └── scoring.py             # Scoring algorithms
 │
 ├── executor/                  # Legacy trade execution logic (Deprecated)
-│   ├── drift_exec.py          # Drift protocol executor
+│   ├── retired protocol_exec.py          # retired protocol protocol executor
 │   ├── hyper_exec.py          # Hyperliquid executor
 │   └── exec_interface.py     # Unified method signature
 │
@@ -217,7 +217,7 @@ TradeSync uses a standardized API contract for all clients.
 | AI Layer (Future) | LangChain, OpenAI | LLM-based reasoning and explanation generation |
 | Voice Parser | openai-whisper | (Optional) Parse voice logs into journal insight |
 | Alerts | discord-webhook, requests | Sends formatted alerts to Discord/Telegram |
-| Execution Layer | driftpy, hyperliquid-sdk | On-chain trade placement logic |
+| Execution Layer | retired protocolpy, hyperliquid-sdk | On-chain trade placement logic |
 | Frontend (Future) | Streamlit, Next.js | Build dashboard UI for metrics and control panel |
 | Env Config | python-dotenv | API key storage and environment control |
 

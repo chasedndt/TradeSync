@@ -26,7 +26,6 @@ const defaultState: ExecutionState = {
   mode: 'observe',
   globalKillSwitch: false,
   venueKillSwitches: {
-    drift: false,
     hyperliquid: false
   },
   isDryRun: true,

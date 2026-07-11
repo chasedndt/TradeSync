@@ -63,7 +63,7 @@ def canonical_to_hl(canonical: str) -> str:
     return canonical.replace("-PERP", "")
 ```
 
-### 3.2 Drift
+### 3.2 retired protocol
 
 | API Symbol | Canonical | Notes |
 |------------|-----------|-------|
@@ -73,11 +73,11 @@ def canonical_to_hl(canonical: str) -> str:
 
 **Transformation**:
 ```python
-def drift_to_canonical(drift_symbol: str) -> str:
-    """Drift uses canonical format already."""
-    return drift_symbol.upper()
+def retired protocol_to_canonical(retired protocol_symbol: str) -> str:
+    """retired protocol uses canonical format already."""
+    return retired protocol_symbol.upper()
 
-def canonical_to_drift(canonical: str) -> str:
+def canonical_to_retired protocol(canonical: str) -> str:
     """No transformation needed."""
     return canonical
 ```
@@ -111,7 +111,7 @@ def binance_to_canonical(binance_symbol: str) -> str:
 
 from typing import Literal
 
-Venue = Literal["hyperliquid", "drift", "binance"]
+Venue = Literal["hyperliquid", "retired protocol", "binance"]
 
 VENUE_MAPPINGS = {
     "hyperliquid": {
@@ -120,8 +120,8 @@ VENUE_MAPPINGS = {
         "ETH": "ETH-PERP",
         "SOL": "SOL-PERP",
     },
-    "drift": {
-        # Drift already canonical
+    "retired protocol": {
+        # retired protocol already canonical
         "BTC-PERP": "BTC-PERP",
         "ETH-PERP": "ETH-PERP",
         "SOL-PERP": "SOL-PERP",
@@ -130,7 +130,7 @@ VENUE_MAPPINGS = {
 
 REVERSE_MAPPINGS = {
     "hyperliquid": {v: k for k, v in VENUE_MAPPINGS["hyperliquid"].items()},
-    "drift": {v: k for k, v in VENUE_MAPPINGS["drift"].items()},
+    "retired protocol": {v: k for k, v in VENUE_MAPPINGS["retired protocol"].items()},
 }
 
 
@@ -203,8 +203,8 @@ def normalize_venue(venue: str) -> str:
     """
     Normalize venue names.
 
-    Accepts: hl, hyperliquid, drift, HL, DRIFT
-    Returns: hyperliquid, drift
+    Accepts: hl, hyperliquid, retired protocol, HL, retired protocol
+    Returns: hyperliquid, retired protocol
     """
     if not venue:
         return venue
@@ -215,7 +215,7 @@ def normalize_venue(venue: str) -> str:
         "hl": "hyperliquid",
         "hyper": "hyperliquid",
         "hyperliquid": "hyperliquid",
-        "drift": "drift",
+        "retired protocol": "retired protocol",
     }
 
     return aliases.get(v, v)
@@ -293,12 +293,12 @@ function displaySymbol(canonical: string, format: "short" | "full" = "short"): s
 | Internal | Display |
 |----------|---------|
 | `hyperliquid` | `Hyperliquid` |
-| `drift` | `Drift` |
+| `retired protocol` | `retired protocol` |
 
 ```typescript
 const VENUE_DISPLAY: Record<string, string> = {
   hyperliquid: "Hyperliquid",
-  drift: "Drift",
+  retired protocol: "retired protocol",
 };
 ```
 

@@ -10,25 +10,25 @@
 | Venue | API Base URL | Auth Required | Rate Limits |
 |-------|-------------|---------------|-------------|
 | Hyperliquid | `https://api.hyperliquid.xyz/info` | No (public) | ~120 req/min (observed) |
-| Drift | `https://data.api.drift.trade` | No (public) | ~60 req/min (observed) |
+| retired protocol | `https://data.api.retired protocol.trade` | No (public) | ~60 req/min (observed) |
 
 ---
 
 ## Metric Availability Matrix
 
-| Metric | Hyperliquid | Drift | Notes |
+| Metric | Hyperliquid | retired protocol | Notes |
 |--------|-------------|-------|-------|
 | **Funding Rate (current)** | REAL | REAL | Both provide current rate |
-| **Funding Rate (historical)** | REAL | REAL | HL: `fundingHistory`, Drift: `/fundingRates` |
+| **Funding Rate (historical)** | REAL | REAL | HL: `fundingHistory`, retired protocol: `/fundingRates` |
 | **Funding Rate (predicted)** | REAL | NO | HL: `predictedFundings` endpoint |
 | **Open Interest** | REAL | REAL | Both in main context endpoints |
-| **Orderbook (L2)** | REAL | REAL | HL: 20 levels/side, Drift: via DLOB |
+| **Orderbook (L2)** | REAL | REAL | HL: 20 levels/side, retired protocol: via DLOB |
 | **Orderbook (spread)** | REAL | REAL | Derived from L2 |
 | **Volume (24h)** | REAL | REAL | `dayNtlVlm` / daily volume |
-| **Volume (historical)** | REAL | PROXY | HL via candles, Drift limited |
+| **Volume (historical)** | REAL | PROXY | HL via candles, retired protocol limited |
 | **CVD (Cumulative Vol Delta)** | PROXY | PROXY | Must compute from trade flow |
 | **Liquidations (real-time)** | NO | NO | No public feed |
-| **Liquidations (historical)** | NO | PROXY | Drift has some historical data |
+| **Liquidations (historical)** | NO | PROXY | retired protocol has some historical data |
 | **Mark Price** | REAL | REAL | Both provide |
 | **Oracle Price** | REAL | REAL | Both provide |
 
@@ -94,7 +94,7 @@
 
 ---
 
-## 2. Drift Protocol
+## 2. retired protocol Protocol
 
 ### 2.1 Endpoints
 
@@ -103,7 +103,7 @@
 | Contracts | GET | `/contracts` | 10s | Main snapshot with all perps |
 | Funding Rates | GET | `/fundingRates` | On-demand | Historical funding |
 | L2 Book | GET | `/l2?marketIndex=0` | 2s | Via DLOB server |
-| DLOB WS | WS | `wss://dlob.drift.trade` | Real-time | Streaming orderbook |
+| DLOB WS | WS | `wss://dlob.retired protocol.trade` | Real-time | Streaming orderbook |
 
 ### 2.2 Rate Limits
 
@@ -278,8 +278,8 @@ See `docs/samples/market/` for raw API response samples:
 - `hyperliquid_metaAndAssetCtxs.json`
 - `hyperliquid_fundingHistory.json`
 - `hyperliquid_l2Book.json`
-- `drift_contracts.json`
-- `drift_fundingRates.json`
+- `retired protocol_contracts.json`
+- `retired protocol_fundingRates.json`
 
 ---
 

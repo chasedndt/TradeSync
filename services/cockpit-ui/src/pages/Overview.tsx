@@ -306,8 +306,7 @@ export function Overview() {
           <div>
             <div className="text-xs text-gray-400">Venues</div>
             <div className="text-sm font-bold flex gap-2">
-              <span className={snapshot?.drift_status === 'ok' ? 'text-green-500' : 'text-red-500'}>Drift</span>
-              <span className={snapshot?.hl_status === 'ok' ? 'text-green-500' : 'text-red-500'}>HL</span>
+              <span className={snapshot?.hl_status === 'ok' ? 'text-green-500' : 'text-red-500'}>Hyperliquid</span>
             </div>
           </div>
         </div>
@@ -374,15 +373,9 @@ export function Overview() {
                       </span>
                     </div>
                     <div className="flex justify-between text-gray-400">
-                      <span>Drift circuit</span>
-                      <span className={snapshot.circuit_drift === false ? 'text-green-400' : snapshot.circuit_drift === true ? 'text-red-400' : 'text-gray-500'}>
-                        {snapshot.circuit_drift === false ? 'CLOSED' : snapshot.circuit_drift === true ? 'OPEN (tripped)' : 'UNKNOWN'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-gray-400">
                       <span>HL circuit</span>
-                      <span className={snapshot.circuit_hl === false ? 'text-green-400' : snapshot.circuit_hl === true ? 'text-red-400' : 'text-gray-500'}>
-                        {snapshot.circuit_hl === false ? 'CLOSED' : snapshot.circuit_hl === true ? 'OPEN (tripped)' : 'UNKNOWN'}
+                      <span className={snapshot.hl_circuit?.circuit_open === false ? 'text-green-400' : snapshot.hl_circuit?.circuit_open === true ? 'text-red-400' : 'text-gray-500'}>
+                        {snapshot.hl_circuit?.circuit_open === false ? 'CLOSED' : snapshot.hl_circuit?.circuit_open === true ? 'OPEN (tripped)' : 'UNKNOWN'}
                       </span>
                     </div>
                     {snapshot.latest_signal_ts && (
@@ -492,30 +485,17 @@ export function Overview() {
                   </div>
                 ))
               ) : (
-                <>
-                  <div>
-                    <div className="flex justify-between text-[10px] text-gray-500 mb-1">
-                      <span>DRIFT</span>
-                      <span className={snapshot?.drift_status === 'ok' ? 'text-green-500' : 'text-yellow-500'}>
-                        {snapshot?.drift_status === 'ok' ? 'CONNECTED' : 'WAITING'}
-                      </span>
-                    </div>
-                    <div className="h-1 bg-gray-800 rounded-full overflow-hidden">
-                      <div className={`h-full ${snapshot?.drift_status === 'ok' ? 'bg-green-500' : 'bg-yellow-500'} w-full`}></div>
-                    </div>
+                <div>
+                  <div className="flex justify-between text-[10px] text-gray-500 mb-1">
+                    <span>HYPERLIQUID</span>
+                    <span className={snapshot?.hl_status === 'ok' ? 'text-green-500' : 'text-yellow-500'}>
+                      {snapshot?.hl_status === 'ok' ? 'CONNECTED' : 'WAITING'}
+                    </span>
                   </div>
-                  <div>
-                    <div className="flex justify-between text-[10px] text-gray-500 mb-1">
-                      <span>HYPERLIQUID</span>
-                      <span className={snapshot?.hl_status === 'ok' ? 'text-green-500' : 'text-yellow-500'}>
-                        {snapshot?.hl_status === 'ok' ? 'CONNECTED' : 'WAITING'}
-                      </span>
-                    </div>
-                    <div className="h-1 bg-gray-800 rounded-full overflow-hidden">
-                      <div className={`h-full ${snapshot?.hl_status === 'ok' ? 'bg-green-500' : 'bg-yellow-500'} w-full`}></div>
-                    </div>
+                  <div className="h-1 bg-gray-800 rounded-full overflow-hidden">
+                    <div className={`h-full ${snapshot?.hl_status === 'ok' ? 'bg-green-500' : 'bg-yellow-500'} w-full`}></div>
                   </div>
-                </>
+                </div>
               )}
             </div>
           </div>

@@ -27,7 +27,7 @@ Phase 3B delivers a complete market data pipeline with real-time funding, OI, vo
 
 Comprehensive documentation of data availability:
 - Hyperliquid: funding, OI, volume, orderbook (✅ REAL)
-- Drift: funding, OI (✅ REAL), liquidations (PROXY)
+- retired protocol: funding, OI (✅ REAL), liquidations (PROXY)
 - Liquidation data marked as PROXY (estimated from OI deltas)
 
 ### Sample Payloads
@@ -37,8 +37,8 @@ Captured API responses for offline development:
 - `hyperliquid_metaAndAssetCtxs.json` - Context data with funding, OI, volume
 - `hyperliquid_l2Book.json` - Orderbook depth
 - `hyperliquid_fundingHistory.json` - Historical funding rates
-- `drift_contracts.json` - Contract specifications
-- `drift_fundingRates.json` - Funding rate data
+- `retired protocol_contracts.json` - Contract specifications
+- `retired protocol_fundingRates.json` - Funding rate data
 
 ---
 
@@ -57,7 +57,7 @@ Canonical schema for market data:
 
 Mapping rules for venue-specific symbols:
 - Hyperliquid: `BTC` → `BTC-PERP`
-- Drift: `BTC-PERP` → `BTC-PERP`
+- retired protocol: `BTC-PERP` → `BTC-PERP`
 
 ---
 
@@ -75,7 +75,7 @@ New microservice for market data aggregation:
 | `app/processors/normalizer.py` | Raw → Normalized event transformation |
 | `app/processors/snapshotter.py` | Event → Snapshot aggregation |
 | `app/providers/hyperliquid.py` | Hyperliquid API integration |
-| `app/providers/drift.py` | Drift API integration |
+| `app/providers/retired protocol.py` | retired protocol API integration |
 | `app/rate_limiter.py` | Rate limiting with backoff/jitter |
 | `app/store.py` | Redis storage layer |
 
@@ -300,7 +300,7 @@ docker compose exec market-data pytest tests/ -v
 | `services/market-data/app/processors/normalizer.py` | Data normalizer |
 | `services/market-data/app/processors/snapshotter.py` | Snapshot builder |
 | `services/market-data/app/providers/hyperliquid.py` | Hyperliquid provider |
-| `services/market-data/app/providers/drift.py` | Drift provider |
+| `services/market-data/app/providers/retired protocol.py` | retired protocol provider |
 | `services/market-data/app/rate_limiter.py` | Rate limiting |
 | `services/market-data/app/store.py` | Redis storage |
 | `services/market-data/tests/fixture_runner.py` | Offline testing |
@@ -332,7 +332,7 @@ docker compose exec market-data pytest tests/ -v
 
 ### External APIs
 - Hyperliquid: `https://api.hyperliquid.xyz/info`
-- Drift: (future integration)
+- retired protocol: (future integration)
 
 ---
 

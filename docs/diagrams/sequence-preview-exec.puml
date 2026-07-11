@@ -3,7 +3,7 @@ actor Trader as U
 participant "UI" as UI
 participant "state-api" as SA
 participant "risk-guardian" as RG
-participant "exec-drift-svc" as DRIFT
+participant "exec-retired protocol-svc" as retired protocol
 participant "exec-hl-svc" as HL
 database "Postgres" as DB
 queue "x:decisions" as DEC
@@ -20,9 +20,9 @@ UI -> SA : POST /actions/execute {plan_id, venue}
 SA -> RG : final check
 RG --> SA : allow OR block + reason
 
-alt venue = Drift
-  SA -> DRIFT : place order(s)
-  DRIFT -> EO : order result
+alt venue = retired protocol
+  SA -> retired protocol : place order(s)
+  retired protocol -> EO : order result
 else venue = Hyperliquid
   SA -> HL : place order(s)
   HL -> EO : order result

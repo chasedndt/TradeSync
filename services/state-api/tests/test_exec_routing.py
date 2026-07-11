@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi.testclient import TestClient
 from app.main import app
 import json
@@ -7,8 +7,9 @@ import json
 client = TestClient(app)
 
 @pytest.mark.asyncio
-async def test_execute_routing_hyperliquid():
+async def test_execute_routing_hyperliquid(monkeypatch):
     """Test that venue='hyperliquid' routes to the correct internal service."""
+    monkeypatch.setenv("EXECUTION_ENABLED", "true")
     
     # Mock decision data
     mock_decision = {
@@ -19,7 +20,8 @@ async def test_execute_routing_hyperliquid():
         "risk": json.dumps({"allowed": True}),
         "symbol": "BTC",
         "opp_status": "previewed",
-        "quality": 1.0,
+        "quality": 100.0,
+        "dir": "long",
         "expires_at": "2030-01-01T00:00:00+00:00"
     }
     
@@ -41,12 +43,19 @@ async def test_execute_routing_hyperliquid():
         # Mock httpx.AsyncClient.post
         with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
             mock_post.return_value.status_code = 200
-            mock_post.return_value.json.return_value = {
+            mock_post.return_value.json = MagicMock(return_value={
                 "ok": True,
                 "venue": "hyperliquid",
-                "execution_id": "test-exec-id",
-                "dry_run": True
-            }
+                "dry_run": True,
+                "execution_enabled": True,
+                "status": "placed",
+                "order_id": "test-exec-id",
+                "idempotency_key": str(mock_decision["id"]),
+                "request_payload": {"size_usd": 50.0, "symbol": "BTC"},
+                "response_payload": {},
+                "error": None,
+                "ts": "2026-07-11T00:00:00Z"
+            })
             
             response = client.post("/actions/execute", json={"decision_id": str(mock_decision["id"]), "confirm": True})
             print(f"DEBUG: Response body: {response.json()}")
@@ -54,41 +63,11 @@ async def test_execute_routing_hyperliquid():
             # Assertions
             assert response.status_code == 200
             assert response.json()["status"] == "placed"
-            assert response.json()["execution_id"] == "test-exec-id"
+            assert response.json()["order_id"] == "test-exec-id"
             
             # Verify routing URL
             args, kwargs = mock_post.call_args
             assert args[0] == "http://exec-hl-svc:8004/exec/hl/order"
             assert kwargs["json"]["venue"] == "hyperliquid"
-            assert kwargs["json"]["client_id"] == str(mock_decision["id"])
-
-@pytest.mark.asyncio
-async def test_execute_routing_drift():
-    """Test that venue='drift' routes to the correct internal service."""
-    
-    mock_decision = {
-        "id": "deacb09c-c29a-43ca-8e5a-b83dba5ca8e7",
-        "opportunity_id": "98bdc9ab-7a1b-45a8-9464-13a1b0441825",
-        "venue": "drift",
-        "requested": json.dumps({"size_usd": 50.0, "symbol": "BTC"}),
-        "risk": json.dumps({"allowed": True}),
-        "symbol": "BTC",
-        "opp_status": "previewed",
-        "quality": 1.0,
-        "expires_at": "2030-01-01T00:00:00+00:00"
-    }
-    
-    mock_conn = AsyncMock()
-    mock_conn.fetchrow.side_effect = [None, mock_decision, {"symbol": "BTC"}]
-    
-    with patch("app.main.state") as mock_state:
-        mock_state.pool.acquire.return_value.__aenter__.return_value = mock_conn
-        with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
-            mock_post.return_value.status_code = 200
-            mock_post.return_value.json.return_value = {"ok": True, "execution_id": "drift-id", "dry_run": True}
-            
-            response = client.post("/actions/execute", json={"decision_id": str(mock_decision["id"]), "confirm": True})
-            
-            assert response.status_code == 200
-            args, _ = mock_post.call_args
-            assert args[0] == "http://exec-drift-svc:8003/exec/drift/order"
+            assert kwargs["json"]["idempotency_key"] == str(mock_decision["id"])
+            assert kwargs["json"]["side"] == "buy"

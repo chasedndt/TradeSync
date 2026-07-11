@@ -1,4 +1,4 @@
-﻿name: tradesync-full
+name: tradesync-full
 
 services:
   # --- Infra (same as compose.infra.yml) ---
@@ -61,7 +61,7 @@ services:
       PG_DSN: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       REDIS_URL: redis://redis:6379
       MARKET_DATA_URL: http://market-data:8005
-      EXECUTION_ENABLED: "true"
+      EXECUTION_ENABLED: "false"
       MAX_SIGNAL_AGE_SECONDS: "3600"
       MAX_EVENT_AGE_SECONDS: "3600"
       MIN_QUALITY: "1.0"
@@ -83,25 +83,6 @@ services:
     ports:
       - "8001:8000"
 
-  exec-drift-svc:
-    build:
-      context: ../services/exec-drift-svc
-    image: tradesync/exec-drift-svc:dev
-    ports:
-      - "8003:8003"
-    environment:
-      DRY_RUN: "true"
-      EXECUTION_ENABLED: "false"
-      # DRIFT_RPC_URL: ${DRIFT_RPC_URL}
-      # DRIFT_WALLET_PRIVATE_KEY: ${DRIFT_WALLET_PRIVATE_KEY}
-    dns:
-      - 8.8.8.8
-      - 1.1.1.1
-    healthcheck:
-      test: [ "CMD", "curl", "-sf", "http://localhost:8003/healthz" ]
-      interval: 10s
-      timeout: 5s
-      retries: 3
 
   exec-hl-svc:
     build:
@@ -111,7 +92,7 @@ services:
       - "8004:8004"
     environment:
       DRY_RUN: "true"
-      EXECUTION_ENABLED: "true" # Enabled for dry-run verification
+      EXECUTION_ENABLED: "false" # Fail closed; activation requires a separate approved change
       # HYPERLIQUID_API_URL: ${HYPERLIQUID_API_URL}
       # HYPERLIQUID_WALLET_PK: ${HYPERLIQUID_WALLET_PK}
     dns:
@@ -133,7 +114,6 @@ services:
     environment:
       PYTHONPATH: /app
       PG_DSN: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      ENABLE_DRIFT: "true"
       REDIS_URL: redis://redis:6379
     dns:
       - 1.1.1.1
@@ -198,7 +178,6 @@ services:
       REDIS_URL: redis://redis:6379
       MARKET_SYMBOLS: "BTC-PERP,ETH-PERP,SOL-PERP"
       ENABLE_HYPERLIQUID: "true"
-      ENABLE_DRIFT: "true"
       POLL_INTERVAL_CONTEXT: "5000"
       POLL_INTERVAL_ORDERBOOK: "3000"
       PYTHONUNBUFFERED: 1

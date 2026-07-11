@@ -1,4 +1,4 @@
-﻿# DOC_PROMPTS.md
+# DOC_PROMPTS.md
 Purpose: explain how to use prompt packs in /prompts/* to scaffold TradeSync to spec.
 See folders:
 - prompts/shared, /windsurf, /claude, /cursor
@@ -146,7 +146,7 @@ create table if not exists exec_orders (
   v text not null default '0.1',
   created_at timestamptz not null default now(),
   decision_id uuid not null references decisions(id) on delete cascade,
-  venue text not null,                                  -- drift|hyperliquid
+  venue text not null,                                  -- retired protocol|hyperliquid
   request jsonb not null,
   response jsonb not null,
   status text not null default 'placed',
@@ -157,7 +157,7 @@ create index if not exists idx_exec_decision on exec_orders(decision_id);
 -- Risk/exposure & regime detection
 create table if not exists exposures (
   id uuid primary key default gen_random_uuid(),
-  venue text not null,                                  -- drift|hyperliquid
+  venue text not null,                                  -- retired protocol|hyperliquid
   symbol text not null,
   size double precision not null default 0,
   notional double precision not null default 0,

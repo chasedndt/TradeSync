@@ -26,7 +26,6 @@ python-dotenv
 httpx
 
 # === On-Chain Execution SDKs ===
-driftpy
 hyperliquid-python-sdk
 websockets
 

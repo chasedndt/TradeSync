@@ -149,7 +149,22 @@ async def get_hl_positions():
 async def execute_hl_order(req: OrderRequest):
     execution_id = str(uuid.uuid4())
     idempo_val = req.idempotency_key or execution_id
-    
+
+    # Fail closed before touching Redis or any venue dependency.
+    if not EXECUTION_ENABLED:
+        return ExecutionResult(
+            ok=False,
+            venue="hyperliquid",
+            dry_run=DRY_RUN,
+            execution_enabled=False,
+            status="rejected",
+            idempotency_key=idempo_val,
+            request_payload=req.model_dump(),
+            response_payload={},
+            error=ExecutionError(code="EXEC_DISABLED", message="Execution disabled"),
+            ts=datetime.utcnow().isoformat()
+        )
+
     r = await get_redis()
     idempo_key = f"exec:idempo:hl:{idempo_val}"
     
@@ -208,10 +223,6 @@ async def execute_hl_order(req: OrderRequest):
         # Cache for 24h
         await r.set(idempo_key, res.model_dump_json(), ex=86400)
         return res
-
-    # 3. Execution Enabled Check
-    if not EXECUTION_ENABLED:
-        return await finish(False, "rejected", error=ExecutionError(code="EXEC_DISABLED", message="Execution disabled"))
 
     # 3. Preflight Checks
     checks = await perform_hl_preflight(req.symbol)

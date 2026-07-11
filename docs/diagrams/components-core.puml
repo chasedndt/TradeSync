@@ -1,4 +1,4 @@
-﻿@startuml
+@startuml
 title TradeSync – Core Components
 
 package "Ingest" {
@@ -27,7 +27,7 @@ package "Decisioning" {
 }
 
 package "Execution" {
-  [exec-drift-svc]
+  [exec-retired protocol-svc]
   [exec-hl-svc]
   queue "x:exec.orders"
 }
@@ -57,8 +57,8 @@ database "Qdrant"
 
 [state-api] -> Postgres
 [risk-guardian] -> [state-api]
-[state-api] -> [exec-drift-svc]
+[state-api] -> [exec-retired protocol-svc]
 [state-api] -> [exec-hl-svc]
-[exec-drift-svc] -> "x:exec.orders"
+[exec-retired protocol-svc] -> "x:exec.orders"
 [exec-hl-svc] -> "x:exec.orders"
 @enduml

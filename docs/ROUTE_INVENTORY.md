@@ -46,14 +46,14 @@ Standardized confluence scoring engine.
 | :--- | :--- | :--- |
 | GET | `/healthz` | Health check |
 
-## 4. exec-drift-svc (Port 8003)
+## 4. exec-retired protocol-svc (Port 8003)
 | Method | Path | Description |
 | :--- | :--- | :--- |
 | GET | `/healthz` | Health check |
-| GET | `/exec/drift/preflight` | Drift-specific account readiness check |
-| GET | `/exec/drift/circuit-status` | Internal circuit breaker status |
-| GET | `/exec/drift/positions` | Raw Drift positions |
-| POST | `/exec/drift/order` | Place a Drift order |
+| GET | `/exec/retired protocol/preflight` | retired protocol-specific account readiness check |
+| GET | `/exec/retired protocol/circuit-status` | Internal circuit breaker status |
+| GET | `/exec/retired protocol/positions` | Raw retired protocol positions |
+| POST | `/exec/retired protocol/order` | Place a retired protocol order |
 
 ## 5. exec-hl-svc (Port 8004)
 | Method | Path | Description |

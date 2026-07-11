@@ -9,7 +9,7 @@ Phase 3D ensures that scoring, risk, and normalization logic runs from a **singl
 
 **Hard constraints honored:**
 - No breaking changes to existing `/state/*` and `/actions/*` API contracts — all services re-export via thin shims
-- Services that don't use `tradesync_core` (exec-hl-svc, exec-drift-svc, cockpit-ui, market-data) were not modified
+- Services that don't use `tradesync_core` (exec-hl-svc, exec-retired protocol-svc, cockpit-ui, market-data) were not modified
 - Backtest-runner uses `profiles: [backtest]` in compose — it does not start with the live stack by default
 - All business logic was extracted verbatim from services (no algorithm changes), plus one pre-existing bug fix in `normalize_symbol`
 
@@ -108,7 +108,7 @@ COPY services/<service>/app /app/app
 - `fusion-engine`
 
 **Untouched services** (build context unchanged):
-- `exec-drift-svc` — uses `../services/exec-drift-svc`
+- `exec-retired protocol-svc` — uses `../services/exec-retired protocol-svc`
 - `exec-hl-svc` — uses `../services/exec-hl-svc`
 - `cockpit-ui` — uses `../services/cockpit-ui`
 - `market-data` — uses `../services/market-data`
@@ -291,7 +291,7 @@ Hand-crafted events for offline testing without a live database:
 |-------|-------|-----------|
 | `TestTradesyncCoreImports` | 3 | All 12 public API symbols importable, version string, `__all__` length |
 | `TestNormalizeSymbol` | 8 | BTCUSDT, BTC/USDT, BTC-PERP, lowercase, bare symbol, USDC suffix, empty, None |
-| `TestNormalizeVenue` | 3 | hl → hyperliquid, drift passthrough, empty string |
+| `TestNormalizeVenue` | 3 | hl → hyperliquid, retired protocol passthrough, empty string |
 | `TestEnhancedScorer` | 4 | Initialization, basic score, microstructure penalties, to_dict() |
 | `TestRiskGuardian` | 4 | OK pass, DNT block, quality block, exec disabled block |
 | `TestCalculateScore` | 5 | Empty events, LONG/SHORT bias, squeeze logic both directions, score clamping |
@@ -409,7 +409,7 @@ docker compose -f ops/compose.full.yml --profile backtest run --rm backtest-runn
 
 ### Pinned Dependency: `pydantic==2.9.2`
 
-`tradesync_core` pins `pydantic==2.9.2` to match the version already used by `fusion-engine`, `state-api`, `core-scorer`, and `ingest-gateway`. This prevents version drift between the shared library and services. The pin is exact (`==`) not ranged.
+`tradesync_core` pins `pydantic==2.9.2` to match the version already used by `fusion-engine`, `state-api`, `core-scorer`, and `ingest-gateway`. This prevents version retired protocol between the shared library and services. The pin is exact (`==`) not ranged.
 
 ---
 

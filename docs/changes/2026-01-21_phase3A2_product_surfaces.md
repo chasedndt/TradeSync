@@ -26,7 +26,7 @@ Completed Phase 3A.2 productization for the TradeSync Cockpit UI. The main goals
 interface ExecutionState {
   mode: 'observe' | 'manual' | 'autonomous'
   globalKillSwitch: boolean
-  venueKillSwitches: Record<string, boolean>  // { drift: false, hyperliquid: false }
+  venueKillSwitches: Record<string, boolean>  // { retired protocol: false, hyperliquid: false }
   isDryRun: boolean      // From backend EXECUTION_ENABLED env
   isDemo: boolean        // True when venues are not connected
 }
@@ -222,7 +222,7 @@ export default function App() {
   "mode": "observe",
   "globalKillSwitch": false,
   "venueKillSwitches": {
-    "drift": false,
+    "retired protocol": false,
     "hyperliquid": false
   }
 }
@@ -308,7 +308,7 @@ All Phase 3A items have been implemented:
   "execution_enabled": "false",
   "venues": [
     {
-      "venue": "drift",
+      "venue": "retired protocol",
       "circuit_open": false,
       "fail_count": 0
     },

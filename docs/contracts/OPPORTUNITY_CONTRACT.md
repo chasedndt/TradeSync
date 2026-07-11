@@ -16,10 +16,10 @@ System health and stream status.
   "latest_signal_ts": "2026-01-21T04:13:29.541102Z",
   "latest_opportunity_ts": "2026-01-21T03:01:17.813737Z",
   "execution_gate": "true",
-  "drift_status": "ok",
+  "retired protocol_status": "ok",
   "hl_status": "ok",
-  "drift_circuit": {
-    "venue": "drift",
+  "retired protocol_circuit": {
+    "venue": "retired protocol",
     "circuit_open": false,
     "consecutive_failures": 0,
     "threshold": 5
@@ -42,7 +42,7 @@ System health and stream status.
 | Field | Type | Description |
 |-------|------|-------------|
 | `execution_gate` | string ("true"/"false") | Global execution enablement |
-| `drift_status` / `hl_status` | string | Venue health: "ok" or error state |
+| `retired protocol_status` / `hl_status` | string | Venue health: "ok" or error state |
 | `*_circuit.circuit_open` | boolean | True = circuit breaker tripped |
 | `stream_lengths` | object | Redis stream event counts |
 
@@ -160,7 +160,7 @@ Simulate a trade execution to check risk gates.
 {
   "opportunity_id": "8c68acb8-...",
   "size_usd": 1000,
-  "venue": "drift"
+  "venue": "retired protocol"
 }
 ```
 
@@ -172,7 +172,7 @@ Simulate a trade execution to check risk gates.
     "action": "Market Order",
     "symbol": "ETH-PERP",
     "size_usd": 1000.0,
-    "venue": "drift",
+    "venue": "retired protocol",
     "slippage_tolerance": 0.01
   },
   "risk_verdict": {

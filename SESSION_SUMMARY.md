@@ -45,7 +45,7 @@ The system now supports **High-Conviction Auditing**. I have mapped the complex 
 ---
 
 ## 🚀 5. Final Stack Readiness
-*   **Services Verified**: `ingest-gateway`, `core-scorer`, `fusion-engine`, `state-api`, `exec-hl-svc`, `exec-drift-svc`, `postgres`, `redis`, `qdrant`.
+*   **Services Verified**: `ingest-gateway`, `core-scorer`, `fusion-engine`, `state-api`, `exec-hl-svc`, `exec-retired protocol-svc`, `postgres`, `redis`, `qdrant`.
 *   **Database Connectivity**: Verified presence and health of ~70,000+ records across events, signals, and opportunities.
 
 **Handover Note**: Future agents should use the `C:\TradeSync` directory and the `tradesync_pg` MCP tool to audit trade logic before modifying any core pipeline code.

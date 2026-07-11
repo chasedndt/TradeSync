@@ -1,4 +1,4 @@
-﻿@startuml
+@startuml
 skinparam shadowing false
 skinparam componentStyle rectangle
 skinparam wrapWidth 240
@@ -20,7 +20,7 @@ rectangle "TradingView Webhooks" as tv
 rectangle "YouTube + TV Ideas (RAG)" as yt
 rectangle "Metrics Provider (Funding/OI/Liq)" as metrics
 rectangle "Discord Alert Feeds" as discord
-rectangle "Drift Protocol" as drift
+rectangle "retired protocol Protocol" as retired protocol
 rectangle "Hyperliquid" as hl
 
 trader --> ui : review / execute
@@ -34,7 +34,7 @@ agents --> fusion : Signals
 fusion --> ui : Opportunities / Bias
 ui --> risk : preview / execute
 risk --> exec : allow / plan
-exec --> drift : orders
+exec --> retired protocol : orders
 exec --> hl : orders
 
 agents --> db : read / write

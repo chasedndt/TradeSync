@@ -1,7 +1,7 @@
 TradeSync — Product Requirements Document (v0.1, Audited)
 1) One-liner
 
-An always-on autonomous trading companion that ingests your vetted market feeds (TV alerts, Published Ideas, YouTube transcripts, metrics), runs specialized agents (structure/tech, funding & OI, sentiment, rotation), fuses them into a live Bias and ranked Opportunity Queue, and can explain or execute (Drift / Hyperliquid) under a strict Risk Guardian.
+An always-on autonomous trading companion that ingests your vetted market feeds (TV alerts, Published Ideas, YouTube transcripts, metrics), runs specialized agents (structure/tech, funding & OI, sentiment, rotation), fuses them into a live Bias and ranked Opportunity Queue, and can explain or execute (retired protocol / Hyperliquid) under a strict Risk Guardian.
 
 2) Problem
 
@@ -23,7 +23,7 @@ Opportunity Queue (top 1–5): entry/SL/TP + management + Evidence Trail.
 
 Copilot (chat/voice): session-aware, position-aware, evidence-first.
 
-Execution (opt-in): Drift + Hyperliquid adapters (preview → policy check → send).
+Execution (opt-in): retired protocol + Hyperliquid adapters (preview → policy check → send).
 
 Daily Brief: changes since yesterday, top setups, risk conditions, source quality deltas.
 
@@ -92,7 +92,7 @@ Funding/OI Agent: funding skew, OI spikes/decay, squeeze risk.
 
 Sentiment/Narrative Agent: YT/Ideas stance (weighted by creator Elo + recency).
 
-Rotation/Macro Agent: ETHBTC flips, SOLETH spikes, DXY/SPX drift.
+Rotation/Macro Agent: ETHBTC flips, SOLETH spikes, DXY/SPX retired protocol.
 
 C. Fusion → Bias & Opportunity Queue
 For each symbol × TF:
@@ -141,7 +141,7 @@ Daily Brief → source Elo deltas, strategy performance by regime, watchlist cle
 8) Features & Acceptance Criteria
 8.1 Bias Engine
 
-Combines tech/structure, sentiment (creator Elo × recency), regime fit, macro drift.
+Combines tech/structure, sentiment (creator Elo × recency), regime fit, macro retired protocol.
 
 AC: Bias updates ≤ 2s after new Signal; JSON available via State API; includes component weights.
 
@@ -165,7 +165,7 @@ AC: Always cites evidence; cannot bypass policy; can trigger Alert/Execute.
 
 8.5 Execution (opt-in)
 
-Drift (Solana) via driftpy. Hyperliquid via TS WS-POST service.
+retired protocol (Solana) via retired protocolpy. Hyperliquid via TS WS-POST service.
 
 AC: Preview → policy check → order; dry-run default; per-exchange kill-switch; full audit log.
 
@@ -251,7 +251,7 @@ Model hallucination → evidence-first copilot; no advice without citations.
 
 Sprint 1 (MVP) — Ingest Tier-1 (keepers + Ideas + YT + metrics) → Agent Runner → Fusion → State API → Dashboard (Bias/Opportunities/Evidence) → Discord poster → Copilot (read-only).
 
-Sprint 2 — Execution adapters (Drift/HL) + Risk Guardian + Daily Brief + source Elo learning.
+Sprint 2 — Execution adapters (retired protocol/HL) + Risk Guardian + Daily Brief + source Elo learning.
 
 Sprint 3 — Passivbot service (MM mode) + kit backtesting/optimizer + agent/kit marketplace hooks.
 

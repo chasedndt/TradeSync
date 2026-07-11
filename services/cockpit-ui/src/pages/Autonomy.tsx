@@ -13,8 +13,8 @@ export function Autonomy() {
   const { mode, isDryRun, isDemo } = useExecution()
   const { data: status } = useExecutionStatus()
 
-  const allVenuesConnected = status?.venues?.length > 0 &&
-    status.venues.every(v => v.circuit_open !== 'unknown')
+  const allVenuesConnected = (status?.venues?.length ?? 0) > 0 &&
+    (status?.venues?.every(v => v.circuit_open !== 'unknown') ?? false)
   const executionEnabled = status?.execution_enabled === 'true'
   const anyCircuitOpen = status?.venues?.some(v => v.circuit_open === true)
 
@@ -23,7 +23,7 @@ export function Autonomy() {
     {
       label: 'All venue exec services reachable',
       met: allVenuesConnected,
-      note: 'exec-drift-svc and exec-hl-svc must respond to /circuit-status'
+      note: 'exec-hl-svc must respond to /circuit-status'
     },
     {
       label: 'Backend execution gate open',

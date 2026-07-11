@@ -86,7 +86,7 @@ Each page includes contextual placeholder panels, phase badges, and feature expl
 **Files:** `pages/Execution.tsx`, `context/ExecutionContext.tsx`
 
 - **Global Kill Switch**: Emergency stop all venues, visual "KILL ALL" / "RESUME" toggle
-- **Per-Venue Kill Switches**: Independent stop/resume per venue (Drift, Hyperliquid)
+- **Per-Venue Kill Switches**: Independent stop/resume per venue (retired protocol, Hyperliquid)
 - **Execution Mode Selector**: Observe / Manual / Autonomous (Autonomous locked with badge)
 - State persisted to localStorage
 - Backend sync via `useBackendSync` hook
@@ -174,7 +174,7 @@ Replaced raw counts with meaningful metrics:
 - Per-venue status cards: CONNECTED / CIRCUIT OPEN / NOT CONNECTED
 - Circuit breaker state display with fail count tracking
 - Context-specific help text:
-  - Drift: "Connect Solana wallet..."
+  - retired protocol: "Connect Solana wallet..."
   - Hyperliquid: "Configure API keys..."
 
 ---

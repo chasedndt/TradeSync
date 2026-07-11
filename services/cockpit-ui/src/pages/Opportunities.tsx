@@ -26,7 +26,7 @@ export function Opportunities() {
       // Client-side expiry guard: hide 'new' items older than TTL.
       // The backend may not have marked them expired yet if fusion-engine is quiet.
       if (status === 'new') {
-        const ageMs = now - new Date(o.created_at).getTime()
+        const ageMs = now - new Date(o.snapshot_ts).getTime()
         if (ageMs > OPPORTUNITY_TTL_MS) return false
       }
       return (
@@ -53,7 +53,7 @@ export function Opportunities() {
   const expiredCount = useMemo(() => {
     if (status !== 'new' || !opportunities) return 0
     return opportunities.filter(o =>
-      now - new Date(o.created_at).getTime() > OPPORTUNITY_TTL_MS
+      now - new Date(o.snapshot_ts).getTime() > OPPORTUNITY_TTL_MS
     ).length
   }, [opportunities, status, now])
 

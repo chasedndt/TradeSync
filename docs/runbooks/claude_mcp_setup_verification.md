@@ -29,7 +29,7 @@ Setup and verification results for the TradeSync development environment on Wind
 | `ingest-gateway` | OK | Running |
 | `fusion-engine` | OK | Running |
 | `core-scorer` | OK | Running |
-| `exec-drift-svc` | OK | Running |
+| `exec-retired protocol-svc` | OK | Running |
 | `exec-hl-svc` | OK | Running |
 
 ## 4. Database Sanity (Task 3)

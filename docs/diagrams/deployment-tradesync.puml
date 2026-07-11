@@ -1,4 +1,4 @@
-﻿@startuml
+@startuml
 title TradeSync – Deployment View (impl split Python/Node)
 
 skinparam componentStyle rectangle
@@ -20,7 +20,7 @@ node "Kubernetes / Docker Host" as k8s {
     rectangle "fusion-engine\nworker" as fusion
     rectangle "risk-guardian\nsvc\n:8090" as risk
     rectangle "state-api\nFastAPI\n:8000" as stateapi
-    rectangle "exec-drift-svc\nsvc\n(DriftPy)" as exec_drift
+    rectangle "exec-retired protocol-svc\nsvc\n(retired protocolPy)" as exec_retired protocol
   }
 
   frame "Node.js Services" {
@@ -38,7 +38,7 @@ cloud "TradingView Webhooks" as tv
 cloud "YouTube/TV Ideas" as yt
 cloud "Metrics Provider\n(CoinAnk-like)" as metrics
 cloud "Discord\n(alerts & ops)" as dc
-cloud "Drift (Solana)" as drift
+cloud "retired protocol (Solana)" as retired protocol
 cloud "Hyperliquid (L2)" as hl
 
 ui -[#blue]-> stateapi : HTTPS (review/execute)
@@ -66,9 +66,9 @@ fusion -down-> qd : embeddings (optional)
 
 stateapi -down-> risk
 risk -down-> pg : exposure, cooldowns, quality
-stateapi -right-> exec_drift : place orders
+stateapi -right-> exec_retired protocol : place orders
 stateapi -right-> exec_hl : place orders
-exec_drift -right-> drift : orders/txid
+exec_retired protocol -right-> retired protocol : orders/txid
 exec_hl -right-> hl : orders/txid
 
 stateapi -down-> pg : decisions, exec logs

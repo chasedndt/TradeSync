@@ -10,7 +10,7 @@ client = TestClient(app)
 MOCK_EVENT = {
     "id": "123e4567-e89b-12d3-a456-426614174000",
     "ts": datetime.now(),
-    "source": "drift",
+    "source": "hyperliquid",
     "kind": "market_snapshot",
     "symbol": "BTC-PERP",
     "timeframe": "1m",

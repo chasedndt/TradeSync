@@ -13,7 +13,7 @@ Use these names with the logs command:
 - `fusion-engine`: Confluence scoring
 - `state-api`: REST snapshots & UI data
 - `exec-hl-svc`: Hyperliquid order execution
-- `exec-drift-svc`: Drift order execution
+- `exec-retired protocol-svc`: retired protocol order execution
 - `postgres`, `redis`, `qdrant`: Persistent & memory storage
 
 ## 📊 Ultimate Trading Journal Audit

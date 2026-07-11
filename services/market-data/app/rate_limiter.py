@@ -119,7 +119,6 @@ class RateLimiterRegistry:
 # Default rate limits per venue (requests per minute)
 VENUE_RATE_LIMITS = {
     "hyperliquid": 120,  # Conservative
-    "drift": 60,         # Conservative
 }
 
 

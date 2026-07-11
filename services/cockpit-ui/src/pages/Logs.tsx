@@ -66,7 +66,6 @@ export function Logs() {
           </div>
           <select className="input text-sm bg-gray-800 border-gray-700">
             <option value="all">All Venues</option>
-            <option value="drift">Drift</option>
             <option value="hyperliquid">Hyperliquid</option>
           </select>
           <select className="input text-sm bg-gray-800 border-gray-700">

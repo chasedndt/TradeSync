@@ -29,7 +29,7 @@ This roadmap outlines the development phases for TradeSync, broken down into par
 *   **Task A5:** Implement caching (Redis?) for `state-api` to ensure low-latency access for the scorer.
 
 ### 🔵 Track B: Execution Adapters
-*   **Task B4:** Implement `executor/drift_exec.py` using `driftpy` SDK.
+*   **Task B4:** Implement `executor/retired protocol_exec.py` using `retired protocolpy` SDK.
     *   *Subtask:* Authentication & Wallet setup.
     *   *Subtask:* Order placement (Limit, Market, Oracle).
 *   **Task B5:** Implement `executor/hyper_exec.py` using `hyperliquid-sdk`.

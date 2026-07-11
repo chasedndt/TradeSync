@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional
 
 class MarketSnapshot(BaseModel):
-    source: str = Field(..., description="Source exchange, e.g. hyperliquid, drift")
+    source: str = Field(..., description="Source exchange; Hyperliquid is the supported venue")
     symbol: str = Field(..., description="Market symbol, e.g. BTC-USD")
     mark: float = Field(..., description="Mark price")
     funding: float = Field(..., description="Funding rate")

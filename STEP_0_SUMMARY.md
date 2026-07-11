@@ -26,7 +26,7 @@ The **State API** now follows a strict canonical naming convention while maintai
     - Automated `Deprecation` and `Link` headers pointing to the new canonical successors.
 - **Normalization Utilities**:
     - Created a shared normalization module in `state-api` and `fusion-engine`.
-    - **Venue Alias Support**: `hl` -> `hyperliquid`, `drift` -> `drift`.
+    - **Venue Alias Support**: `hl` -> `hyperliquid`, `retired protocol` -> `retired protocol`.
     - **Timeframe Alias Support**: `tf` -> `timeframe`.
 
 ---
@@ -79,7 +79,7 @@ During the Phase 3A (Cockpit UI) audit, the following issues were identified for
     *   **Cause**: Potential polling conflict or backend filter depth issue.
 4.  **Mock/Demo Execution State**:
     *   **Status**: Execution is currently in **Mock Mode** (DRY_RUN=true).
-    *   **Positions**: "Live Positions" are currently deterministic demo data served by the `exec-*-svc` containers. Backend wallet configurations (Drift/Hyperliquid PKs) are **NOT** yet blueprinted or implemented.
+    *   **Positions**: "Live Positions" are currently deterministic demo data served by the `exec-*-svc` containers. Backend wallet configurations (retired protocol/Hyperliquid PKs) are **NOT** yet blueprinted or implemented.
 
 ---
 Next Phase: Fixing identified UI/State bugs and proceeding to **Phase 3B: Advanced Execution**.

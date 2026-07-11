@@ -34,7 +34,7 @@ Maintains Bias state and Opportunity Queue per symbol×TF; stores component weig
 risk-guardian
 Policy checks: daily loss stop, per-symbol exposure, leverage ceiling, cooldowns, do-not-trade.
 
-exec-drift-svc (Python, driftpy)
+exec-retired protocol-svc (Python, retired protocolpy)
 Order preview/place/modify/cancel + account/positions stream.
 
 exec-hl-svc (Node/TS)
@@ -117,7 +117,7 @@ Funding/OI Agent — consumes metrics thresholds; detects squeeze risk and “fu
 
 Sentiment/Narrative Agent — consumes YT + TV Ideas; weights by creator Elo × recency.
 
-Rotation/Macro Agent — reasons across ETHBTC, SOLETH, DXY/SPX drift (basic rules in v0.1).
+Rotation/Macro Agent — reasons across ETHBTC, SOLETH, DXY/SPX retired protocol (basic rules in v0.1).
 
 4) Fusion Engine (Bias & Opportunities)
 
@@ -140,7 +140,7 @@ Outputs: allow/blocked + reason + suggested adjustment (reduce size X%, wait for
 
 6) Execution Adapters
 
-exec-drift-svc (Python + driftpy): creates orders, OCO (SL/TP), reads positions, emits status → x:exec.orders.
+exec-retired protocol-svc (Python + retired protocolpy): creates orders, OCO (SL/TP), reads positions, emits status → x:exec.orders.
 
 exec-hl-svc (Node/TS): uses Hyperliquid SDK with WS-POST; handles nonce/retry/backoff and asset map refresh.
 
@@ -219,7 +219,7 @@ actor Trader as U
 participant "UI" as UI
 participant "state-api" as SA
 participant "risk-guardian" as RG
-participant "exec-drift-svc" as DRIFT
+participant "exec-retired protocol-svc" as retired protocol
 participant "exec-hl-svc" as HL
 database "Postgres" as DB
 queue "x:decisions" as DEC
@@ -236,9 +236,9 @@ UI -> SA : POST /actions/execute {plan_id, venue}
 SA -> RG : final check
 RG --> SA : allow OR block + reason
 
-alt venue = Drift
-  SA -> DRIFT : place order(s)
-  DRIFT -> EO : order result
+alt venue = retired protocol
+  SA -> retired protocol : place order(s)
+  retired protocol -> EO : order result
 else venue = Hyperliquid
   SA -> HL : place order(s)
   HL -> EO : order result
@@ -316,7 +316,7 @@ METRICS_API_KEY=...
 YTDLP_BIN=/usr/local/bin/yt-dlp
 WHISPER_MODEL=medium
 INGEST_TV_SIGNING_SECRET=...
-DRIFT_RPC=https://...
+retired protocol_RPC=https://...
 HL_API_KEY=...
 HL_API_SECRET=...
 

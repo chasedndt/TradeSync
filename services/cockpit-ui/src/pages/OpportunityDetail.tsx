@@ -4,7 +4,7 @@ import { useEvidence, usePreview, useExecute, useMarketSnapshot } from '../api/h
 import { StatusBadge, DirectionBadge, EvidenceTrail, PreviewPanel, DryRunBanner } from '../components'
 import type { PreviewResponse, ExecutionResult, MetricStatus, MarketSnapshotWithMicrostructure, Confluence } from '../api/types'
 import { calculateBiasStrength } from '../utils/metrics'
-import { AlertTriangle, ShieldCheck, TrendingUp, Info, Activity, Shield, AlertCircle, Droplets } from 'lucide-react'
+import { AlertTriangle, ShieldCheck, TrendingUp, Info, Activity, Shield, AlertCircle } from 'lucide-react'
 
 const MetricStatusBadge = ({ status }: { status?: MetricStatus }) => {
   if (!status) return null
@@ -161,7 +161,7 @@ export function OpportunityDetail() {
   const { data: marketSnapshot } = useMarketSnapshot('hyperliquid', symbol)
 
   const [sizeUsd, setSizeUsd] = useState(1000)
-  const [venue, setVenue] = useState('drift')
+  const [venue, setVenue] = useState('hyperliquid')
   const [previewResult, setPreviewResult] = useState<PreviewResponse | null>(null)
   const [executeResult, setExecuteResult] = useState<ExecutionResult | null>(null)
 
@@ -396,13 +396,7 @@ export function OpportunityDetail() {
                   </div>
                   <div>
                     <label className="block text-xs text-gray-400 mb-1.5 uppercase font-bold">Target Venue</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        onClick={() => setVenue('drift')}
-                        className={`px-3 py-2 rounded border text-sm font-medium transition-all ${venue === 'drift' ? 'border-blue-500 bg-blue-500/10 text-blue-400' : 'border-gray-700 bg-gray-900 text-gray-400 hover:border-gray-600'}`}
-                      >
-                        Drift (Solana)
-                      </button>
+                    <div className="grid grid-cols-1 gap-2">
                       <button
                         onClick={() => setVenue('hyperliquid')}
                         className={`px-3 py-2 rounded border text-sm font-medium transition-all ${venue === 'hyperliquid' ? 'border-blue-500 bg-blue-500/10 text-blue-400' : 'border-gray-700 bg-gray-900 text-gray-400 hover:border-gray-600'}`}

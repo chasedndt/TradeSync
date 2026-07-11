@@ -11,9 +11,7 @@ export interface SnapshotResponse {
   latest_signal_ts: string | null
   latest_opportunity_ts: string | null
   execution_gate: string
-  drift_status: string
   hl_status: string
-  drift_circuit: CircuitStatus | null
   hl_circuit: CircuitStatus | null
   stream_lengths: Record<string, number>
   ingest_sources: IngestSource[]

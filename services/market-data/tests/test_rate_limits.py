@@ -220,12 +220,6 @@ class TestGlobalRateLimiters:
         assert limiter.venue == "hyperliquid"
         assert limiter.rpm == 120  # From VENUE_RATE_LIMITS
 
-    def test_get_limiter_drift(self):
-        """get_limiter should return configured limiter for drift."""
-        limiter = get_limiter("drift")
-        assert limiter.venue == "drift"
-        assert limiter.rpm == 60  # From VENUE_RATE_LIMITS
-
     def test_get_limiter_unknown_venue(self):
         """get_limiter should use default 60 rpm for unknown venues."""
         limiter = get_limiter("unknown_venue")

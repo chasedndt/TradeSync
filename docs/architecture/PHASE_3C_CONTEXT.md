@@ -41,9 +41,9 @@ This document captures the key code locations and architecture for Phase 3C impl
 | Component | File Path | Purpose |
 |-----------|-----------|---------|
 | Hyperliquid Source | `services/ingest-gateway/sources/hyperliquid.py` | Polls HL API (metaAndAssetCtxs) |
-| Drift Source | `services/ingest-gateway/sources/drift.py` | Polls Drift API (/contracts) |
+| retired protocol Source | `services/ingest-gateway/sources/retired protocol.py` | Polls retired protocol API (/contracts) |
 | HL Provider | `services/market-data/app/providers/hyperliquid.py` | `fetch_orderbook()` via l2Book |
-| Drift Provider | `services/market-data/app/providers/drift.py` | `fetch_orderbook()` via DLOB |
+| retired protocol Provider | `services/market-data/app/providers/retired protocol.py` | `fetch_orderbook()` via DLOB |
 | Base Interface | `services/market-data/app/providers/base.py` | `BaseProvider` abstract class |
 | DB Insert | `services/ingest-gateway/app/db.py` | `insert_event()` - Postgres + Redis |
 | Normalizer | `services/market-data/app/processors/normalizer.py` | `normalize_orderbook()` |
@@ -81,7 +81,7 @@ This document captures the key code locations and architecture for Phase 3C impl
 
 INGESTION LAYER
 ┌─────────────────┐     ┌─────────────────┐
-│   Hyperliquid   │     │      Drift      │
+│   Hyperliquid   │     │      retired protocol      │
 │ metaAndAssetCtxs│     │   /contracts    │
 │ l2Book endpoint │     │  DLOB server    │
 └────────┬────────┘     └────────┬────────┘
@@ -89,7 +89,7 @@ INGESTION LAYER
          ▼                       ▼
 ┌────────────────────────────────────────────┐
 │           ingest-gateway                   │
-│  sources/hyperliquid.py, sources/drift.py  │
+│  sources/hyperliquid.py, sources/retired protocol.py  │
 │  ┌────────────────────────────────────┐    │
 │  │  NormalizedEvent (market_snapshot) │    │
 │  │  - mark, funding, OI, volume       │    │
@@ -296,7 +296,7 @@ UI LAYER
 | `OPPORTUNITY_TTL_SECONDS` | fusion-engine | 900 | Opportunity expiration |
 | `POLL_INTERVAL_ORDERBOOK` | market-data | 3000 | Orderbook poll interval (ms) |
 | `POLL_INTERVAL_CONTEXT` | market-data | 5000 | Context poll interval (ms) |
-| `EXECUTION_ENABLED` | state-api | true | Global execution gate |
+| `EXECUTION_ENABLED` | state-api | false | Global execution gate (disabled by default) |
 | `MAX_LEVERAGE` | state-api | 5.0 | Maximum allowed leverage |
 | `MIN_QUALITY` | state-api | 50.0 | Minimum quality score |
 

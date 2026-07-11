@@ -630,7 +630,7 @@ pytest tests/test_phase3c.py -v
 ## What's Next
 
 ### Phase 3D/3E: Wallet Connect & Live Execution
-- [ ] Wallet signing/custody flows (Drift + Hyperliquid)
+- [ ] Wallet signing/custody flows (retired protocol + Hyperliquid)
 - [ ] Transition from DRY_RUN=true to live execution
 - [ ] Real position tracking and PnL
 

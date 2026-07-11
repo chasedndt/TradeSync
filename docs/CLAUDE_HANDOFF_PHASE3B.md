@@ -411,7 +411,7 @@ class TestGlobalRateLimiters:
     def test_venue_limiters_exist(self):
         """Global rate_limiters should have entries for each venue."""
         assert "hyperliquid" in rate_limiters.limiters
-        assert "drift" in rate_limiters.limiters
+        assert "retired protocol" in rate_limiters.limiters
 
     def test_status_report(self):
         """status() should return current state of all limiters."""

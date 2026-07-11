@@ -1,4 +1,4 @@
-﻿@startuml
+@startuml
 title TradeSync – Data & Config ERD (light)
 
 hide circle
@@ -57,7 +57,7 @@ entity decisions {
 entity exec_orders {
   * id : uuid PK
   decision_id : uuid FK
-  venue : text <<drift|hyperliquid>>
+  venue : text <<retired protocol|hyperliquid>>
   order_json : jsonb
   status : text <<placed|filled|rejected>>
   txid : text?

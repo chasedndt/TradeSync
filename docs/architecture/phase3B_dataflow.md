@@ -1,7 +1,7 @@
 # Phase 3B — Market Data Expansion: Dataflow Architecture
 
 > **Purpose**: Single source of truth for how market data flows through the system.
-> **Invariant**: Prevents implementation drift across services.
+> **Invariant**: Prevents implementation retired protocol across services.
 
 ---
 
@@ -12,7 +12,7 @@
 │                           MARKET DATA EXPANSION PIPELINE                         │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
-  [Hyperliquid API]      [Drift API]        [Future Providers]
+  [Hyperliquid API]      [retired protocol API]        [Future Providers]
          │                    │                     │
          ▼                    ▼                     ▼
     ┌─────────────────────────────────────────────────────┐
@@ -94,7 +94,7 @@
 **Venue Mappings**:
 ```
 Hyperliquid: "BTC" → "BTC-PERP"
-Drift:       "BTC-PERP" → "BTC-PERP" (already canonical)
+retired protocol:       "BTC-PERP" → "BTC-PERP" (already canonical)
 ```
 
 ### 2.2 Staleness Computation
@@ -504,7 +504,7 @@ MARKET_POLL_INTERVAL_VOLUME=10000      # ms
 
 # Rate Limits
 HL_RATE_LIMIT_RPM=120                  # requests per minute
-DRIFT_RATE_LIMIT_RPM=60
+retired protocol_RATE_LIMIT_RPM=60
 
 # Staleness Thresholds
 STALE_THRESHOLD_ORDERBOOK=5000         # ms

@@ -181,9 +181,7 @@ export function Settings() {
                 )}
                 {!isConnected && (
                   <p className="text-xs text-gray-500 mt-2">
-                    {venue.venue === 'drift'
-                      ? 'Drift requires Solana wallet connection for live trading (Phase 3E).'
-                      : 'Hyperliquid requires API keys configured via backend environment variables.'}
+                    Hyperliquid requires API keys configured via backend environment variables.
                   </p>
                 )}
               </div>

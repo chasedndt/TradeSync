@@ -88,9 +88,9 @@ python services\fusion-engine\app\main.py
 
 T3 – executors
 
-# Drift (python)
+# retired protocol (python)
 .\.venv\Scripts\Activate.ps1
-python services\exec-drift-svc\app\main.py
+python services\exec-retired protocol-svc\app\main.py
 
 # Hyperliquid (python)
 .\.venv\Scripts\Activate.ps1
@@ -119,7 +119,7 @@ ingest-gateway	Py	8080	accept TV/ideas/metrics → x:events.*
 core-scorer	Py	8001	produce technical bias & confidence
 fusion-engine	Py	8002	merge signals → opportunities
 state-api	Py	8000	REST: state, risk-guarded actions, telemetry
-exec-drift-svc	Py	8003	Drift executor
+exec-retired protocol-svc	Py	8003	retired protocol executor
 exec-hl-svc	Py	8004	Hyperliquid executor
 cockpit-ui	TS/JS	3000	Main management dashboard
 Infra	—	—	Postgres, Redis Streams, Qdrant
@@ -317,7 +317,7 @@ See risk-guardian logs for reason_code (cooldown, exposure, quality).
 
 HL orders rejected
 
-Verify nonce/time drift, API perms, and WS connectivity in exec-hl-svc logs.
+Verify nonce/time retired protocol, API perms, and WS connectivity in exec-hl-svc logs.
 
 13) Clean Up
 docker compose -f ops/compose.full.yml down -v   # remove volumes (dev only)
@@ -357,7 +357,7 @@ See `docs/runbooks/Phase3C_Verification.md` for comprehensive verification steps
 
 15) Appendix
 
-Ports: Postgres 5432, Redis 6379, Qdrant 6333, state-api 8000, core-scorer 8001, fusion-engine 8002, exec-drift 8003, exec-hl 8004, market-data 8005, ingest 8080.
+Ports: Postgres 5432, Redis 6379, Qdrant 6333, state-api 8000, core-scorer 8001, fusion-engine 8002, exec-retired protocol 8003, exec-hl 8004, market-data 8005, ingest 8080.
 
 Diagrams: see docs/SYSTEM_DESIGN.md (links to SVGs).
 

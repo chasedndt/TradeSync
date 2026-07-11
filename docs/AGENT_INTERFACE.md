@@ -169,7 +169,7 @@ Rules: weight=elo(source)*recency_decay*author_relevance(symbol); produce stance
 
 5.4 Rotation/Macro (agent_id=rotation)
 
-Inputs: ETHBTC trend flips, SOLETH spikes, DXY/SPX drift.
+Inputs: ETHBTC trend flips, SOLETH spikes, DXY/SPX retired protocol.
 Outputs: kind ∈ {rotation_in, rotation_out} with optional target baskets (e.g., {alts_high_beta}).
 
 6) Confidence & Calibration
@@ -281,7 +281,7 @@ GET /opps/{id} – includes links.event_ids and resolved events.
 
 POST /actions/preview
 
-{"opportunity_id":"uuid","venue":"drift","size":0.75}
+{"opportunity_id":"uuid","venue":"retired protocol","size":0.75}
 
 
 Returns Decision with risk.allowed and {entry,sl,tp} plan.
@@ -325,10 +325,10 @@ GET /events/{id}
 Returns e.g.
 {"allowed":false,"reason_code":"COOLDOWN","until":"…Z"}
 
-15) Executors – Drift & Hyperliquid
+15) Executors – retired protocol & Hyperliquid
 
-Drift (Python exec-drift-svc)
-POST /exec/drift/order
+retired protocol (Python exec-retired protocol-svc)
+POST /exec/retired protocol/order
 {"symbol":"BTC-PERP","side":"buy|sell","qty":0.75,"type":"market|limit","price":69210.0,"reduceOnly":false,"clientId":"uuid"}
 
 Hyperliquid (Node/TS exec-hl-svc)
@@ -368,7 +368,7 @@ Decisions/Exec: append-only audit trail; immutable.
 
 19) Example Flows
 
-TV alert → execute on Drift (happy path)
+TV alert → execute on retired protocol (happy path)
 TV → /ingest/tv → events (hash) → x:events.raw → normalize → x:events.norm → agents → x:signals.* → fusion → opportunities(new) → /actions/preview (OK) → /actions/execute → executor → exec_orders → opportunities.status=executed.
 
 Duplicate TV alert (retry)
@@ -433,12 +433,12 @@ Fused opportunity (2h)
 
 Preview OK
 
-{"v":"0.1","id":"…","opportunity_id":"…","requested":{"venue":"drift","size":0.75,"dir":"short","plan":{"entry":69180,"sl":69400,"tp":68600}},"risk":{"allowed":true,"reason_code":"OK","checks":{"exposure":{"current":1.2,"limit":1.5},"cooldowns":{"symbol":0,"venue":0},"quality":{"min":0.6,"actual":0.71}}},"created_at":"…Z"}
+{"v":"0.1","id":"…","opportunity_id":"…","requested":{"venue":"retired protocol","size":0.75,"dir":"short","plan":{"entry":69180,"sl":69400,"tp":68600}},"risk":{"allowed":true,"reason_code":"OK","checks":{"exposure":{"current":1.2,"limit":1.5},"cooldowns":{"symbol":0,"venue":0},"quality":{"min":0.6,"actual":0.71}}},"created_at":"…Z"}
 
 
 Execute placed
 
-{"v":"0.1","id":"…","decision_id":"…","venue":"drift","request":{"symbol":"BTC-PERP","side":"sell","qty":0.75,"type":"market"},"response":{"status":"placed","order_id":"…","txid":"…"},"created_at":"…Z"}
+{"v":"0.1","id":"…","decision_id":"…","venue":"retired protocol","request":{"symbol":"BTC-PERP","side":"sell","qty":0.75,"type":"market"},"response":{"status":"placed","order_id":"…","txid":"…"},"created_at":"…Z"}
 
 25) Repo Map (for agents)
 docs/
@@ -452,7 +452,7 @@ services/
   fusion-engine/
   risk-guardian/
   state-api/
-  exec-drift-svc/
+  exec-retired protocol-svc/
   exec-hl-svc/
 
   26) Appendices (recommended)
@@ -463,7 +463,7 @@ services/
 - **event.kinds:** ["tv","yt_chunk","idea","funding","oi_delta","liqmap"]
 - **signal.kinds:** ["trend","pullback","reclaim","exhaustion","breakout","squeeze_risk","unwind","narrative_push","rotation_impulse"]
 - **regimes:** ["trend","range","high_vol","low_vol"]
-- **venues:** ["drift","hyperliquid"]
+- **venues:** ["retired protocol","hyperliquid"]
 - **risk.reason_codes:** ["OK","COOLDOWN","MAX_EXPOSURE","QUALITY_LOW"]
 
 ### 26.2 Sample Agent Configs (YAML)

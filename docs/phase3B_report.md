@@ -17,7 +17,7 @@ Key principles followed:
 
 ### 2.1 Market Data Service (`services/market-data`)
 A new microservice responsible for:
-- **Polling**: Continuously fetching funding rates, open interest, liquidations, volume, and orderbook data from Hyperliquid and Drift.
+- **Polling**: Continuously fetching funding rates, open interest, liquidations, volume, and orderbook data from Hyperliquid and retired protocol.
 - **Normalization**: Unifying heterogeneous data formats and symbols.
 - **Snapshotting**: Computing rolling statistics (averages, deltas) and classifying market regimes.
 - **Alerting**: Detecting significant regime changes and emitting events.
@@ -63,7 +63,7 @@ All market data is proxied through the `state-api` for consistent access:
 
 ### 4.3 Alerts & Status
 - **`GET /state/market/alerts?limit=50`**: Recent regime change events.
-- **`GET /state/market/status`**: Connectivity status of providers (`DRIFT`, `HYPERLIQUID`).
+- **`GET /state/market/status`**: Connectivity status of providers (`retired protocol`, `HYPERLIQUID`).
 
 ---
 

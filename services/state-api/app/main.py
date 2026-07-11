@@ -1,4 +1,4 @@
-﻿import os
+import os
 import json
 import uuid
 import time
@@ -242,9 +242,7 @@ class SnapshotResponse(BaseModel):
     latest_signal_ts: Optional[datetime]
     latest_opportunity_ts: Optional[datetime]
     execution_gate: str
-    drift_status: str
     hl_status: str
-    drift_circuit: Optional[Dict[str, Any]] = None
     hl_circuit: Optional[Dict[str, Any]] = None
     stream_lengths: Dict[str, int] = {}
     ingest_sources: List[Dict[str, Any]] = []
@@ -263,7 +261,7 @@ class RiskLimitResponse(BaseModel):
 class PreviewRequest(BaseModel):
     opportunity_id: str
     size_usd: float = 1000.0
-    venue: str = "drift"
+    venue: str = "hyperliquid"
 
 class PreviewResponse(BaseModel):
     decision_id: Optional[str] = None
@@ -440,20 +438,11 @@ async def get_state_snapshot():
             """)
             
             # Check execution services health + circuit
-            drift_status = "error"
             hl_status = "error"
-            drift_circuit = None
             hl_circuit = None
             ingest_sources = []
             
             async with httpx.AsyncClient() as client:
-                try:
-                    resp = await client.get("http://exec-drift-svc:8003/exec/drift/circuit-status", timeout=1.0)
-                    if resp.status_code == 200:
-                        drift_circuit = resp.json()
-                        drift_status = "ok"
-                except Exception:
-                    pass
                 
                 try:
                     resp = await client.get("http://exec-hl-svc:8004/exec/hl/circuit-status", timeout=1.0)
@@ -483,9 +472,7 @@ async def get_state_snapshot():
                 latest_signal_ts=row['last_sig'] if row else None,
                 latest_opportunity_ts=row['last_opp'] if row else None,
                 execution_gate=os.getenv("EXECUTION_ENABLED", "false"),
-                drift_status=drift_status,
                 hl_status=hl_status,
-                drift_circuit=drift_circuit,
                 hl_circuit=hl_circuit,
                 stream_lengths=stream_lengths,
                 ingest_sources=ingest_sources
@@ -739,9 +726,8 @@ async def get_evidence(opportunity_id: str):
 async def get_aggregated_positions(venue: str = "all"):
     """Aggregates positions from execution services."""
     venue = normalize_venue(venue)
-    venues = ["drift", "hyperliquid"] if venue == "all" else [venue]
+    venues = ["hyperliquid"] if venue == "all" else [venue]
     urls = {
-        "drift": "http://exec-drift-svc:8003/exec/drift/positions",
         "hyperliquid": "http://exec-hl-svc:8004/exec/hl/positions"
     }
     
@@ -832,7 +818,7 @@ async def preview_action(req: PreviewRequest):
 
                     # Fetch current exposure (if available)
                     exposure_resp = await client.get(
-                        f"http://exec-{req.venue}-svc:800{3 if req.venue == 'drift' else 4}/exec/{req.venue[:2]}/positions",
+                        "http://exec-hl-svc:8004/exec/hl/positions",
                         timeout=2.0
                     )
                     if exposure_resp.status_code == 200:
@@ -895,9 +881,8 @@ async def preview_action(req: PreviewRequest):
 @app.get("/state/execution/status")
 async def get_execution_status():
     """Aggregates execution status and circuit breaker states from all venues."""
-    venues = ["drift", "hyperliquid"]
+    venues = ["hyperliquid"]
     urls = {
-        "drift": "http://exec-drift-svc:8003/exec/drift/circuit-status",
         "hyperliquid": "http://exec-hl-svc:8004/exec/hl/circuit-status"
     }
     
@@ -980,7 +965,7 @@ async def execute_action(req: ExecuteRequest):
 
             # 2. Re-validate Decision & Risk
             dec_row = await conn.fetchrow("""
-                SELECT d.*, o.symbol, o.status as opp_status, o.quality, o.expires_at 
+                SELECT d.*, o.symbol, o.status as opp_status, o.quality, o.expires_at, o.dir
                 FROM decisions d
                 JOIN opportunities o ON d.opportunity_id = o.id
                 WHERE d.id = $1
@@ -1030,9 +1015,13 @@ async def execute_action(req: ExecuteRequest):
             # 3. Venue Routing
             venue = dec_row["venue"]
             exec_result = None
-            
+            direction = str(dec_row["dir"]).lower()
+            side_by_direction = {"long": "buy", "buy": "buy", "short": "sell", "sell": "sell"}
+            order_side = side_by_direction.get(direction)
+            if order_side is None:
+                raise HTTPException(status_code=400, detail=f"Unsupported opportunity direction: {direction}")
+
             exec_url_map = {
-                "drift": "http://exec-drift-svc:8003/exec/drift/order",
                 "hyperliquid": "http://exec-hl-svc:8004/exec/hl/order"
             }
             
@@ -1045,7 +1034,7 @@ async def execute_action(req: ExecuteRequest):
                         exec_url_map[venue],
                         json={
                             "symbol": dec_row["symbol"],
-                            "side": "buy",
+                            "side": order_side,
                             "order_type": "market",
                             "size_usd": requested_data["size_usd"],
                             "venue": venue,

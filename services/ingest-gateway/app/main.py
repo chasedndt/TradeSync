@@ -1,4 +1,4 @@
-﻿import os
+import os
 import json
 import uuid
 import asyncpg
@@ -29,11 +29,7 @@ import os
 # Actually, if running from root, sources should be importable if root is in path.
 # But let's assume standard uvicorn run from ingest-gateway dir.
 # Then 'sources' is top level.
-from sources.drift import poll_drift_markets
 from sources.hyperliquid import poll_hyperliquid_markets
-
-# Config
-ENABLE_DRIFT = os.getenv("ENABLE_DRIFT", "true").lower() == "true"
 
 # Background tasks
 background_tasks = []
@@ -44,9 +40,6 @@ async def lifespan(app: FastAPI):
     task_hl = asyncio.create_task(poll_hyperliquid_markets())
     background_tasks.append(task_hl)
     
-    if ENABLE_DRIFT:
-        task_drift = asyncio.create_task(poll_drift_markets())
-        background_tasks.append(task_drift)
         
     yield
     # Shutdown

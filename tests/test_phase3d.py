@@ -104,9 +104,9 @@ class TestNormalizeVenue:
         from tradesync_core import normalize_venue
         assert normalize_venue("hl") == "hyperliquid"
 
-    def test_drift_passthrough(self):
+    def test_hyperliquid_passthrough(self):
         from tradesync_core import normalize_venue
-        assert normalize_venue("drift") == "drift"
+        assert normalize_venue("hyperliquid") == "hyperliquid"
 
     def test_empty(self):
         from tradesync_core import normalize_venue

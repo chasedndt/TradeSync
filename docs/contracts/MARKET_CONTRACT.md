@@ -23,7 +23,7 @@ The `MarketSnapshot` is the canonical representation of market state for a singl
 ```typescript
 interface MarketSnapshot {
   // === Identification ===
-  venue: "hyperliquid" | "drift";
+  venue: "hyperliquid" | "retired protocol";
   symbol: string;           // Canonical format: "BTC-PERP"
   ts: number;               // Unix timestamp (ms) when snapshot was created
   data_age_ms: number;      // Age of oldest data in this snapshot
@@ -287,7 +287,7 @@ type MarketCondition =
 
 ```typescript
 interface SourceMetadata {
-  provider: string;         // "hyperliquid" | "drift"
+  provider: string;         // "hyperliquid" | "retired protocol"
   endpoint: string;         // API endpoint used
   fetched_at: number;       // When data was fetched (ms)
   metrics_provided: string[]; // Which metrics came from this source
