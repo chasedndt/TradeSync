@@ -132,7 +132,37 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
 POOL_MIN_SIZE = int(os.getenv("POOL_MIN_SIZE", "5"))
 POOL_MAX_SIZE = int(os.getenv("POOL_MAX_SIZE", "20"))
 POOL_TIMEOUT = float(os.getenv("POOL_TIMEOUT", "5.0"))
+OPPORTUNITY_TTL_SECONDS = int(os.getenv("OPPORTUNITY_TTL_SECONDS", "300"))
+# Capital base for account risk load calculation during preview.
+# Not exchange margin — this is: total_open_notional / ACCOUNT_EQUITY_USD.
+# Override via env var to match the real funded account size.
+ACCOUNT_EQUITY_USD = float(os.getenv("ACCOUNT_EQUITY_USD", "50000.0"))
 VALID_TIMEFRAMES = ["1m", "5m", "15m", "30m", "1h", "2h", "4h", "8h", "1d"]
+
+# Canonical exec service positions endpoints — single source of truth within state-api.
+# Used by _fetch_aggregated_positions() and the /state/positions route.
+_EXEC_POSITIONS_URLS: Dict[str, str] = {
+    "drift":       "http://exec-drift-svc:8003/exec/drift/positions",
+    "hyperliquid": "http://exec-hl-svc:8004/exec/hl/positions",
+}
+
+# Daily notional cap across all executed orders. Enforced at preview time.
+# Resets at midnight (calendar day boundary, UTC). Override via env var.
+DAILY_NOTIONAL_LIMIT = float(os.getenv("DAILY_NOTIONAL_LIMIT", "50000.0"))
+
+# RiskGuardian reason codes that indicate an opportunity is permanently ineligible.
+# On preview rejection with one of these codes, status is written to 'blocked' so the
+# opportunity is not retried by the cockpit and is not swept to 'expired' by TTL.
+# Transient codes (rate limits, market microstructure, portfolio state) are excluded —
+# those conditions change over time and the opportunity should remain retryable.
+_NON_TRANSIENT_CODES = frozenset({
+    "DNT",          # Symbol permanently on the Do-Not-Trade list; won't be removed per-opp
+    "MIN_QUALITY",  # Quality is a fixed property of this snapshot; won't improve
+    "STALE_DATA",   # Signal is too old; this opportunity's data will not get fresher
+    "EXPIRED",      # Past expiry window; mirrors what the background TTL sweep does
+    "MIN_SIZE",     # Request size is static for this opportunity lifecycle
+    "MAX_LEVERAGE", # Derived from size vs capital base; static for this opportunity
+})
 
 # --- Global Client ---
 redis_client = None
@@ -180,6 +210,7 @@ class OpportunityResponse(BaseModel):
     direction: str = Field(alias="dir")
     status: str
     snapshot_ts: datetime
+    expires_at: Optional[datetime] = None
     links: Dict[str, Any]
     # Phase 3C: Enhanced scoring data
     confluence: Optional[Dict[str, Any]] = None
@@ -242,12 +273,18 @@ class SnapshotResponse(BaseModel):
     latest_signal_ts: Optional[datetime]
     latest_opportunity_ts: Optional[datetime]
     execution_gate: str
+    # Backward-compatible per-service status strings
     drift_status: str
     hl_status: str
     drift_circuit: Optional[Dict[str, Any]] = None
     hl_circuit: Optional[Dict[str, Any]] = None
     stream_lengths: Dict[str, int] = {}
     ingest_sources: List[Dict[str, Any]] = []
+    # Truthfulness additions: explicit degraded state and per-service health map
+    service_health: Dict[str, Any] = {}
+    degraded: bool = False
+    errors: Dict[str, str] = {}
+    snapshot_ts: Optional[datetime] = None
 
 class RiskLimitResponse(BaseModel):
     max_leverage: float
@@ -258,6 +295,10 @@ class RiskLimitResponse(BaseModel):
     max_signal_age: int
     blacklist: List[str]
     daily_notional_limit: float
+    # Capital base used for account risk load calculation at preview time.
+    # Matches ACCOUNT_EQUITY_USD env var (default $50k). Used as denominator in
+    # margin_utilization = total_open_notional / account_equity_usd.
+    account_equity_usd: float
     current_counters: Dict[str, Any]
 
 class PreviewRequest(BaseModel):
@@ -283,9 +324,46 @@ class AppState:
 
 state = AppState()
 
+
+async def expire_stale_opportunities():
+    """Background task: marks stale 'new'/'previewed' opportunities as 'expired' using server-side TTL.
+
+    Runs every 60 seconds. Uses OPPORTUNITY_TTL_SECONDS (default 300s).
+    Respects the explicit expires_at field if set by fusion-engine; otherwise falls back to
+    snapshot_ts + TTL. Only transitions 'new' and 'previewed' statuses — never touches
+    'executed', 'blocked', or already-'expired' rows.
+    The 'blocked' exclusion is intentional: blocked opportunities were permanently rejected
+    at preview time and must not be silently overwritten to 'expired' by the TTL sweep.
+    """
+    while True:
+        await asyncio.sleep(60)
+        if not state.pool:
+            continue
+        try:
+            async with state.pool.acquire() as conn:
+                result = await conn.execute("""
+                    UPDATE opportunities
+                    SET status = 'expired'
+                    WHERE status IN ('new', 'previewed')
+                      AND (
+                            (expires_at IS NOT NULL AND expires_at < now())
+                         OR (expires_at IS NULL AND snapshot_ts < now() - make_interval(secs => $1))
+                          )
+                """, float(OPPORTUNITY_TTL_SECONDS))
+                # asyncpg returns "UPDATE N" — extract count
+                count = int(result.split()[-1]) if result else 0
+                if count > 0:
+                    logger.info(
+                        f"TTL expiry: marked {count} opportunities as expired",
+                        extra={"trace_id": "ttl-expiry"}
+                    )
+        except Exception as e:
+            logger.error(f"TTL expiry task failed: {e}", extra={"trace_id": "ttl-expiry"})
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
+    ttl_task = None
     try:
         print(f"Connecting to DB pool: min={POOL_MIN_SIZE} max={POOL_MAX_SIZE}")
         state.pool = await asyncpg.create_pool(
@@ -294,9 +372,15 @@ async def lifespan(app: FastAPI):
             max_size=POOL_MAX_SIZE,
             command_timeout=POOL_TIMEOUT
         )
+        ttl_task = asyncio.create_task(expire_stale_opportunities())
         yield
     finally:
-        # Shutdown
+        if ttl_task:
+            ttl_task.cancel()
+            try:
+                await ttl_task
+            except asyncio.CancelledError:
+                pass
         if state.pool:
             print("Closing DB pool")
             await state.pool.close()
@@ -425,74 +509,145 @@ async def state_health():
 
 @app.get("/state/snapshot", response_model=SnapshotResponse)
 async def get_state_snapshot():
-    """Returns a high-level overview of system status."""
+    """Returns a high-level overview of system status.
+
+    Never fails the entire response due to an optional upstream being unavailable.
+    Returns partial data with explicit per-service health flags and error metadata.
+    Critical section (postgres) is distinguished from optional upstreams.
+    """
     if not state.pool:
-         raise HTTPException(status_code=503, detail="DB Pool not ready")
-    
+        raise HTTPException(status_code=503, detail="DB Pool not ready")
+
+    snapshot_ts = datetime.utcnow()
+    errors: Dict[str, str] = {}
+    service_health: Dict[str, Any] = {}
+
+    # --- Critical section: DB timestamps ---
+    latest_event_ts = None
+    latest_signal_ts = None
+    latest_opportunity_ts = None
+    t0 = time.time()
     try:
-        r = await get_redis()
         async with state.pool.acquire() as conn:
             row = await conn.fetchrow("""
-                SELECT 
+                SELECT
                     (SELECT ts FROM events ORDER BY ts DESC LIMIT 1) as last_evt,
                     (SELECT created_at FROM signals ORDER BY created_at DESC LIMIT 1) as last_sig,
                     (SELECT snapshot_ts FROM opportunities ORDER BY snapshot_ts DESC LIMIT 1) as last_opp
             """)
-            
-            # Check execution services health + circuit
-            drift_status = "error"
-            hl_status = "error"
-            drift_circuit = None
-            hl_circuit = None
-            ingest_sources = []
-            
-            async with httpx.AsyncClient() as client:
-                try:
-                    resp = await client.get("http://exec-drift-svc:8003/exec/drift/circuit-status", timeout=1.0)
-                    if resp.status_code == 200:
-                        drift_circuit = resp.json()
-                        drift_status = "ok"
-                except Exception:
-                    pass
-                
-                try:
-                    resp = await client.get("http://exec-hl-svc:8004/exec/hl/circuit-status", timeout=1.0)
-                    if resp.status_code == 200:
-                        hl_circuit = resp.json()
-                        hl_status = "ok"
-                except Exception:
-                    pass
-                
-                try:
-                    resp = await client.get("http://ingest-gateway:8080/ingest/sources", timeout=1.0)
-                    if resp.status_code == 200:
-                        ingest_sources = resp.json()
-                except Exception:
-                    pass
-            
-            # Stream lengths
-            stream_lengths = {}
-            for s in ["x:events.norm", "x:signals.funding"]:
-                try:
-                    stream_lengths[s] = await r.xlen(s)
-                except Exception:
-                    stream_lengths[s] = -1
-
-            return SnapshotResponse(
-                latest_event_ts=row['last_evt'] if row else None,
-                latest_signal_ts=row['last_sig'] if row else None,
-                latest_opportunity_ts=row['last_opp'] if row else None,
-                execution_gate=os.getenv("EXECUTION_ENABLED", "false"),
-                drift_status=drift_status,
-                hl_status=hl_status,
-                drift_circuit=drift_circuit,
-                hl_circuit=hl_circuit,
-                stream_lengths=stream_lengths,
-                ingest_sources=ingest_sources
-            )
+            if row:
+                latest_event_ts = row['last_evt']
+                latest_signal_ts = row['last_sig']
+                latest_opportunity_ts = row['last_opp']
+        service_health["postgres"] = {"ok": True, "latency_ms": round((time.time() - t0) * 1000, 2)}
     except Exception as e:
-        print(f"Snapshot error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        err_msg = str(e)[:200]
+        errors["postgres"] = err_msg
+        service_health["postgres"] = {"ok": False, "latency_ms": round((time.time() - t0) * 1000, 2), "error": err_msg}
+        logger.error(f"Snapshot: DB query failed: {err_msg}", extra={"trace_id": "snapshot"})
+
+    # --- Optional section: upstream services ---
+    drift_status = "error"
+    hl_status = "error"
+    drift_circuit = None
+    hl_circuit = None
+    ingest_sources = []
+
+    async with httpx.AsyncClient() as client:
+        # exec-drift-svc circuit status (optional)
+        t0 = time.time()
+        try:
+            resp = await client.get("http://exec-drift-svc:8003/exec/drift/circuit-status", timeout=1.0)
+            latency = round((time.time() - t0) * 1000, 2)
+            if resp.status_code == 200:
+                drift_circuit = resp.json()
+                drift_status = "ok"
+                service_health["exec-drift-svc"] = {"ok": True, "latency_ms": latency}
+            else:
+                err_msg = f"HTTP {resp.status_code}"
+                errors["exec-drift-svc"] = err_msg
+                service_health["exec-drift-svc"] = {"ok": False, "latency_ms": latency, "error": err_msg}
+        except Exception as e:
+            err_msg = str(e)[:200]
+            errors["exec-drift-svc"] = err_msg
+            service_health["exec-drift-svc"] = {"ok": False, "error": err_msg}
+
+        # exec-hl-svc circuit status (optional)
+        t0 = time.time()
+        try:
+            resp = await client.get("http://exec-hl-svc:8004/exec/hl/circuit-status", timeout=1.0)
+            latency = round((time.time() - t0) * 1000, 2)
+            if resp.status_code == 200:
+                hl_circuit = resp.json()
+                hl_status = "ok"
+                service_health["exec-hl-svc"] = {"ok": True, "latency_ms": latency}
+            else:
+                err_msg = f"HTTP {resp.status_code}"
+                errors["exec-hl-svc"] = err_msg
+                service_health["exec-hl-svc"] = {"ok": False, "latency_ms": latency, "error": err_msg}
+        except Exception as e:
+            err_msg = str(e)[:200]
+            errors["exec-hl-svc"] = err_msg
+            service_health["exec-hl-svc"] = {"ok": False, "error": err_msg}
+
+        # ingest-gateway sources (optional)
+        t0 = time.time()
+        try:
+            resp = await client.get("http://ingest-gateway:8080/ingest/sources", timeout=1.0)
+            latency = round((time.time() - t0) * 1000, 2)
+            if resp.status_code == 200:
+                raw = resp.json()
+                ingest_sources = raw if isinstance(raw, list) else []
+                service_health["ingest-gateway"] = {"ok": True, "latency_ms": latency}
+            else:
+                err_msg = f"HTTP {resp.status_code}"
+                errors["ingest-gateway"] = err_msg
+                service_health["ingest-gateway"] = {"ok": False, "latency_ms": latency, "error": err_msg}
+        except Exception as e:
+            err_msg = str(e)[:200]
+            errors["ingest-gateway"] = err_msg
+            service_health["ingest-gateway"] = {"ok": False, "error": err_msg}
+
+    # --- Optional section: Redis stream lengths ---
+    stream_lengths = {}
+    t0 = time.time()
+    try:
+        r = await get_redis()
+        for s in ["x:events.norm", "x:signals.funding"]:
+            try:
+                stream_lengths[s] = await r.xlen(s)
+            except Exception as e:
+                stream_lengths[s] = -1
+                errors[f"redis.{s}"] = str(e)[:100]
+        service_health["redis"] = {"ok": True, "latency_ms": round((time.time() - t0) * 1000, 2)}
+    except Exception as e:
+        err_msg = str(e)[:200]
+        errors["redis"] = err_msg
+        service_health["redis"] = {"ok": False, "error": err_msg}
+
+    degraded = len(errors) > 0
+    if degraded:
+        logger.warning(
+            f"Snapshot returned degraded state, unavailable services: {list(errors.keys())}",
+            extra={"trace_id": "snapshot"}
+        )
+
+    return SnapshotResponse(
+        latest_event_ts=latest_event_ts,
+        latest_signal_ts=latest_signal_ts,
+        latest_opportunity_ts=latest_opportunity_ts,
+        execution_gate=os.getenv("EXECUTION_ENABLED", "false"),
+        drift_status=drift_status,
+        hl_status=hl_status,
+        drift_circuit=drift_circuit,
+        hl_circuit=hl_circuit,
+        stream_lengths=stream_lengths,
+        ingest_sources=ingest_sources,
+        service_health=service_health,
+        degraded=degraded,
+        errors=errors,
+        snapshot_ts=snapshot_ts,
+    )
 
 @app.get("/state/events/latest", response_model=List[EventResponse])
 async def get_latest_events(
@@ -610,7 +765,7 @@ async def get_opportunities(
         async with state.pool.acquire() as conn:
             if symbol:
                 rows = await conn.fetch("""
-                    SELECT id, symbol, timeframe, bias, quality, dir, status, snapshot_ts, links, confluence
+                    SELECT id, symbol, timeframe, bias, quality, dir, status, snapshot_ts, expires_at, links, confluence
                     FROM opportunities
                     WHERE symbol = $1 AND status = $2
                     ORDER BY snapshot_ts DESC
@@ -618,7 +773,7 @@ async def get_opportunities(
                 """, symbol, status, limit)
             else:
                 rows = await conn.fetch("""
-                    SELECT id, symbol, timeframe, bias, quality, dir, status, snapshot_ts, links, confluence
+                    SELECT id, symbol, timeframe, bias, quality, dir, status, snapshot_ts, expires_at, links, confluence
                     FROM opportunities
                     WHERE status = $1
                     ORDER BY snapshot_ts DESC
@@ -635,6 +790,7 @@ async def get_opportunities(
                     "dir": r["dir"],
                     "status": r["status"],
                     "snapshot_ts": r["snapshot_ts"],
+                    "expires_at": r["expires_at"],
                     "links": json.loads(r["links"]) if isinstance(r["links"], str) else r["links"],
                     # Phase 3C: Include confluence with score_breakdown, execution_risk, warnings
                     "confluence": json.loads(r["confluence"]) if isinstance(r["confluence"], str) else (r["confluence"] or {})
@@ -666,7 +822,9 @@ async def get_evidence(opportunity_id: str):
                 "dir": opp_row["dir"],
                 "status": opp_row["status"],
                 "snapshot_ts": opp_row["snapshot_ts"],
-                "links": json.loads(opp_row["links"]) if isinstance(opp_row["links"], str) else opp_row["links"]
+                "expires_at": opp_row.get("expires_at"),
+                "links": json.loads(opp_row["links"]) if isinstance(opp_row["links"], str) else opp_row["links"],
+                "confluence": json.loads(opp_row["confluence"]) if isinstance(opp_row.get("confluence"), str) else (opp_row.get("confluence") or {})
             }
             links = opportunity["links"] or {}
             
@@ -735,31 +893,41 @@ async def get_evidence(opportunity_id: str):
         print(f"Evidence error: {e}")
         return EvidenceResponse(opportunity=None) # Empty instead of 500
 
+async def _fetch_aggregated_positions(client: httpx.AsyncClient) -> List[Dict[str, Any]]:
+    """
+    Fetch and combine positions from all known exec services using one shared HTTP client.
+    Partial results are returned on any upstream failure — unavailable services are excluded
+    rather than failing the whole call.
+
+    Used by both the /state/positions route and preview_action to ensure exposure calculations
+    are always cross-venue. Callers must not assume all venues responded successfully.
+    """
+    tasks = [client.get(url, timeout=2.0) for url in _EXEC_POSITIONS_URLS.values()]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    positions: List[Dict[str, Any]] = []
+    for res in results:
+        if not isinstance(res, Exception) and res.status_code == 200:
+            positions.extend(res.json())
+    return positions
+
+
 @app.get("/state/positions", response_model=List[Position])
 async def get_aggregated_positions(venue: str = "all"):
-    """Aggregates positions from execution services."""
+    """Aggregates positions from all execution services (or a specific venue)."""
     venue = normalize_venue(venue)
-    venues = ["drift", "hyperliquid"] if venue == "all" else [venue]
-    urls = {
-        "drift": "http://exec-drift-svc:8003/exec/drift/positions",
-        "hyperliquid": "http://exec-hl-svc:8004/exec/hl/positions"
-    }
-    
-    all_positions = []
     async with httpx.AsyncClient() as client:
-        tasks = []
-        for v in venues:
-            if v in urls:
-                tasks.append(client.get(urls[v], timeout=2.0))
-        
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        for res in results:
-            if isinstance(res, httpx.Response) and res.status_code == 200:
-                all_positions.extend(res.json())
-            else:
-                print(f"Failed to fetch positions: {res}")
-                
-    return all_positions
+        if venue == "all":
+            return await _fetch_aggregated_positions(client)
+        url = _EXEC_POSITIONS_URLS.get(venue)
+        if not url:
+            return []
+        try:
+            resp = await client.get(url, timeout=2.0)
+            if resp.status_code == 200:
+                return resp.json()
+        except Exception as e:
+            print(f"Failed to fetch positions for {venue}: {e}")
+        return []
 
 @app.post("/actions/preview", response_model=PreviewResponse)
 async def preview_action(req: PreviewRequest):
@@ -814,6 +982,14 @@ async def preview_action(req: PreviewRequest):
                 WHERE EXISTS (SELECT 1 FROM opportunities o WHERE o.id = decisions.opportunity_id AND o.symbol = $1)
             """, symbol)
 
+            # 4c. Daily notional usage — sum of all orders placed today regardless of fill status.
+            # Used to enforce DAILY_NOTIONAL_LIMIT at preview time.
+            daily_notional_usd = await conn.fetchval("""
+                SELECT COALESCE(SUM((request->>'size_usd')::float), 0.0)
+                FROM exec_orders
+                WHERE created_at >= CURRENT_DATE
+            """) or 0.0
+
             # Phase 3C: 4b. Fetch microstructure data for risk assessment
             microstructure = None
             margin_utilization = 0.0
@@ -828,25 +1004,25 @@ async def preview_action(req: PreviewRequest):
                     )
                     if market_resp.status_code == 200:
                         market_data = market_resp.json()
-                        microstructure = market_data.get("microstructure")
+                        if isinstance(market_data, dict):
+                            microstructure = market_data.get("microstructure")
 
-                    # Fetch current exposure (if available)
-                    exposure_resp = await client.get(
-                        f"http://exec-{req.venue}-svc:800{3 if req.venue == 'drift' else 4}/exec/{req.venue[:2]}/positions",
-                        timeout=2.0
-                    )
-                    if exposure_resp.status_code == 200:
-                        positions = exposure_resp.json()
-                        for pos in positions:
-                            if pos.get("symbol") == symbol:
-                                symbol_exposure_usd = abs(pos.get("notional", 0))
-                        # Rough margin utilization (simplified)
-                        total_notional = sum(abs(p.get("notional", 0)) for p in positions)
-                        margin_utilization = total_notional / 50000.0  # Assuming $50k account
+                    # Phase 3F-3: Fetch positions from ALL venues via canonical helper.
+                    # Replaces the single-venue fetch from Phase 3F-2 — that version was
+                    # blind to positions on other venues and overwrote rather than summed.
+                    all_positions = await _fetch_aggregated_positions(client)
+                    for pos in all_positions:
+                        if pos.get("symbol") == symbol:
+                            symbol_exposure_usd += abs(pos.get("size_usd", 0))
+                    # Account risk load: fraction of configured capital deployed in open positions.
+                    # Variable kept as margin_utilization for RiskGuardian interface compatibility,
+                    # but this is NOT exchange margin — it is total_open_notional / ACCOUNT_EQUITY_USD.
+                    total_position_usd = sum(abs(p.get("size_usd", 0)) for p in all_positions)
+                    margin_utilization = total_position_usd / ACCOUNT_EQUITY_USD
             except Exception as e:
                 logger.warning(f"Failed to fetch market/exposure data for risk check: {e}", extra={"trace_id": "preview"})
 
-            # 5. Check Risk (Phase 3C: with microstructure data)
+            # 5. Check Risk (Phase 3C: with microstructure + exposure data)
             verdict = risk_engine.check(
                 symbol=symbol,
                 size_usd=req.size_usd,
@@ -855,9 +1031,37 @@ async def preview_action(req: PreviewRequest):
                 recent_decisions_count=recent_decisions,
                 microstructure=microstructure,
                 margin_utilization=margin_utilization,
-                symbol_exposure_usd=symbol_exposure_usd
+                symbol_exposure_usd=symbol_exposure_usd,
+                account_equity=ACCOUNT_EQUITY_USD,
+                daily_notional_usd=daily_notional_usd,
+                daily_notional_limit=DAILY_NOTIONAL_LIMIT,
             )
-            
+
+            # Phase 3F-3: Non-transient rejection → write 'blocked' status.
+            # Also stores the rejection reason in links.rejection so the cockpit can
+            # surface why the opportunity was permanently blocked without a separate query.
+            # Blocked rows are intentionally excluded from TTL expiry (see expire_stale_opportunities).
+            if not verdict.allowed and verdict.reason_code in _NON_TRANSIENT_CODES:
+                if opportunity.get("status") == "new":
+                    rejection = json.dumps({
+                        "reason_code": verdict.reason_code.value,
+                        "reason": verdict.reason
+                    })
+                    await conn.execute(
+                        """UPDATE opportunities
+                           SET status = 'blocked',
+                               links = jsonb_set(COALESCE(links, '{}'::jsonb), '{rejection}', $2::jsonb, true)
+                           WHERE id = $1 AND status = 'new'""",
+                        req.opportunity_id,
+                        rejection
+                    )
+                return PreviewResponse(
+                    decision_id=None,
+                    plan=plan,
+                    risk_verdict=verdict.model_dump(),
+                    suggested_adjustments=verdict.suggested_adjustment
+                )
+
             decision_id = None
             if verdict.allowed:
                 # 6. Idempotent Decision Insert (Safety unique constraint)
@@ -935,12 +1139,11 @@ async def get_risk_limits():
         try:
             async with state.pool.acquire() as conn:
                 row = await conn.fetchrow("""
-                    SELECT SUM((request->>'size_usd')::float) as total
+                    SELECT COALESCE(SUM((request->>'size_usd')::float), 0.0) as total
                     FROM exec_orders
-                    WHERE status = 'placed' 
-                    AND created_at >= CURRENT_DATE
+                    WHERE created_at >= CURRENT_DATE
                 """)
-                current_notional = row["total"] or 0.0
+                current_notional = row["total"] if row else 0.0
         except Exception as e:
             print(f"Error fetching daily notional: {e}")
 
@@ -952,12 +1155,49 @@ async def get_risk_limits():
         max_event_age=guardian.max_event_age,
         max_signal_age=guardian.max_signal_age,
         blacklist=guardian.blacklist,
-        daily_notional_limit=float(os.getenv("DAILY_NOTIONAL_LIMIT", "50000.0")),
+        daily_notional_limit=DAILY_NOTIONAL_LIMIT,
+        account_equity_usd=ACCOUNT_EQUITY_USD,
         current_counters={
             "daily_notional_usage": current_notional,
             "today_date": datetime.utcnow().date().isoformat()
         }
     )
+
+@app.post("/admin/cleanup")
+async def cleanup_old_opportunities(
+    days: int = Query(30, ge=1, le=365),
+    dry_run: bool = Query(True)
+):
+    """Delete old terminal opportunities (blocked/expired) older than N days.
+
+    Cascades to decisions rows (decisions.opportunity_id has ON DELETE CASCADE).
+    Only touches 'blocked' and 'expired' rows — never 'executed' or 'new'.
+
+    Query params:
+      days     — retention window in days (default 30, min 1, max 365)
+      dry_run  — if true (default) returns count without deleting; set false to delete
+    """
+    if not state.pool:
+        raise HTTPException(status_code=503, detail="DB Pool not ready")
+
+    async with state.pool.acquire() as conn:
+        if dry_run:
+            row = await conn.fetchrow("""
+                SELECT COUNT(*) as count
+                FROM opportunities
+                WHERE status IN ('blocked', 'expired')
+                  AND snapshot_ts < now() - make_interval(days => $1)
+            """, days)
+            return {"dry_run": True, "would_delete": int(row["count"]) if row else 0, "older_than_days": days}
+        else:
+            result = await conn.execute("""
+                DELETE FROM opportunities
+                WHERE status IN ('blocked', 'expired')
+                  AND snapshot_ts < now() - make_interval(days => $1)
+            """, days)
+            count = int(result.split()[-1]) if result else 0
+            return {"dry_run": False, "deleted": count, "older_than_days": days}
+
 
 @app.post("/actions/execute", response_model=ExecutionResult)
 async def execute_action(req: ExecuteRequest):
@@ -1128,11 +1368,13 @@ async def execute_action(req: ExecuteRequest):
 # --- Market Data Endpoints (Phase 3B) ---
 
 MARKET_DATA_URL = os.getenv("MARKET_DATA_URL", "http://market-data:8005")
+KNOWN_VENUES = [v.strip() for v in os.getenv("KNOWN_VENUES", "drift,hyperliquid").split(",")]
 
 class MarketSnapshotResponse(BaseModel):
-    """Market snapshot with truthfulness indicators."""
+    """Market snapshot with truthfulness indicators — always single venue/symbol."""
     venue: str
     symbol: str
+    scope: str = "single_venue"  # Explicit: this is never an all-venues aggregate
     ts: int
     data_age_ms: int
     available_metrics: List[Dict[str, Any]]
@@ -1145,6 +1387,45 @@ class MarketSnapshotResponse(BaseModel):
     microstructure: Optional[Dict[str, Any]] = None
     regimes: Dict[str, Any]
     sources: List[Dict[str, Any]] = []
+
+
+# --- Market Aggregate Models ---
+
+class VenueAvailability(BaseModel):
+    venue: str
+    available: bool
+    data_age_ms: Optional[int] = None
+    error: Optional[str] = None
+
+
+class OIAggregate(BaseModel):
+    """OI aggregate across venues. total_usd only reflects contributing_venues."""
+    total_usd: float
+    per_venue: Dict[str, Optional[float]]          # venue -> current_usd or None
+    contributing_venues: List[str]                  # Venues included in total_usd
+    missing_venues: List[str]                       # Venues excluded (unavailable/no data)
+    regime_per_venue: Dict[str, Optional[str]]      # venue -> OI regime string or None
+
+
+class FundingAggregate(BaseModel):
+    """Funding rates per venue. Spread is only valid when exactly 2 venues contribute."""
+    per_venue: Dict[str, Optional[float]]           # venue -> funding rate now (decimal) or None
+    spread: Optional[float] = None                  # Absolute spread in BPS; None if < 2 venues
+    available_venues: List[str]
+    missing_venues: List[str]
+
+
+class MarketAggregateResponse(BaseModel):
+    """All-venues aggregate for a symbol. Always scope='all_venues'."""
+    symbol: str
+    scope: str = "all_venues"
+    aggregate_ts: str                               # ISO UTC datetime when aggregated
+    partial: bool                                   # True if any known venue was unavailable
+    venue_availability: List[VenueAvailability]
+    oi: OIAggregate
+    funding: FundingAggregate
+    per_venue: Dict[str, Optional[Dict[str, Any]]]  # Full per-venue snapshot or None
+    notes: List[str] = []                           # Human-readable transparency notes
 
 class MarketAlertResponse(BaseModel):
     """Market alert for regime changes."""
@@ -1261,6 +1542,156 @@ async def get_market_data_status():
                 "error": str(e),
                 "providers": []
             }
+
+
+@app.get("/state/market/aggregate/{symbol}", response_model=MarketAggregateResponse)
+async def get_market_aggregate(symbol: str):
+    """All-venues aggregate market metrics for a symbol.
+
+    Normalization rules (documented, not implied):
+    - OI: oi.current_usd is always USD-notional (market-data normalizer converts asset units).
+      total_usd is the sum across contributing_venues only. Never imputed for missing venues.
+    - Funding: per-venue decimal rate (e.g., 0.0001 = 0.01% per 8h). Not averaged across venues
+      because venues are independent markets. Spread in BPS returned only when exactly 2 venues
+      have live data.
+    - OI delta windows: exposed per-venue via per_venue[venue].oi.horizons — not re-aggregated here.
+    - Regimes: per-venue from each snapshot; no cross-venue regime synthesized at this layer.
+
+    Truthfulness guarantees:
+    - scope is always "all_venues"
+    - partial=True whenever any known venue was unavailable
+    - oi.total_usd only reflects contributing_venues — not an all-venues number if partial
+    - funding.spread is None unless exactly 2 venues provided a live rate
+    - per_venue always has an entry for every KNOWN_VENUE (None if unavailable)
+    """
+    symbol = normalize_symbol(symbol)
+    per_venue: Dict[str, Optional[Dict[str, Any]]] = {}
+    venue_availability: List[VenueAvailability] = []
+    notes: List[str] = []
+
+    async with httpx.AsyncClient() as client:
+        for venue in KNOWN_VENUES:
+            t0 = time.time()
+            try:
+                resp = await client.get(
+                    f"{MARKET_DATA_URL}/snapshot/{venue}/{symbol}",
+                    timeout=3.0
+                )
+                latency_ms = round((time.time() - t0) * 1000, 2)
+                if resp.status_code == 200:
+                    snap = resp.json()
+                    per_venue[venue] = snap
+                    venue_availability.append(VenueAvailability(
+                        venue=venue,
+                        available=True,
+                        data_age_ms=snap.get("data_age_ms"),
+                    ))
+                elif resp.status_code == 404:
+                    per_venue[venue] = None
+                    venue_availability.append(VenueAvailability(
+                        venue=venue,
+                        available=False,
+                        error="no_snapshot",
+                    ))
+                    notes.append(f"{venue}: no snapshot available for {symbol}")
+                else:
+                    per_venue[venue] = None
+                    venue_availability.append(VenueAvailability(
+                        venue=venue,
+                        available=False,
+                        error=f"HTTP {resp.status_code}",
+                    ))
+            except Exception as e:
+                per_venue[venue] = None
+                err_msg = str(e)[:100]
+                venue_availability.append(VenueAvailability(
+                    venue=venue,
+                    available=False,
+                    error=err_msg,
+                ))
+                notes.append(f"{venue}: unavailable — {err_msg}")
+
+    # --- Aggregate: OI ---
+    # Rule: sum current_usd from venues where data is present and non-null.
+    # Do not impute or estimate missing venues.
+    oi_per_venue: Dict[str, Optional[float]] = {}
+    oi_regime_per_venue: Dict[str, Optional[str]] = {}
+    contributing_oi: List[str] = []
+    missing_oi: List[str] = []
+    total_oi_usd = 0.0
+
+    for venue in KNOWN_VENUES:
+        snap = per_venue.get(venue)
+        if snap and snap.get("oi") and snap["oi"].get("current_usd") is not None:
+            val = float(snap["oi"]["current_usd"])
+            oi_per_venue[venue] = val
+            oi_regime_per_venue[venue] = snap["oi"].get("regime")
+            total_oi_usd += val
+            contributing_oi.append(venue)
+        else:
+            oi_per_venue[venue] = None
+            oi_regime_per_venue[venue] = None
+            missing_oi.append(venue)
+
+    if missing_oi:
+        notes.append(
+            f"OI aggregate is partial: contributing={contributing_oi}, missing={missing_oi}"
+        )
+
+    # --- Aggregate: Funding ---
+    # Rule: per-venue current rate only. No cross-venue average.
+    # Spread = abs difference in BPS, only when exactly 2 venues have live data.
+    funding_per_venue: Dict[str, Optional[float]] = {}
+    available_funding: List[str] = []
+    missing_funding: List[str] = []
+
+    for venue in KNOWN_VENUES:
+        snap = per_venue.get(venue)
+        rate = None
+        if snap and snap.get("funding"):
+            horizons = snap["funding"].get("horizons") or {}
+            rate = horizons.get("now")
+        funding_per_venue[venue] = rate
+        if rate is not None:
+            available_funding.append(venue)
+        else:
+            missing_funding.append(venue)
+
+    funding_spread: Optional[float] = None
+    if len(available_funding) == 2:
+        rates = [funding_per_venue[v] for v in available_funding]
+        funding_spread = round(abs(rates[0] - rates[1]) * 10000, 4)
+    elif len(available_funding) < 2:
+        notes.append(
+            f"Funding spread unavailable: need 2 venues with data, "
+            f"have {len(available_funding)} ({available_funding})"
+        )
+
+    partial = any(not va.available for va in venue_availability)
+
+    return MarketAggregateResponse(
+        symbol=symbol,
+        scope="all_venues",
+        aggregate_ts=datetime.utcnow().isoformat(),
+        partial=partial,
+        venue_availability=venue_availability,
+        oi=OIAggregate(
+            total_usd=total_oi_usd,
+            per_venue=oi_per_venue,
+            contributing_venues=contributing_oi,
+            missing_venues=missing_oi,
+            regime_per_venue=oi_regime_per_venue,
+        ),
+        funding=FundingAggregate(
+            per_venue=funding_per_venue,
+            spread=funding_spread,
+            available_venues=available_funding,
+            missing_venues=missing_funding,
+        ),
+        per_venue=per_venue,
+        notes=notes,
+    )
+
 
 # --- Phase 3C: Macro Feed Endpoints ---
 

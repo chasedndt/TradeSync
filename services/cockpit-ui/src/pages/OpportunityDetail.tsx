@@ -4,7 +4,7 @@ import { useEvidence, usePreview, useExecute, useMarketSnapshot } from '../api/h
 import { StatusBadge, DirectionBadge, EvidenceTrail, PreviewPanel, DryRunBanner } from '../components'
 import type { PreviewResponse, ExecutionResult, MetricStatus, MarketSnapshotWithMicrostructure, Confluence } from '../api/types'
 import { calculateBiasStrength } from '../utils/metrics'
-import { AlertTriangle, ShieldCheck, TrendingUp, Info, Activity, Shield, AlertCircle, Droplets } from 'lucide-react'
+import { AlertTriangle, ShieldCheck, TrendingUp, Info, Activity, Shield, AlertCircle } from 'lucide-react'
 
 const MetricStatusBadge = ({ status }: { status?: MetricStatus }) => {
   if (!status) return null

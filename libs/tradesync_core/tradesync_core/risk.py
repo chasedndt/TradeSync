@@ -68,7 +68,10 @@ class RiskGuardian:
               # Phase 3C: New parameters for microstructure checks
               microstructure: Optional[Dict[str, Any]] = None,
               margin_utilization: float = 0.0,
-              symbol_exposure_usd: float = 0.0
+              symbol_exposure_usd: float = 0.0,
+              # Phase 1 daily notional enforcement
+              daily_notional_usd: float = 0.0,
+              daily_notional_limit: float = 0.0,
               ) -> RiskVerdict:
         """
         Validates a proposed trade against comprehensive hardening rules.
@@ -213,6 +216,18 @@ class RiskGuardian:
                 allowed=False,
                 reason_code=ReasonCode.LIMIT_POSITIONS,
                 reason="Max open positions reached"
+            )
+
+        # 6.5 Daily Notional Limit
+        if daily_notional_limit > 0 and daily_notional_usd + size_usd > daily_notional_limit:
+            return RiskVerdict(
+                allowed=False,
+                reason_code=ReasonCode.LIMIT_DAILY,
+                reason=(
+                    f"Daily notional limit reached: ${daily_notional_usd:,.0f} used + "
+                    f"${size_usd:,.0f} order = ${daily_notional_usd + size_usd:,.0f} "
+                    f"> ${daily_notional_limit:,.0f} daily limit"
+                )
             )
 
         # 7. Cooldown / Duplicate Decision Check

@@ -7,6 +7,7 @@ const statusColors: Record<string, string> = {
   previewed: 'bg-yellow-900 text-yellow-200',
   executed: 'bg-green-900 text-green-200',
   expired: 'bg-gray-700 text-gray-400',
+  blocked: 'bg-red-950 text-red-300 border border-red-800',
   placed: 'bg-green-900 text-green-200',
   rejected: 'bg-red-900 text-red-200',
   error: 'bg-red-900 text-red-200',

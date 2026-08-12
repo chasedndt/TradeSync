@@ -10,40 +10,55 @@ from app.db import insert_event
 logger = logging.getLogger(__name__)
 
 # Drift API Endpoint
-# Using the one user provided: GET https://data.api.drift.trade/contracts
-# But user said "contracts" returns contract info including OI and funding.
-DRIFT_API_URL = "https://data.api.drift.trade/contracts"
+# /contracts was removed from the Drift Data API (returns 404).
+# Replacement: /stats/markets — returns {success, markets: [...]} with same logical data.
+DRIFT_API_URL = "https://data.api.drift.trade/stats/markets"
 
 async def fetch_drift_contracts():
     """
-    Fetch contracts from Drift API.
+    Fetch market data from Drift API via /stats/markets.
+    Returns a list of perp market dicts with symbol, funding, OI, price fields.
     """
     async with aiohttp.ClientSession() as session:
         try:
             async with session.get(DRIFT_API_URL) as response:
                 if response.status != 200:
-                    logger.error(f"Failed to fetch Drift contracts: {response.status}")
+                    logger.error(f"Failed to fetch Drift markets: {response.status}")
                     return []
-                # The response is likely a list of contracts or a dict with a list.
-                # Assuming list based on "contracts" endpoint name, but let's handle dict too.
                 data = await response.json()
+                # /stats/markets returns {"success": true, "markets": [...]} or a bare list
                 if isinstance(data, dict):
-                    if "contracts" in data:
-                        logger.info(f"Drift API returned dict with contracts key. Count: {len(data['contracts'])}")
-                        return data["contracts"]
-                    if "data" in data:
-                        logger.info(f"Drift API returned dict with data key. Count: {len(data['data'])}")
-                        return data["data"]
-                    else:
-                        logger.warning(f"Drift API returned dict with keys: {list(data.keys())}")
-                        return []
-                if isinstance(data, list):
-                    logger.info(f"Drift API returned list. Count: {len(data)}")
-                    return data
-                logger.warning(f"Drift API returned unexpected format: {type(data)}")
-                return []
+                    markets = data.get("markets", data.get("data", []))
+                elif isinstance(data, list):
+                    markets = data
+                else:
+                    logger.warning(f"Drift API returned unexpected format: {type(data)}")
+                    return []
+                # Only perp markets; remap field names to the shape downstream expects
+                result = []
+                for m in markets:
+                    if m.get("marketType", "perp") != "perp":
+                        continue
+                    # Normalise fundingRate: scalar or {long, short}
+                    fr = m.get("fundingRate", 0)
+                    funding_rate = float(fr.get("long", 0) if isinstance(fr, dict) else (fr or 0))
+                    # Normalise openInterest: scalar or {long, short}
+                    oi_raw = m.get("openInterest", 0)
+                    open_interest = (
+                        float(oi_raw.get("long", 0)) + float(oi_raw.get("short", 0))
+                        if isinstance(oi_raw, dict) else float(oi_raw or 0)
+                    )
+                    result.append({
+                        "ticker_id": m.get("symbol", ""),
+                        "last_price": m.get("price", 0),
+                        "funding_rate": funding_rate,
+                        "open_interest": open_interest,
+                        "index_price": m.get("oraclePrice", 0),
+                    })
+                logger.info(f"Drift /stats/markets returned {len(result)} perp markets")
+                return result
         except Exception as e:
-            logger.error(f"Exception fetching Drift contracts: {e}")
+            logger.error(f"Exception fetching Drift markets: {e}")
             return []
 
 async def poll_drift_markets():
@@ -51,39 +66,36 @@ async def poll_drift_markets():
     Poll Drift markets, filter for BTC, ETH, SOL, and insert snapshots into DB.
     """
     logger.info("Starting Drift market polling...")
-    
+
     while True:
         try:
             contracts = await fetch_drift_contracts()
-            
+
             # Filter for BTC, ETH, SOL perps
             target_bases = ["BTC", "ETH", "SOL"]
-            
+
             for contract in contracts:
                 # Fields: ticker_id, last_price, funding_rate, open_interest
                 symbol = contract.get("ticker_id") # e.g. "BTC-PERP"
-                
+
                 if not symbol:
                     continue
-                    
+
                 is_target = False
                 for base in target_bases:
-                    # Check for exact match or suffix
-                    # Drift symbols: "BTC-PERP", "SOL-PERP"
                     if symbol == f"{base}-PERP":
                         is_target = True
                         break
-                
+
                 if not is_target:
                     continue
-                
+
                 # Create payload
                 payload = {
                     "mark": contract.get("last_price"),
                     "funding": contract.get("funding_rate"),
                     "oi": contract.get("open_interest"),
                     "index_price": contract.get("index_price"),
-                    "raw": contract, # Optional: store raw for debugging
                     "venue": "drift"
                 }
                 

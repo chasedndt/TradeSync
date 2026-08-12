@@ -34,6 +34,11 @@ export interface IngestSource {
   last_poll_ts?: string
 }
 
+export interface OpportunityRejection {
+  reason_code: string
+  reason: string
+}
+
 export interface Opportunity {
   id: string
   symbol: string
@@ -43,7 +48,8 @@ export interface Opportunity {
   dir: string
   status: string
   snapshot_ts: string
-  links: Record<string, unknown>
+  links: Record<string, unknown> & { rejection?: OpportunityRejection }
+  confluence?: Record<string, unknown>
 }
 
 export interface Signal {
@@ -115,6 +121,7 @@ export interface RiskLimitResponse {
   max_signal_age: number
   blacklist: string[]
   daily_notional_limit: number
+  account_equity_usd: number
   current_counters: {
     daily_notional_usage: number
     today_date: string
@@ -342,10 +349,11 @@ export interface Confluence {
   warnings: string[]
 }
 
-// Extended Opportunity with Phase 3C confluence data
-export interface OpportunityWithConfluence extends Opportunity {
-  confluence?: Confluence
-}
+// Extended Opportunity with Phase 3C confluence data.
+// Uses Omit+intersection instead of interface extension because Confluence
+// is not assignable to Record<string,unknown> (no index signature), so
+// a direct `extends` with a narrower confluence type is rejected by TS.
+export type OpportunityWithConfluence = Omit<Opportunity, 'confluence'> & { confluence?: Confluence }
 
 // Extended MarketSnapshot with Phase 3C microstructure
 export interface MarketSnapshotWithMicrostructure extends MarketSnapshot {

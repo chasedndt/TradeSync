@@ -40,6 +40,11 @@ export function RiskPolicies() {
                 <div className="text-gray-400">Max Signal Age</div>
                 <div className="text-xl font-bold">{limits.max_signal_age}s</div>
               </div>
+              <div>
+                <div className="text-gray-400">Account Equity</div>
+                <div className="text-xl font-bold">${limits.account_equity_usd.toLocaleString()}</div>
+                <div className="text-xs text-gray-600 mt-0.5">capital base for risk load</div>
+              </div>
             </div>
           </div>
 
@@ -105,6 +110,7 @@ export function RiskPolicies() {
               <div>MAX_EVENT_AGE_SECONDS=<span className="text-gray-400">{limits.max_event_age}</span></div>
               <div>MAX_SIGNAL_AGE_SECONDS=<span className="text-gray-400">{limits.max_signal_age}</span></div>
               <div>DAILY_NOTIONAL_LIMIT=<span className="text-gray-400">{limits.daily_notional_limit}</span></div>
+              <div>ACCOUNT_EQUITY_USD=<span className="text-gray-400">{limits.account_equity_usd}</span></div>
             </div>
             <p className="text-xs text-gray-600">
               Editable policy UI (without restart) is planned for a future release.

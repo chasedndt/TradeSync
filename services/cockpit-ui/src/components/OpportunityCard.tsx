@@ -3,7 +3,7 @@ import type { Opportunity } from '../api/types'
 import { StatusBadge } from './StatusBadge'
 import { DirectionBadge } from './DirectionBadge'
 import { calculateBiasStrength } from '../utils/metrics'
-import { Clock, AlertTriangle } from 'lucide-react'
+import { Clock, AlertTriangle, Ban } from 'lucide-react'
 
 const OPPORTUNITY_TTL_SECONDS = 300 // 5 minutes
 
@@ -12,7 +12,7 @@ interface OpportunityCardProps {
 }
 
 export function OpportunityCard({ opportunity }: OpportunityCardProps) {
-  const { id, symbol, timeframe, bias, quality, dir, status, snapshot_ts } = opportunity
+  const { id, symbol, timeframe, bias, quality, dir, status, snapshot_ts, links } = opportunity
 
   const biasStrength = calculateBiasStrength(bias)
   const ageMs = Date.now() - new Date(snapshot_ts).getTime()
@@ -22,6 +22,9 @@ export function OpportunityCard({ opportunity }: OpportunityCardProps) {
   // Derive display status from timestamps
   const isExpired = ageSec > OPPORTUNITY_TTL_SECONDS
   const displayStatus = isExpired ? 'expired' : status
+
+  // Rejection data for blocked opportunities
+  const rejection = status === 'blocked' ? links?.rejection : undefined
 
   // Freshness indicator
   const isFresh = ageSec < 60
@@ -66,6 +69,14 @@ export function OpportunityCard({ opportunity }: OpportunityCardProps) {
           </div>
         </div>
       </div>
+
+      {rejection && (
+        <div className="mt-2 flex items-center gap-1.5 text-xs text-red-300 bg-red-950/60 border border-red-900 rounded px-2 py-1">
+          <Ban size={10} className="shrink-0" />
+          <span className="font-mono font-medium">{rejection.reason_code}</span>
+          <span className="text-red-400 truncate">{rejection.reason}</span>
+        </div>
+      )}
 
       <div className="mt-3 flex items-center justify-between text-xs">
         <span className="text-gray-500">{new Date(snapshot_ts).toLocaleTimeString()}</span>

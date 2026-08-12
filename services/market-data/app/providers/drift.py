@@ -87,28 +87,52 @@ class DriftProvider(BaseProvider):
 
     async def fetch_context(self, symbols: List[str]) -> Dict[str, Any]:
         """
-        Fetch main context data using /contracts endpoint.
+        Fetch main context data using /stats/markets endpoint.
 
-        Returns funding, OI, volume, prices for all perp contracts.
+        Returns funding, OI, volume, prices for all perp markets.
+        Note: /contracts was removed from the Drift Data API; /stats/markets is the
+        current replacement and returns the same data under different field names.
         """
         try:
-            data = await self._request("/contracts")
+            data = await self._request("/stats/markets")
 
             result = {}
             poll_ts = int(time.time() * 1000)
 
-            # data is a list of contracts
-            contracts = data if isinstance(data, list) else data.get("contracts", [])
+            # /stats/markets returns {"success": true, "markets": [...]} or a bare list
+            if isinstance(data, dict):
+                markets = data.get("markets", [])
+            else:
+                markets = data if isinstance(data, list) else []
 
-            for contract in contracts:
-                ticker = contract.get("ticker_id", "")
+            for market in markets:
+                # Only process perp markets; spot markets have different semantics
+                if market.get("marketType", "perp") != "perp":
+                    continue
 
+                ticker = market.get("symbol", "")
                 if ticker not in symbols:
                     continue
 
-                # Drift reports OI in USD
-                oi_usd = float(contract.get("open_interest", 0))
-                last_price = float(contract.get("last_price", 0))
+                last_price = float(market.get("price", 0))
+
+                # fundingRate may be a scalar or {"long": x, "short": y}
+                funding_raw = market.get("fundingRate", 0)
+                if isinstance(funding_raw, dict):
+                    funding_rate = float(funding_raw.get("long", funding_raw.get("rate", 0)))
+                else:
+                    funding_rate = float(funding_raw or 0)
+
+                # openInterest may be a scalar or {"long": x, "short": y}
+                oi_raw = market.get("openInterest", 0)
+                if isinstance(oi_raw, dict):
+                    oi_usd = float(oi_raw.get("long", 0)) + float(oi_raw.get("short", 0))
+                else:
+                    oi_usd = float(oi_raw or 0)
+
+                # Max leverage lives under limits in the new schema
+                limits = market.get("limits", {})
+                max_leverage = int(limits.get("maxLeverage", market.get("maxLeverage", 20)))
 
                 result[ticker] = {
                     "venue": self.venue,
@@ -116,27 +140,27 @@ class DriftProvider(BaseProvider):
                     "symbol_raw": ticker,
                     "poll_ts": poll_ts,
                     "funding": {
-                        "rate": float(contract.get("funding_rate", 0)),
-                        "source": "contracts"
+                        "rate": funding_rate,
+                        "source": "stats/markets"
                     },
                     "oi": {
                         "value": oi_usd,
-                        "unit": "usd",  # Drift reports in USD
-                        "source": "contracts"
+                        "unit": "usd",
+                        "source": "stats/markets"
                     },
                     "volume": {
-                        "value_24h": float(contract.get("24h_volume", 0)),
+                        "value_24h": float(market.get("baseVolume", 0)),
                         "unit": "usd",
-                        "source": "contracts"
+                        "source": "stats/markets"
                     },
                     "price": {
-                        "mark": float(contract.get("mark_price", last_price)),
-                        "index": float(contract.get("index_price", 0)),
+                        "mark": float(market.get("markPrice", last_price)),
+                        "index": float(market.get("oraclePrice", 0)),
                         "last": last_price
                     },
                     "meta": {
-                        "max_leverage": int(contract.get("max_leverage", 20)),
-                        "market_index": contract.get("market_index", 0)
+                        "max_leverage": max_leverage,
+                        "market_index": self._market_index.get(ticker, 0)
                     }
                 }
 

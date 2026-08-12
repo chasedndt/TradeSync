@@ -1,4 +1,4 @@
-﻿name: tradesync-full
+name: tradesync-full
 
 services:
   # --- Infra (same as compose.infra.yml) ---
@@ -13,7 +13,7 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./ops/sql:/docker-entrypoint-initdb.d:ro
+      - ./sql:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
       interval: 5s
@@ -65,6 +65,9 @@ services:
       MAX_SIGNAL_AGE_SECONDS: "3600"
       MAX_EVENT_AGE_SECONDS: "3600"
       MIN_QUALITY: "1.0"
+      ACCOUNT_EQUITY_USD: "${ACCOUNT_EQUITY_USD:-50000.0}"
+      DAILY_NOTIONAL_LIMIT: "${DAILY_NOTIONAL_LIMIT:-50000.0}"
+      OPPORTUNITY_TTL_SECONDS: "${OPPORTUNITY_TTL_SECONDS:-300}"
     ports:
       - "8000:8000"
 

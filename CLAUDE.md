@@ -1,10 +1,13 @@
 # TradeSync Master Guide
 
 ## 🚀 Core Commands
-- `docker compose -f ops/compose.full.yml up -d` - **Start** full trade stack
-- `docker compose -f ops/compose.full.yml down` - **Stop** all services
+**IMPORTANT:** Always run from project root and include `--env-file .env`. Without this flag, Docker Compose won't find `.env` because the compose file is in `ops/` (a subdirectory).
+
+- `docker compose -f ops/compose.full.yml --env-file .env up -d` - **Start** full trade stack
+- `docker compose -f ops/compose.full.yml --env-file .env up -d --build` - **Start with rebuild** (use after code changes)
+- `docker compose -f ops/compose.full.yml --env-file .env down` - **Stop** all services
 - `docker compose -f ops/compose.full.yml logs -f <service>` - **Live Logs** (e.g., `qdrant`, `ingest-gateway`)
-- `docker compose -f ops/compose.full.yml exec postgres psql -U tradesync -d tradesync` - **DB Access**
+- `docker compose -f ops/compose.full.yml --env-file .env exec postgres psql -U tradesync -d tradesync` - **DB Access**
 
 ## 🧩 Service Logs Reference
 Use these names with the logs command:

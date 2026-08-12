@@ -375,14 +375,14 @@ export function Overview() {
                     </div>
                     <div className="flex justify-between text-gray-400">
                       <span>Drift circuit</span>
-                      <span className={snapshot.circuit_drift === false ? 'text-green-400' : snapshot.circuit_drift === true ? 'text-red-400' : 'text-gray-500'}>
-                        {snapshot.circuit_drift === false ? 'CLOSED' : snapshot.circuit_drift === true ? 'OPEN (tripped)' : 'UNKNOWN'}
+                      <span className={snapshot.drift_circuit?.circuit_open === false ? 'text-green-400' : snapshot.drift_circuit?.circuit_open === true ? 'text-red-400' : 'text-gray-500'}>
+                        {snapshot.drift_circuit?.circuit_open === false ? 'CLOSED' : snapshot.drift_circuit?.circuit_open === true ? 'OPEN (tripped)' : 'UNKNOWN'}
                       </span>
                     </div>
                     <div className="flex justify-between text-gray-400">
                       <span>HL circuit</span>
-                      <span className={snapshot.circuit_hl === false ? 'text-green-400' : snapshot.circuit_hl === true ? 'text-red-400' : 'text-gray-500'}>
-                        {snapshot.circuit_hl === false ? 'CLOSED' : snapshot.circuit_hl === true ? 'OPEN (tripped)' : 'UNKNOWN'}
+                      <span className={snapshot.hl_circuit?.circuit_open === false ? 'text-green-400' : snapshot.hl_circuit?.circuit_open === true ? 'text-red-400' : 'text-gray-500'}>
+                        {snapshot.hl_circuit?.circuit_open === false ? 'CLOSED' : snapshot.hl_circuit?.circuit_open === true ? 'OPEN (tripped)' : 'UNKNOWN'}
                       </span>
                     </div>
                     {snapshot.latest_signal_ts && (

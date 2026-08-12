@@ -1,4 +1,19 @@
-# TradeSync Development Roadmap
+# TradeSync Development Roadmap — SUPERSEDED
+
+> **This file is no longer the active roadmap.**
+>
+> The canonical roadmap is at:
+> **[docs/roadmap/CANONICAL_ROADMAP.md](docs/roadmap/CANONICAL_ROADMAP.md)**
+>
+> That document reflects the actual implemented state of the repo (as of 2026-03-27),
+> merges all phase history, and defines the correct next build steps.
+> Do not add new tasks here.
+
+---
+
+## Historical Content (preserved for reference)
+
+This was the original roadmap. It describes the early-phase structure before the project reached Phase 3C/3D.
 
 This roadmap outlines the development phases for TradeSync, broken down into parallelizable tasks suitable for multiple agents working simultaneously.
 
