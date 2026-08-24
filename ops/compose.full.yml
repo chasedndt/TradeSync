@@ -13,7 +13,7 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./ops/sql:/docker-entrypoint-initdb.d:ro
+      - ./sql:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
       interval: 5s
@@ -187,13 +187,13 @@ services:
     ports:
       - "8005:8005"
     healthcheck:
-      test: [ "CMD", "curl", "-sf", "http://localhost:8005/healthz" ]
+      test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8005/healthz', timeout=3)" ]
       interval: 10s
       timeout: 5s
       retries: 3
 
   backtest-runner:
-    profiles: [backtest]
+    profiles: [analytics]
     build:
       context: ..
       dockerfile: services/backtest-runner/Dockerfile

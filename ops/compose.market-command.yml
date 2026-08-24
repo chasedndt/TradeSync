@@ -1,0 +1,126 @@
+services:
+  postgres:
+    restart: unless-stopped
+    mem_limit: 768m
+    mem_reservation: 384m
+    cpus: 0.50
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
+  redis:
+    restart: unless-stopped
+    mem_limit: 256m
+    mem_reservation: 128m
+    cpus: 0.25
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - 160mb
+      - --maxmemory-policy
+      - noeviction
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
+  market-data:
+    restart: unless-stopped
+    mem_limit: 512m
+    mem_reservation: 256m
+    cpus: 0.50
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
+  ingest-gateway:
+    restart: unless-stopped
+    mem_limit: 384m
+    mem_reservation: 192m
+    cpus: 0.50
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
+  core-scorer:
+    restart: unless-stopped
+    mem_limit: 384m
+    mem_reservation: 192m
+    cpus: 0.50
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
+  fusion-engine:
+    restart: unless-stopped
+    mem_limit: 512m
+    mem_reservation: 256m
+    cpus: 0.75
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
+  state-api:
+    restart: unless-stopped
+    mem_limit: 512m
+    mem_reservation: 256m
+    cpus: 0.75
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
+  qdrant:
+    profiles: [evidence]
+    mem_limit: 768m
+    mem_reservation: 384m
+    cpus: 0.50
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
+  cockpit-ui:
+    profiles: [operator]
+    mem_limit: 256m
+    mem_reservation: 128m
+    cpus: 0.25
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
+  exec-hl-svc:
+    profiles: [paper-exec]
+    restart: unless-stopped
+    mem_limit: 384m
+    mem_reservation: 192m
+    cpus: 0.50
+    environment:
+      DRY_RUN: "true"
+      EXECUTION_ENABLED: "false"
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
+  backtest-runner:
+    profiles: [analytics]
+    mem_limit: 2g
+    mem_reservation: 512m
+    cpus: 2.00
+    logging:
+      driver: json-file
+      options: {max-size: "20m", max-file: "3"}
