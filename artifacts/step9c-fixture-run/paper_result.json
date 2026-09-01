@@ -1,0 +1,23 @@
+{
+  "autonomous_live_approval_allowed": false,
+  "candidate_id": "cand_step9c_fixture_001",
+  "credential_accessed": false,
+  "execution_mode": "paper_only",
+  "fixture_hash": "a693209fb6129250ee8a0d7ddd4a883a9493ab57b288d8b68e132df48c32345a",
+  "human_approval_required_for_live_execution": true,
+  "live_order_created": false,
+  "paper_fill_price": 65050,
+  "paper_filled_at_utc": "2026-07-24T09:10:00Z",
+  "paper_order_id": "paper_ccebd2be12c52310b2cd72096411ecb3",
+  "private_venue_called": false,
+  "reason_code": "activation_observed_on_closed_fixture_candle",
+  "requested_leverage": null,
+  "requested_size": null,
+  "schema_version": "paper_ledger_entry_v1",
+  "side": "long",
+  "simulation_id": "sim_9c460b5f7f72e1f627ac83688797ac3b",
+  "status": "paper_filled",
+  "symbol": "BTC-USD-PERP",
+  "venue": "hyperliquid_simulation",
+  "wallet_action_performed": false
+}

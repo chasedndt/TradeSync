@@ -1,0 +1,52 @@
+{
+  "schema_version": "trade_candidate_v1",
+  "candidate_id": "cand_step9c_fixture_001",
+  "created_at_utc": "2026-07-24T09:00:00Z",
+  "valid_from_utc": "2026-07-24T09:00:00Z",
+  "evidence_cutoff_utc": "2026-07-24T09:00:00Z",
+  "expires_at_utc": "2026-07-24T10:00:00Z",
+  "candidate": {
+    "status": "review_only",
+    "direction": "long",
+    "candidate_type": "directional"
+  },
+  "instrument": {
+    "asset": "BTC",
+    "canonical_symbol": "BTC-USD-PERP",
+    "market_type": "perpetual",
+    "venue_preference": null
+  },
+  "activation": {
+    "operator": "all",
+    "conditions": [{"field": "close", "operator": "above", "value": 65000}]
+  },
+  "invalidation": {
+    "operator": "any",
+    "conditions": [{"field": "close", "operator": "below", "value": 64200}]
+  },
+  "lineage": {
+    "signal_ids": ["sig_fixture_001"],
+    "scenario_ids": ["scn_fixture_001"],
+    "source_item_ids": ["src_fixture_001"]
+  },
+  "risk": {
+    "risk_status": "not_evaluated",
+    "requested_size": null,
+    "requested_leverage": null,
+    "approved_size": null,
+    "approved_leverage": null,
+    "risk_decision_id": null
+  },
+  "execution": {
+    "execution_gateway_status": "disabled",
+    "live_execution_allowed": false,
+    "order_creation_allowed": false,
+    "paper_execution_allowed": false,
+    "order_id": null
+  },
+  "governance": {
+    "authority_level": "level_0_observation_only",
+    "operator_approval_status": "not_requested",
+    "self_authority_change_allowed": false
+  }
+}

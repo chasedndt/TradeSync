@@ -1,0 +1,29 @@
+{
+  "credential_access_enabled": false,
+  "current_mode": "paper_only",
+  "execution_enabled": false,
+  "future_live_execution": {
+    "approval_must_bind": [
+      "candidate_id",
+      "symbol",
+      "side",
+      "maximum_size",
+      "maximum_leverage",
+      "expiry"
+    ],
+    "approval_scope": "one_order_or_bounded_batch",
+    "autonomous_approval_allowed": false,
+    "human_approval_required": true,
+    "required_pre_dispatch_gates": [
+      "independent_risk_decision",
+      "fresh_market_snapshot",
+      "idempotency_key",
+      "kill_switch_healthy",
+      "operator_approval_unconsumed"
+    ]
+  },
+  "private_api_enabled": false,
+  "schema_version": "tradesync_execution_blueprint_v1",
+  "venue_vocabulary": "hyperliquid_only",
+  "wallet_enabled": false
+}

@@ -1,0 +1,14 @@
+{
+  "authority": {
+    "credential_accessed": false,
+    "execution_enabled": false,
+    "future_live_execution_human_approval_required": true,
+    "paper_only": true,
+    "private_venue_called": false,
+    "wallet_action_performed": false
+  },
+  "candidate_path": "/mnt/c/Users/chaseos/Documents/Projects/TradeSync-hyperliquid-only/fixtures/step9c/candidate.json",
+  "candles_path": "/mnt/c/Users/chaseos/Documents/Projects/TradeSync-hyperliquid-only/fixtures/step9c/candles.json",
+  "result_status": "paper_filled",
+  "schema_version": "step9c_fixture_run_v1"
+}
