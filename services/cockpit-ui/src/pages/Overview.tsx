@@ -1,506 +1,246 @@
-import { useSnapshot, useOpportunities, useMarketSnapshots, useMarketStatus, useMacroHeadlines } from '../api/hooks'
-import { OpportunityCard } from '../components'
-import { AlertTriangle, BarChart3, Globe, Zap, Droplets, Shield, AlertCircle, TrendingUp, TrendingDown, Minus, ExternalLink, RefreshCw } from 'lucide-react'
+import { Fragment } from 'react'
+import {
+  Bank,
+  BracketsCurly,
+  ChartLineDown,
+  ChartLineUp,
+  CirclesThreePlus,
+  CurrencyBtc,
+  CurrencyCircleDollar,
+  CurrencyEth,
+  Gauge,
+  GlobeHemisphereWest,
+  HardDrives,
+  Heartbeat,
+  Prohibit,
+  Stack,
+  Waves,
+} from '../components/icons'
+import {
+  useContextOverview,
+  useHealth,
+  useMarketSnapshots,
+  useOpportunities,
+  useSnapshot,
+} from '../api/hooks'
 import type { MarketSnapshotWithMicrostructure } from '../api/types'
 
-// Phase 3C: Execution Conditions Strip Component
-function ExecutionConditionsStrip({
-  btcSnapshot,
-  ethSnapshot
-}: {
-  btcSnapshot?: MarketSnapshotWithMicrostructure
-  ethSnapshot?: MarketSnapshotWithMicrostructure
-}) {
-  // Helper to get condition badge
-  const getConditionBadge = (snapshot?: MarketSnapshotWithMicrostructure, metric: string = 'spread') => {
-    if (!snapshot?.microstructure) {
-      return { status: 'UNAVAILABLE', color: 'bg-gray-800 text-gray-500', icon: AlertCircle }
-    }
+const TRACKED_ORDER = ['BTC-PERP', 'ETH-PERP', 'SOL-PERP']
 
-    const micro = snapshot.microstructure
+function formatUsd(value?: number, digits = 2) {
+  if (value == null || !Number.isFinite(value)) return '—'
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency', currency: 'USD', maximumFractionDigits: value > 10_000 ? 1 : digits,
+  }).format(value)
+}
 
-    if (metric === 'spread') {
-      const spreadOk = micro.spread_bps <= 25
-      return {
-        status: spreadOk ? 'OK' : 'WIDE',
-        color: spreadOk ? 'bg-green-900/30 text-green-400' : 'bg-yellow-900/30 text-yellow-400',
-        value: `${micro.spread_bps.toFixed(1)} bps`,
-        icon: spreadOk ? Shield : AlertTriangle
-      }
-    }
+function formatCompactUsd(value?: number) {
+  if (value == null || !Number.isFinite(value)) return '—'
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 2,
+  }).format(value)
+}
 
-    if (metric === 'liquidity') {
-      const liqOk = micro.liquidity_score >= 0.5
-      return {
-        status: liqOk ? 'HEALTHY' : 'THIN',
-        color: liqOk ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400',
-        value: `${(micro.liquidity_score * 100).toFixed(0)}%`,
-        icon: liqOk ? Droplets : AlertCircle
-      }
-    }
+function formatPercent(value?: number | null, digits = 2) {
+  if (value == null || !Number.isFinite(value)) return '—'
+  return `${value >= 0 ? '+' : ''}${value.toFixed(digits)}%`
+}
 
-    if (metric === 'slippage') {
-      const impact5k = micro.impact_est_bps['5000'] || 0
-      const slipOk = impact5k <= 15
-      return {
-        status: slipOk ? 'LOW' : 'HIGH',
-        color: slipOk ? 'bg-green-900/30 text-green-400' : 'bg-orange-900/30 text-orange-400',
-        value: `${impact5k.toFixed(1)} bps`,
-        icon: slipOk ? Shield : AlertTriangle
-      }
-    }
+function formatAge(seconds?: number | null) {
+  if (seconds == null || !Number.isFinite(seconds)) return '—'
+  if (seconds < 60) return `${seconds.toFixed(seconds < 10 ? 1 : 0)}s ago`
+  return `${Math.floor(seconds / 60)}m ago`
+}
 
-    return { status: 'N/A', color: 'bg-gray-800 text-gray-500', icon: AlertCircle }
-  }
+function AssetIcon({ symbol }: { symbol: string }) {
+  if (symbol === 'BTC') return <span className="asset-icon asset-icon--btc"><CurrencyBtc size={21} weight="bold" /></span>
+  if (symbol === 'ETH') return <span className="asset-icon asset-icon--eth"><CurrencyEth size={21} weight="fill" /></span>
+  return <span className="asset-icon asset-icon--sol"><CurrencyCircleDollar size={21} weight="duotone" /></span>
+}
 
-  const btcSpread = getConditionBadge(btcSnapshot, 'spread')
-  const btcLiquidity = getConditionBadge(btcSnapshot, 'liquidity')
-  const ethSpread = getConditionBadge(ethSnapshot, 'spread')
-  const ethLiquidity = getConditionBadge(ethSnapshot, 'liquidity')
+interface ReadinessItemProps {
+  icon: React.ReactNode
+  label: string
+  value: string
+  detail: string
+  tone: 'good' | 'warn' | 'bad' | 'dim'
+}
 
-  // Overall execution conditions
-  const hasData = btcSnapshot?.microstructure || ethSnapshot?.microstructure
-  const allConditionsGood =
-    (btcSnapshot?.microstructure?.spread_bps ?? 100) <= 25 &&
-    (btcSnapshot?.microstructure?.liquidity_score ?? 0) >= 0.5 &&
-    (ethSnapshot?.microstructure?.spread_bps ?? 100) <= 25 &&
-    (ethSnapshot?.microstructure?.liquidity_score ?? 0) >= 0.5
-
+function ReadinessItem({ icon, label, value, detail, tone }: ReadinessItemProps) {
   return (
-    <div className={`card border-l-4 ${hasData ? (allConditionsGood ? 'border-l-green-500' : 'border-l-yellow-500') : 'border-l-gray-700'}`}>
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
-          <Shield size={14} className={hasData ? (allConditionsGood ? 'text-green-500' : 'text-yellow-500') : 'text-gray-600'} />
-          Execution Conditions
-        </h3>
-        {hasData ? (
-          <span className={`text-[9px] px-2 py-0.5 rounded font-bold ${allConditionsGood ? 'bg-green-900/30 text-green-400' : 'bg-yellow-900/30 text-yellow-400'}`}>
-            {allConditionsGood ? 'ALL CLEAR' : 'CAUTION'}
-          </span>
-        ) : (
-          <span className="text-[9px] px-2 py-0.5 rounded font-bold bg-gray-800 text-gray-500">
-            UNAVAILABLE
-          </span>
-        )}
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-        {/* BTC Spread */}
-        <div className={`${btcSpread.color} rounded p-2`}>
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-gray-400">BTC Spread</span>
-            <btcSpread.icon size={10} />
-          </div>
-          <div className="font-mono font-bold">{btcSpread.value || btcSpread.status}</div>
-        </div>
-
-        {/* BTC Liquidity */}
-        <div className={`${btcLiquidity.color} rounded p-2`}>
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-gray-400">BTC Liq</span>
-            <btcLiquidity.icon size={10} />
-          </div>
-          <div className="font-mono font-bold">{btcLiquidity.value || btcLiquidity.status}</div>
-        </div>
-
-        {/* ETH Spread */}
-        <div className={`${ethSpread.color} rounded p-2`}>
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-gray-400">ETH Spread</span>
-            <ethSpread.icon size={10} />
-          </div>
-          <div className="font-mono font-bold">{ethSpread.value || ethSpread.status}</div>
-        </div>
-
-        {/* ETH Liquidity */}
-        <div className={`${ethLiquidity.color} rounded p-2`}>
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-gray-400">ETH Liq</span>
-            <ethLiquidity.icon size={10} />
-          </div>
-          <div className="font-mono font-bold">{ethLiquidity.value || ethLiquidity.status}</div>
-        </div>
+    <div className="readiness-item">
+      <span className={`readiness-icon tone-${tone}`}>{icon}</span>
+      <div className="readiness-copy">
+        <div className="eyebrow">{label}</div>
+        <div className={`readiness-value tone-${tone}`}>{value}</div>
+        <div className="readiness-detail">{detail}</div>
       </div>
     </div>
   )
 }
 
-// Phase 3C: Macro Feed Card Component
-function MacroFeedCard() {
-  const { data: macroData, isLoading, refetch, isFetching } = useMacroHeadlines({ limit: 5 })
-
-  const getSentimentIcon = (sentiment?: string) => {
-    if (sentiment === 'bullish') return <TrendingUp size={10} className="text-green-400" />
-    if (sentiment === 'bearish') return <TrendingDown size={10} className="text-red-400" />
-    return <Minus size={10} className="text-gray-500" />
-  }
-
-  const getSentimentColor = (sentiment?: string) => {
-    if (sentiment === 'bullish') return 'border-l-green-500'
-    if (sentiment === 'bearish') return 'border-l-red-500'
-    return 'border-l-gray-600'
-  }
-
-  // If no data and loading
-  if (isLoading) {
-    return (
-      <div className="card bg-gray-900/30">
-        <h3 className="text-sm font-bold mb-2 text-gray-400 flex items-center gap-2">
-          <Globe size={14} />
-          Macro Feed
-        </h3>
-        <div className="flex items-center justify-center py-8">
-          <RefreshCw size={20} className="animate-spin text-gray-500" />
-        </div>
-      </div>
-    )
-  }
-
-  // If no headlines
-  if (!macroData?.headlines?.length) {
-    return (
-      <div className="card bg-gray-900/30 border-dashed">
-        <h3 className="text-sm font-bold mb-2 text-gray-400 flex items-center gap-2">
-          <Globe size={14} />
-          Macro Feed
-        </h3>
-        <div className="flex flex-col items-center justify-center py-6 text-center">
-          <AlertCircle className="text-gray-700 mb-2" size={24} />
-          <p className="text-xs text-gray-600">
-            {macroData?.status?.error ? 'Feed error' : 'No headlines available'}
-          </p>
-          <button
-            onClick={() => refetch()}
-            className="mt-3 text-[10px] text-blue-500 hover:underline flex items-center gap-1"
-          >
-            <RefreshCw size={10} />
-            RETRY
-          </button>
-        </div>
-      </div>
-    )
-  }
+function MarketPulse({ snapshots }: { snapshots: MarketSnapshotWithMicrostructure[] }) {
+  const rows = [...snapshots]
+    .filter((snapshot) => TRACKED_ORDER.includes(snapshot.symbol))
+    .sort((a, b) => TRACKED_ORDER.indexOf(a.symbol) - TRACKED_ORDER.indexOf(b.symbol))
 
   return (
-    <div className="card bg-gray-900/30">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-bold text-gray-400 flex items-center gap-2">
-          <Globe size={14} className="text-blue-400" />
-          Macro Feed
-        </h3>
-        <button
-          onClick={() => refetch()}
-          disabled={isFetching}
-          className="p-1 hover:bg-gray-800 rounded"
-          title="Refresh headlines"
-        >
-          <RefreshCw size={12} className={`text-gray-500 ${isFetching ? 'animate-spin' : ''}`} />
-        </button>
+    <section className="panel market-panel" aria-labelledby="market-pulse-title">
+      <div className="panel-heading">
+        <div><h2 id="market-pulse-title">Market Pulse</h2><p>Hyperliquid Perpetuals (Authoritative)</p></div>
+        <span>All times UTC</span>
       </div>
-
-      <div className="space-y-2">
-        {macroData.headlines.map((headline, idx) => (
-          <a
-            key={idx}
-            href={headline.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`block p-2 bg-gray-900/50 rounded border-l-2 ${getSentimentColor(headline.sentiment)} hover:bg-gray-800/50 transition-colors`}
-          >
-            <div className="flex items-start gap-2">
-              {getSentimentIcon(headline.sentiment)}
-              <div className="flex-1 min-w-0">
-                <div className="text-[11px] text-gray-300 leading-tight line-clamp-2">
-                  {headline.title}
-                </div>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="text-[9px] text-gray-500">{headline.source}</span>
-                  <span className="text-[9px] px-1 py-0.5 rounded bg-gray-800 text-gray-500">
-                    {headline.category}
-                  </span>
-                </div>
-              </div>
-              <ExternalLink size={10} className="text-gray-600 flex-shrink-0" />
-            </div>
-          </a>
-        ))}
+      <div className="table-scroll">
+        <table className="market-table">
+          <thead>
+            <tr>
+              <th>Market</th><th>Price (USD)</th><th>24h Price</th><th>Funding (8h)</th>
+              <th>OI Δ (24h)</th><th>Spread</th><th>Liquidity</th><th>Regime</th><th>Freshness</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((snapshot) => {
+              const symbol = snapshot.symbol.replace('-PERP', '')
+              const price = snapshot.microstructure?.mid_price ?? snapshot.orderbook?.mid_price
+              const oi24 = snapshot.oi?.horizons?.['24h']
+              const spread = snapshot.microstructure?.spread_bps ?? snapshot.orderbook?.spread_bps
+              const liquidity = snapshot.microstructure?.liquidity_score
+              const regime = snapshot.regimes?.trend || snapshot.regimes?.market_condition || 'unknown'
+              const ageSeconds = snapshot.data_age_ms / 1000
+              return (
+                <tr key={snapshot.symbol}>
+                  <td><div className="market-id"><AssetIcon symbol={symbol} /><div className="market-name"><strong>{symbol}</strong><span>{snapshot.symbol}</span></div></div></td>
+                  <td><span className="metric-main">{formatUsd(price, price && price < 1000 ? 2 : 1)}</span><span className="metric-sub">mark midpoint</span></td>
+                  <td><span className="metric-main tone-dim">—</span><span className="metric-sub">not exposed</span></td>
+                  <td><span className="metric-main">{snapshot.funding ? `${(snapshot.funding.horizons.h8 * 100).toFixed(4)}%` : '—'}</span><span className="metric-sub">{snapshot.funding?.regime?.toUpperCase() || 'UNAVAILABLE'}</span></td>
+                  <td><span className={`metric-main ${(oi24?.delta_pct ?? 0) >= 0 ? 'tone-good' : 'tone-bad'}`}>{formatPercent(oi24?.delta_pct)}</span><span className="metric-sub">{formatCompactUsd(oi24?.delta_usd)}</span></td>
+                  <td><span className="metric-main tone-good">{spread != null ? `${spread.toFixed(2)} bps` : '—'}</span><span className="metric-sub">{spread != null && spread <= 2 ? 'TIGHT' : 'CHECK'}</span></td>
+                  <td><span className={`metric-main ${liquidity != null && liquidity >= .5 ? 'tone-good' : 'tone-warn'}`}>{liquidity != null ? `${Math.round(liquidity * 100)}%` : '—'}</span><span className="metric-sub">{liquidity != null && liquidity >= .7 ? 'GOOD' : 'LIMITED'}</span></td>
+                  <td><span className={`regime-badge ${regime.toLowerCase() === 'range' ? 'regime-badge--range' : ''}`}>{regime.toUpperCase()}</span></td>
+                  <td><span className={`metric-main ${ageSeconds < 10 ? 'tone-good' : 'tone-warn'}`}>{formatAge(ageSeconds)}</span><span className="metric-sub">{ageSeconds < 10 ? 'LIVE' : 'AGING'}</span></td>
+                </tr>
+              )
+            })}
+            {!rows.length && <tr><td colSpan={9} className="tone-dim">Waiting for Hyperliquid market snapshots.</td></tr>}
+          </tbody>
+        </table>
       </div>
-
-      <div className="mt-2 text-[9px] text-gray-600 flex items-center justify-between">
-        <span>
-          {macroData.status.sources_configured} sources | {macroData.cached ? 'cached' : 'fresh'}
-        </span>
-        <span>{macroData.status.headlines_cached} total</span>
-      </div>
-    </div>
+      <div className="market-footnote">Source: Hyperliquid API &nbsp; • &nbsp; Perpetuals only &nbsp; • &nbsp; 24h price change stays blank until it is exposed by the authoritative feed</div>
+    </section>
   )
 }
 
-const regimeColor = (regime?: string) => {
-  if (!regime) return 'text-gray-500'
-  const r = regime.toLowerCase()
-  if (r === 'bullish' || r === 'increasing' || r === 'elevated') return 'text-green-500'
-  if (r === 'bearish' || r === 'decreasing' || r === 'subdued') return 'text-red-500'
-  return 'text-yellow-500'
+function OpportunitiesPanel({ count, loading }: { count: number; loading: boolean }) {
+  return (
+    <section className="panel" aria-labelledby="paper-opps-title">
+      <div className="panel-heading"><div><h2 id="paper-opps-title">Paper Opportunities</h2><p>Review-worthy setups</p></div></div>
+      <div className="empty-state">
+        <div className="empty-icon"><ChartLineDown size={38} weight="thin" /></div>
+        <h3>{loading ? 'Checking scoring output' : count ? `${count} paper setup${count === 1 ? '' : 's'} available` : 'No scored opportunities available'}</h3>
+        <p>{count ? 'Open Opportunities to inspect the evidence and paper thesis. Nothing can be sent to a wallet.' : 'Market data is live, but the lean runtime is not currently producing ranked opportunities.'}</p>
+        <div className="pipeline-status"><span className="status-dot" />Pipeline status: <strong className="tone-warn">{count ? 'OUTPUT AVAILABLE' : 'PARTIAL'}</strong></div>
+      </div>
+    </section>
+  )
+}
+
+function ContextPanel({ context }: { context: ReturnType<typeof useContextOverview>['data'] }) {
+  const coin = context?.providers.coingecko
+  const llama = context?.providers.defillama
+  const fred = context?.providers.fred
+  const assets = coin?.data.assets || {}
+
+  return (
+    <section className="panel context-panel" aria-labelledby="context-title">
+      <div id="context-title" className="context-title">Context Only <span>(Non-Authoritative)</span></div>
+      <div className="context-grid">
+        <div className="context-block">
+          <div className="context-provider"><GlobeHemisphereWest size={20} className="tone-good" weight="duotone" />CoinGecko <span>(Spot Reference)</span></div>
+          <div className="context-assets">
+            {['BTC', 'ETH', 'SOL'].map((symbol) => <Fragment key={symbol}><span>{symbol}</span><span>{formatUsd(assets[symbol]?.price_usd, assets[symbol]?.price_usd < 1000 ? 2 : 0)}</span><span className={(assets[symbol]?.change_24h_pct ?? 0) >= 0 ? 'tone-good' : 'tone-bad'}>{formatPercent(assets[symbol]?.change_24h_pct)}</span></Fragment>)}
+          </div>
+          <div className="context-age">Updated {formatAge(coin?.age_seconds)}</div>
+        </div>
+        <div className="context-block">
+          <div className="context-provider"><Waves size={20} className="tone-info" weight="duotone" />DefiLlama <span>(Hyperliquid TVL)</span></div>
+          <div className="context-big">{formatCompactUsd(llama?.data.tvl_usd)}</div>
+          <div className="context-age">Updated {formatAge(llama?.age_seconds)}</div>
+        </div>
+        <div className="context-block">
+          <div className="context-provider"><Bank size={20} weight="duotone" />FRED <span>(Macro Reference)</span></div>
+          <div className="context-big tone-dim">{fred?.status === 'healthy' ? 'Configured' : 'Not configured'}</div>
+          <div className="context-age">{fred?.status === 'healthy' ? 'Free macro context enabled' : 'Free API key required to enable'}</div>
+        </div>
+        <div className="context-block context-note">
+          <strong>CONTEXT ONLY</strong> — for situational awareness.<br />
+          Authoritative data comes from Hyperliquid.<br />
+          No trade decisions are made from these sources.
+        </div>
+      </div>
+    </section>
+  )
+}
+
+interface HealthItemProps { icon: React.ReactNode; name: string; state: string; detail: string; tone: 'good' | 'warn' | 'bad' | 'dim' }
+function HealthItem({ icon, name, state, detail, tone }: HealthItemProps) {
+  return <div className="health-item"><span className={`tone-${tone}`}>{icon}</span><span className="health-name">{name}</span><span className={`health-state tone-${tone}`}>{state}</span><span className="health-latency">{detail}</span></div>
 }
 
 export function Overview() {
+  const { data: marketData, isError: marketError } = useMarketSnapshots()
+  const { data: context } = useContextOverview()
+  const { data: health, isError: healthError } = useHealth()
   const { data: snapshot } = useSnapshot()
-  const { data: opportunities, isLoading: oppsLoading } = useOpportunities('all', 50)
-  const { data: marketData } = useMarketSnapshots()
-  const { data: marketStatus } = useMarketStatus()
-
-  const ltfOpps = opportunities?.filter(o => ['15m', '5m', '1m'].includes(o.timeframe)) || []
-
-  // Extract BTC and ETH snapshots for HTF thesis
-  const btcSnapshot = marketData?.snapshots?.find(s => s.symbol === 'BTC-PERP')
-  const ethSnapshot = marketData?.snapshots?.find(s => s.symbol === 'ETH-PERP')
-
-  // Unique LTF opportunities (one per symbol per direction)
-  const curatedLtf = Array.from(new Map(ltfOpps.map(o => [`${o.symbol}-${o.dir}`, o])).values()).slice(0, 6)
-
-  const eventAgeSec = snapshot?.latest_event_ts
-    ? Math.floor((Date.now() - new Date(snapshot.latest_event_ts).getTime()) / 1000)
-    : null
+  const { data: opportunities, isLoading: opportunitiesLoading } = useOpportunities('all', 50)
+  const snapshots = (marketData?.snapshots || []) as MarketSnapshotWithMicrostructure[]
+  const freshest = snapshots.length ? Math.min(...snapshots.map((item) => item.data_age_ms)) / 1000 : null
+  const marketLive = !marketError && snapshots.length > 0 && (freshest ?? 999) < 15
+  const redisHealthy = snapshot ? Object.values(snapshot.stream_lengths || {}).every((value) => value >= 0) : false
+  const opportunityCount = opportunities?.length || 0
+  const hasSignals = Boolean(snapshot?.latest_signal_ts)
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold">Trading Command</h2>
-        {eventAgeSec !== null && eventAgeSec > 300 && (
-          <div className="flex items-center gap-2 text-red-500 text-sm font-bold animate-pulse">
-            <AlertTriangle size={16} />
-            DATA STALE ({Math.floor(eventAgeSec / 60)}m ago)
-          </div>
-        )}
+    <div className="mission-control">
+      <section className="panel readiness-strip" aria-label="System readiness">
+        <ReadinessItem icon={<ChartLineUp size={35} weight="duotone" />} label="Market Data" value={marketLive ? 'LIVE' : 'UNAVAILABLE'} detail={`Hyperliquid · ${freshest == null ? 'waiting for data' : `last update ${formatAge(freshest)}`}`} tone={marketLive ? 'good' : 'bad'} />
+        <ReadinessItem icon={<Heartbeat size={35} weight="duotone" />} label="Intelligence Pipeline" value={hasSignals ? 'ACTIVE' : 'PARTIAL'} detail={hasSignals ? 'Scoring output detected' : 'No current scoring output'} tone={hasSignals ? 'good' : 'warn'} />
+        <ReadinessItem icon={<Prohibit size={35} weight="bold" />} label="Execution" value="DISABLED" detail="Paper-only · No wallet connected" tone="bad" />
+      </section>
+
+      <div className="primary-grid">
+        <MarketPulse snapshots={snapshots} />
+        <OpportunitiesPanel count={opportunityCount} loading={opportunitiesLoading} />
       </div>
 
-      {/* Primary Metrics Strip */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="card flex items-center gap-4">
-          <div className="p-2 bg-blue-900/20 rounded text-blue-500">
-            <Zap size={20} />
-          </div>
-          <div>
-            <div className="text-xs text-gray-400">Events in Stream</div>
-            <div className="text-sm font-bold">
-              {snapshot?.stream_lengths?.['x:events.norm'] != null
-                ? `${snapshot.stream_lengths['x:events.norm'].toLocaleString()}`
-                : <span className="text-gray-500">—</span>}
-            </div>
-          </div>
-        </div>
-        <div className="card flex items-center gap-4">
-          <div className="p-2 bg-green-900/20 rounded text-green-500">
-            <BarChart3 size={20} />
-          </div>
-          <div>
-            <div className="text-xs text-gray-400">Execution</div>
-            <div className="text-sm font-bold">{snapshot?.execution_gate === 'true' ? 'ARMED' : 'DISARMED'}</div>
-          </div>
-        </div>
-        <div className="card flex items-center gap-4">
-          <div className="p-2 bg-purple-900/20 rounded text-purple-500">
-            <Globe size={20} />
-          </div>
-          <div>
-            <div className="text-xs text-gray-400">Venues</div>
-            <div className="text-sm font-bold flex gap-2">
-              <span className={snapshot?.hl_status === 'ok' ? 'text-green-500' : 'text-red-500'}>Hyperliquid</span>
-            </div>
-          </div>
-        </div>
-        <div className="card flex items-center gap-4">
-          <div className="p-2 bg-orange-900/20 rounded text-orange-500">
-            <AlertTriangle size={20} />
-          </div>
-          <div>
-            <div className="text-xs text-gray-400">Last Event</div>
-            <div className={`text-sm font-bold ${
-              eventAgeSec === null ? 'text-gray-500' :
-              eventAgeSec < 30 ? 'text-green-500' :
-              eventAgeSec < 120 ? 'text-yellow-500' : 'text-red-500'
-            }`}>
-              {eventAgeSec === null ? '—' : eventAgeSec < 60 ? `${eventAgeSec}s ago` : `${Math.floor(eventAgeSec / 60)}m ago`}
-            </div>
-          </div>
-        </div>
-      </div>
+      <ContextPanel context={context} />
 
-      {/* Phase 3C: Execution Conditions Strip */}
-      <ExecutionConditionsStrip btcSnapshot={btcSnapshot as MarketSnapshotWithMicrostructure} ethSnapshot={ethSnapshot as MarketSnapshotWithMicrostructure} />
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: Opportunities */}
-        <div className="lg:col-span-2 space-y-6">
-          <section>
-            <h3 className="text-sm font-medium text-gray-400 mb-3 flex items-center gap-2">
-              <Zap size={14} className="text-yellow-500" />
-              Active Opportunities (LTF)
-            </h3>
-            {oppsLoading && <div className="text-gray-400">Scanning markets...</div>}
-            {curatedLtf.length === 0 && !oppsLoading && (
-              <div className="bg-gray-900/50 border border-gray-800 border-dashed rounded-lg p-8 text-center text-gray-500">
-                No active signals found in current regime.
-              </div>
-            )}
-            <div className="grid gap-4 md:grid-cols-2">
-              {curatedLtf.map((opp) => (
-                <OpportunityCard key={opp.id} opportunity={opp} />
-              ))}
-            </div>
-          </section>
-
-          <section>
-            <h3 className="text-sm font-medium text-gray-400 mb-3">System State</h3>
-            <div className="card p-0 overflow-hidden">
-              <div className="bg-gray-900/50 p-2 text-xs text-gray-500 border-b border-gray-800 flex items-center justify-between">
-                <span>Telemetry Stream</span>
-                {snapshot?.stream_lengths && (
-                  <span className="text-gray-600">
-                    norm:{snapshot.stream_lengths['x:events.norm'] ?? '?'} &nbsp;
-                    sig:{snapshot.stream_lengths['x:signals.funding'] ?? '?'}
-                  </span>
-                )}
-              </div>
-              <div className="p-4 space-y-2 text-xs">
-                {snapshot ? (
-                  <>
-                    <div className="flex justify-between text-gray-400">
-                      <span>Execution gate</span>
-                      <span className={snapshot.execution_gate === 'true' ? 'text-green-400' : 'text-yellow-400'}>
-                        {snapshot.execution_gate === 'true' ? 'ARMED' : 'DISARMED'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-gray-400">
-                      <span>HL circuit</span>
-                      <span className={snapshot.hl_circuit?.circuit_open === false ? 'text-green-400' : snapshot.hl_circuit?.circuit_open === true ? 'text-red-400' : 'text-gray-500'}>
-                        {snapshot.hl_circuit?.circuit_open === false ? 'CLOSED' : snapshot.hl_circuit?.circuit_open === true ? 'OPEN (tripped)' : 'UNKNOWN'}
-                      </span>
-                    </div>
-                    {snapshot.latest_signal_ts && (
-                      <div className="flex justify-between text-gray-400">
-                        <span>Last signal</span>
-                        <span className="text-gray-500">
-                          {Math.floor((Date.now() - new Date(snapshot.latest_signal_ts).getTime()) / 1000)}s ago
-                        </span>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="text-gray-600 text-center py-4 italic">
-                    Awaiting backend connection…
-                  </div>
-                )}
-              </div>
-            </div>
-          </section>
-        </div>
-
-        {/* Right Column: High-Level Context */}
-        <div className="space-y-6">
-          <div className="card border-l-4 border-l-blue-500">
-            <h3 className="text-sm font-bold mb-2">HTF Thesis</h3>
-            <div className="space-y-4">
-              {btcSnapshot ? (
-                <div>
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="text-gray-400 text-xs">BTC</span>
-                    <span className={`font-bold ${regimeColor(btcSnapshot.regimes?.trend)}`}>
-                      {btcSnapshot.regimes?.trend?.toUpperCase() || 'UNKNOWN'}
-                    </span>
-                  </div>
-                  <div className="text-xs text-gray-300 space-y-1">
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Funding</span>
-                      <span className={regimeColor(btcSnapshot.regimes?.funding)}>
-                        {btcSnapshot.regimes?.funding || 'N/A'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">OI</span>
-                      <span className={regimeColor(btcSnapshot.regimes?.oi)}>
-                        {btcSnapshot.regimes?.oi || 'N/A'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-xs text-gray-500 italic">BTC data unavailable</div>
-              )}
-              <div className="pt-2 border-t border-gray-800">
-                {ethSnapshot ? (
-                  <div>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-gray-400">ETH</span>
-                      <span className={`font-bold ${regimeColor(ethSnapshot.regimes?.trend)}`}>
-                        {ethSnapshot.regimes?.trend?.toUpperCase() || 'UNKNOWN'}
-                      </span>
-                    </div>
-                    <div className="text-xs text-gray-300 space-y-1">
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Funding</span>
-                        <span className={regimeColor(ethSnapshot.regimes?.funding)}>
-                          {ethSnapshot.regimes?.funding || 'N/A'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">OI</span>
-                        <span className={regimeColor(ethSnapshot.regimes?.oi)}>
-                          {ethSnapshot.regimes?.oi || 'N/A'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-xs text-gray-500 italic">ETH data unavailable</div>
-                )}
-              </div>
-            </div>
+      <div className="bottom-grid">
+        <section className="panel" aria-labelledby="system-health-title">
+          <div className="panel-heading"><h2 id="system-health-title">System Health</h2></div>
+          <div className="health-grid">
+            <HealthItem icon={<HardDrives size={24} weight="duotone" />} name="PostgreSQL" state={health?.postgres ? 'HEALTHY' : 'UNAVAILABLE'} detail={health?.latency_ms != null ? `${health.latency_ms.toFixed(0)}ms` : '—'} tone={health?.postgres ? 'good' : 'bad'} />
+            <HealthItem icon={<Stack size={24} weight="duotone" />} name="Redis" state={redisHealthy ? 'HEALTHY' : 'UNAVAILABLE'} detail={redisHealthy ? 'stream checks pass' : '—'} tone={redisHealthy ? 'good' : 'bad'} />
+            <HealthItem icon={<PulseIcon />} name="Hyperliquid Market Data" state={marketLive ? 'LIVE' : 'UNAVAILABLE'} detail={freshest == null ? '—' : formatAge(freshest)} tone={marketLive ? 'good' : 'bad'} />
+            <HealthItem icon={<BracketsCurly size={24} weight="duotone" />} name="State API" state={!healthError && health ? 'HEALTHY' : 'UNAVAILABLE'} detail={health ? `${health.latency_ms.toFixed(0)}ms DB read` : '—'} tone={!healthError && health ? 'good' : 'bad'} />
+            <HealthItem icon={<Gauge size={24} weight="duotone" />} name="Scorer Service" state={hasSignals ? 'OUTPUT SEEN' : 'NO OUTPUT'} detail={hasSignals ? 'signal timestamp present' : 'not measured directly'} tone={hasSignals ? 'good' : 'warn'} />
+            <HealthItem icon={<CirclesThreePlus size={24} weight="duotone" />} name="Fusion Engine" state={opportunityCount ? 'OUTPUT SEEN' : 'NO OUTPUT'} detail={opportunityCount ? `${opportunityCount} opportunities` : 'not measured directly'} tone={opportunityCount ? 'good' : 'warn'} />
           </div>
+          <div className="health-note">Runtime evidence only. “No output” is not reported as a service outage.</div>
+        </section>
 
-          <MacroFeedCard />
-
-          <div className="card">
-            <h3 className="text-sm font-bold mb-3">Market Data Providers</h3>
-            <div className="space-y-3">
-              {marketStatus?.providers && marketStatus.providers.length > 0 ? (
-                marketStatus.providers.map((provider) => (
-                  <div key={provider.venue}>
-                    <div className="flex justify-between text-[10px] text-gray-500 mb-1">
-                      <span className="uppercase">{provider.venue}</span>
-                      <span className={provider.enabled ? 'text-green-500' : 'text-red-500'}>
-                        {provider.enabled ? 'ENABLED' : 'DISABLED'}
-                      </span>
-                    </div>
-                    <div className="h-1 bg-gray-800 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full ${provider.enabled ? 'bg-green-500' : 'bg-red-500'}`}
-                        style={{ width: provider.enabled ? '100%' : '20%' }}
-                      ></div>
-                    </div>
-                    <div className="text-[9px] text-gray-600 mt-1">
-                      Metrics: {provider.metrics?.join(', ') || 'none'}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div>
-                  <div className="flex justify-between text-[10px] text-gray-500 mb-1">
-                    <span>HYPERLIQUID</span>
-                    <span className={snapshot?.hl_status === 'ok' ? 'text-green-500' : 'text-yellow-500'}>
-                      {snapshot?.hl_status === 'ok' ? 'CONNECTED' : 'WAITING'}
-                    </span>
-                  </div>
-                  <div className="h-1 bg-gray-800 rounded-full overflow-hidden">
-                    <div className={`h-full ${snapshot?.hl_status === 'ok' ? 'bg-green-500' : 'bg-yellow-500'} w-full`}></div>
-                  </div>
-                </div>
-              )}
-            </div>
+        <section className="panel" aria-labelledby="execution-status-title">
+          <div className="panel-heading"><h2 id="execution-status-title">Execution Status</h2></div>
+          <div className="execution-card">
+            <Prohibit size={35} className="tone-bad" weight="bold" />
+            <div><h3>DISABLED</h3><strong>Paper-only mode</strong></div>
+            <ul className="execution-list"><li>No wallet connected</li><li>No orders can be placed</li></ul>
           </div>
-        </div>
+        </section>
       </div>
     </div>
   )
+}
+
+function PulseIcon() {
+  return <Heartbeat size={24} weight="duotone" />
 }

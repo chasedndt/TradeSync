@@ -377,3 +377,37 @@ export interface MacroFeedResponse {
   cached: boolean
   ts: string
 }
+
+export interface ContextProvider {
+  provider: string
+  status: 'healthy' | 'stale' | 'degraded' | 'unavailable' | 'disabled'
+  source_type: 'context_only'
+  execution_authority: false
+  cached?: boolean
+  stale?: boolean
+  age_seconds?: number | null
+  fetched_at?: string | null
+  ttl_seconds?: number
+  reason?: string
+  error?: string
+  data: {
+    metric_family?: string
+    assets?: Record<string, {
+      price_usd: number
+      change_24h_pct?: number | null
+      observed_at?: number
+    }>
+    protocol?: string
+    tvl_usd?: number
+    series?: Record<string, { value: string; date: string }>
+  }
+}
+
+export interface ContextOverviewResponse {
+  role: 'context_only'
+  authoritative_market_source: 'hyperliquid'
+  execution_venue: 'hyperliquid'
+  execution_authority: false
+  providers: Record<'coingecko' | 'defillama' | 'fred', ContextProvider>
+  generated_at: string
+}

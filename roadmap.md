@@ -1,71 +1,78 @@
-# TradeSync Development Roadmap
+# TradeSync Roadmap
 
-This roadmap outlines the development phases for TradeSync, broken down into parallelizable tasks suitable for multiple agents working simultaneously.
+Last updated: 2026-09-01
 
-## 📅 Phase 1: Foundation & Data Ingestion
-**Goal:** Establish a robust data pipeline and storage layer.
+## Product direction
 
-### 🟢 Track A: Infrastructure & Database
-*   **Task A1:** Finalize `ops/sql/schema.sql` and ensure all necessary tables (events, signals, opportunities) are correctly defined.
-*   **Task A2:** Create a database migration script/tool (e.g., using Alembic or raw Python) to manage schema changes.
-*   **Task A3:** Set up a local Docker Compose environment for Postgres + Services.
+TradeSync is the Hyperliquid-only operator and evidence layer for ChaseOS Market Command. Development remains paper-first. New capability must improve decision quality, auditability, reliability, or safety before it increases automation.
 
-### 🔵 Track B: Ingest Gateway (Data)
-*   **Task B1:** Complete `services/ingest-gateway/app/main.py` to accept and validate incoming data payloads.
-*   **Task B2:** Implement data normalization logic in `ingest-gateway` to convert exchange-specific formats into the standard `events` schema.
-*   **Task B3:** Add support for multiple data sources (e.g., Binance, Bybit) in `data/fetch_data.py` or as separate microservices feeding the gateway.
+## Phase 1 — Mission Control foundation (current)
 
-### 🟣 Track C: Core Scorer (Logic)
-*   **Task C1:** Refine `agent/core.py` to implement the "Bias Scoring" logic described in README.
-*   **Task C2:** Implement unit tests for `agent/scorer.py` to verify scoring algorithms independent of live data.
+Status: implemented locally; visual QA pending browser availability.
 
----
+- Responsive Mission Control shell for desktop, tablet, and mobile.
+- Hyperliquid-authoritative BTC, ETH, and SOL perpetual market pulse.
+- CoinGecko and DefiLlama free context feeds; optional free-key FRED feed.
+- Context-only authority labels in the API and UI.
+- Honest readiness model that separates live market data, scoring output, and execution authority.
+- Read-only execution readiness; no fake arming, kill, or wallet controls.
+- Reconciled README, provider matrix, and change record.
 
-## 🚀 Phase 2: State Management & Execution
-**Goal:** Enable the system to maintain state and execute trades.
+Acceptance gate: frontend build, context tests, healthy Docker cockpit, browser visual QA, responsive screenshots, and zero critical console errors.
 
-### 🟢 Track A: State API
-*   **Task A4:** Develop `services/state-api` to expose the current market state (latest events, signals) via REST/gRPC.
-*   **Task A5:** Implement caching (Redis?) for `state-api` to ensure low-latency access for the scorer.
+## Phase 2 — Data truth and journal accuracy
 
-### 🔵 Track B: Execution Adapters
-*   **Task B4:** Implement `executor/retired protocol_exec.py` using `retired protocolpy` SDK.
-    *   *Subtask:* Authentication & Wallet setup.
-    *   *Subtask:* Order placement (Limit, Market, Oracle).
-*   **Task B5:** Implement `executor/hyper_exec.py` using `hyperliquid-sdk`.
-    *   *Subtask:* API signing & Order management.
-*   **Task B6:** Create `executor/exec_interface.py` to enforce a common interface for all executors.
+Status: next.
 
-### 🟣 Track C: Signal Engine Integration
-*   **Task C3:** Connect `agent/core.py` to `state-api` to fetch real-time data for scoring.
-*   **Task C4:** Implement the "Decision" logic to convert Scores -> Opportunities -> Decisions -> Execution Orders.
+- Expose authoritative Hyperliquid 24-hour mark-price change instead of borrowing spot context.
+- Add explicit service probes for scorer and fusion so “no output” and “service offline” remain distinct.
+- Audit ingested events, signals, opportunities, decisions, and orders for timestamp, symbol, timeframe, status, and provenance consistency.
+- Build reconciliation views for missing links, duplicates, stale rows, and schema drift.
+- Define deterministic KPI calculations for win rate, expectancy, drawdown, slippage, and thesis adherence.
 
----
+Acceptance gate: fixture-backed calculations, database reconciliation report, and no ambiguous simulated/live labels.
 
-## 💎 Phase 3: User Interface & Advanced Features
-**Goal:** Provide visibility and advanced AI capabilities.
+## Phase 3 — Market Canvas drilldown (selected future direction 2)
 
-### 🟢 Track A: Frontend Dashboard
-*   **Task A6:** Initialize a Next.js project for the dashboard.
-*   **Task A7:** Build UI components to visualize:
-    *   Real-time "Bias Score" charts.
-    *   Active "Opportunities" and "Positions".
-    *   System health/status.
+Status: planned, not started.
 
-### 🔵 Track B: AI & Journaling
-*   **Task B7:** Implement `agent/journal.py` to log trade reasoning to the database.
-*   **Task B8:** Integrate an LLM (OpenAI/Anthropic) to generate natural language explanations for signals.
+- Individual Hyperliquid market workspace opened from a Mission Control row.
+- Multi-timeframe chart, funding/OI/volume overlays, order-book depth, liquidity, regime, and provenance.
+- Evidence timeline linking market observations to signals and paper decisions.
+- Time-range, timeframe, and metric controls with mobile-safe interaction states.
 
-### 🟣 Track C: Multi-Agent Coordination
-*   **Task C5:** Implement a "Conflict Resolution" module to handle disagreeing signals from different sub-agents.
+Acceptance gate: a single-market paper review can be reproduced from stored evidence without relying on screenshots or memory.
 
----
+## Phase 4 — Paper intelligence bridge
 
-## 🤝 Parallel Workflows (Agent Assignments)
+Status: planned.
 
-| Agent Role | Focus Area | Immediate Tasks |
-| :--- | :--- | :--- |
-| **Agent 1 (Data)** | Ingest Gateway & DB | B1, B2, A1, A2 |
-| **Agent 2 (Core)** | Scoring & State | C1, C2, A4 |
-| **Agent 3 (Exec)** | Execution Adapters | B4, B5, B6 |
-| **Agent 4 (UI)** | Dashboard | A6, A7 |
+- Versioned Strike Zone receipt to `trade_candidate_v1` adapter.
+- Single-use approval-consumption ledger and replay protection.
+- Scorer/fusion restoration and calibrated opportunity ranking.
+- Paper-only outcome tracking and model/rule evaluation.
+- Optional local Hermes/Ollama explanations that cannot change risk or authority.
+
+Acceptance gate: end-to-end paper receipt, approval, decision, journal, and outcome evidence across restarts.
+
+## Phase 5 — Ecosystem screener expansion
+
+Status: far-later deferred scope.
+
+- Start with Solana ecosystem discovery and on-chain token screening only after the Hyperliquid workflow is mature.
+- Keep on-chain token data in a separate source/authority namespace from Hyperliquid perpetual execution.
+- Add provenance, liquidity, contract-risk, holder/distribution, and manipulation-risk gates before any token is surfaced.
+- Reuse the Market Canvas pattern for asset drilldown, not the primary Mission Control table.
+
+No-go: do not add Solana execution, wallet authority, token routing, or paid feeds as part of the current dashboard phase.
+
+## Phase 6 — Isolated wallet and bounded canary
+
+Status: approval-gated future work.
+
+- Create a separate Hyperliquid wallet only with explicit operator approval.
+- Keep signer secrets outside models, logs, browser storage, and general service environments.
+- Require durable approval consumption, idempotency, reconciliation, risk ceilings, and emergency fail-closed controls.
+- Start with a bounded canary only after paper evidence and security review pass.
+
+No-go: no wallet creation, credential use, live execution, deployment, spend, or permission changes under the current roadmap authorization.

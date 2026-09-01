@@ -1,267 +1,111 @@
-# 🤖 TradeSync AI Agent
+# TradeSync Mission Control
 
-> A Modular AI-Powered Crypto Trading Engine for Signal Scoring, On-Chain Execution, and Future Autonomous Trading Agents.
+TradeSync is the Hyperliquid-only market-state, paper-research, risk, evidence, and future fail-closed execution layer inside ChaseOS Market Command.
 
----
+The current system is deliberately **paper-only**:
 
-## 🧠 What is TradeSync?
+- Hyperliquid is the sole venue and authoritative market source.
+- `EXECUTION_ENABLED=false` and `DRY_RUN=true` are the required defaults.
+- No wallet or signer is configured.
+- CoinGecko, DefiLlama, and optional FRED data are context-only and never grant scoring, approval, risk, or execution authority.
+- ChaseOS means the canonical control-plane vault at `C:\Users\chaseos\Documents\chaseos_obsidian`; this repository does not replace or relocate it.
 
-**TradeSync** is an AI-driven crypto trading agent designed to mimic the thinking process of a professional trader — but with **machine-speed logic**, real-time data ingestion, and full system modularity.
+## Current runtime
 
-It collects key market signals (funding, open interest, CVD, price structure, etc.), scores them using custom rule-weighting models, and outputs high-quality **long/short bias alerts** to platforms like Discord or Telegram. These alerts include **confidence scores**, **natural-language rationale**, and optional signal modifiers like SL/TP targets or PnL zones.
+The lean operator stack used by the dashboard contains:
 
-> In future versions, TradeSync will also auto-execute trades across **retired protocol (Solana)** and **Hyperliquid (Custom L2)** using smart wallet logic, execution guards, and LLM-based override systems.
+| Service | Role | Current operator profile |
+|---|---|---|
+| `postgres` | Durable market, signal, opportunity, decision, and order records | Running |
+| `redis` | Streams and short-lived coordination state | Running |
+| `market-data` | Hyperliquid public market polling and normalized snapshots | Running |
+| `state-api` | Read model and bounded action API | Running |
+| `cockpit-ui` | Responsive Mission Control dashboard | Running |
+| `core-scorer` | Signal scoring | Optional / not in lean dashboard profile |
+| `fusion-engine` | Opportunity construction | Optional / not in lean dashboard profile |
+| `exec-hl-svc` | Hyperliquid paper executor | Optional profile; fail-closed |
 
----
+The dashboard reports measured output. It does not label an unprobed service outage as healthy, and it does not treat the absence of signals as venue disconnection.
 
-## 🧬 Core Vision & Philosophy
+## Start and stop
 
-TradeSync is built on four key pillars:
+Use the governed runtime environment file already prepared on E:. Do not copy secrets into this repository.
 
-1. **Data-Driven Scoring Logic**
-   We don't guess. We evaluate. The system ingests real-time funding, delta, trend structure, and technical indicators — then computes a **bias score** based on configurable rules.
-
-2. **Modular Execution Layer**
-   Our system will support multiple backends (retired protocol, Hyperliquid, Base) using a **swappable execution interface** to stay flexible across chains and future infrastructure.
-
-3. **AI Interpretation & Natural Language Alerts**
-   All outputs are human-readable, LLM-ready, and structured for social and Discord delivery. No vague signals — only full rationale.
-
-4. **Agent-Based Expansion**
-   Future modules include: real-time chart parsing, Pine Script interop, PnL logging, self-improvement scoring loops, and autonomous trade journaling.
-
----
-
-## ⚙️ What TradeSync Currently Does (v1)
-
-### 🧪 1. Ingests Market Data:
-- 📈 Price structure (support, resistance, trend)
-- 🔁 Funding rate (bullish/bearish sentiment)
-- 📊 Open interest (leverage exposure)
-- 🔴 Delta (CVD / net taker flow)
-- ⚙️ Technical indicators (VWAP, EMA, FVG, RSI, etc.)
-
-### 🧠 2. Scores the Market:
-- Configurable rule system assigns weights to each component
-- Long/Short bias scores are calculated
-- Confirmation filters applied (e.g., EMA trend must align with funding bias)
-- Confidence output between `0–100` for each direction
-
-### 📣 3. Sends Trade Alerts:
-- Discord or Telegram bot messages
-- Structured markdown:
-  - 🔺 Long / 🔻 Short
-  - 📊 Confidence score
-  - 💡 Signal reason summary
-  - ⛓️ Chain reference (e.g., retired protocol vs Hyperliquid)
-  - 📉 Funding / CVD / OI summary
-- Optionally includes SL/TP suggestions or Notion journal embeds
-
----
-
-## 🚀 Future Roadmap
-
-### ✅ retired protocol Protocol Integration (Solana)
-- TradeSync will use `retired protocolpy` SDK for order execution
-- Phantom wallet auth
-- Stop loss, TP, order type selection
-- Real trade journaling + auto-PnL detection
-
-### ✅ Hyperliquid Integration (Custom L2)
-- On-chain execution via `hyperliquid-sdk`
-- Faster low-latency environment for quant-style agents
-- Will support trade loops, order retry systems, and LP-based modifiers
-
-### ✅ Modular Executor Architecture
-All future execution layers will follow this folder logic:
-
-```
-executor/
-├── retired protocol_exec.py # retired protocol trade logic
-├── hyper_exec.py # Hyperliquid trade logic
-├── exec_interface.py # Common interface wrapper
+```powershell
+docker compose `
+  --env-file E:\Projects\TradeSync\dashboard-runtime\runtime.env `
+  -f ops\compose.full.yml `
+  -f ops\compose.market-command.yml `
+  up -d postgres redis market-data state-api cockpit-ui
 ```
 
-You can **plug in any protocol** as long as it respects the `exec_interface.py` function signature.
+Open [http://localhost:3000/](http://localhost:3000/).
 
-### 🧠 Future Features:
+Stop the same bounded services with:
 
-- ✅ PnL tracking and execution stats logging
-- ✅ Pine Script signal scraper and parser
-- ✅ AI-generated signal explanations using GPT / Claude / LLaMA
-- ✅ Streamlit or Next.js web dashboard
-- ✅ Voice or video parsing of trading commentary via Whisper (LLM journaling)
-- ✅ AI journaling + TradeSync Memory Vault (LLM stores reasoning for each trade)
-- ✅ Multi-agent coordination for signal conflict resolution
-
----
-
-## 🗂 Folder Structure (Modular v1.0)
-
-```bash
-tradesync/
-├── services/                  # Microservices
-│   ├── ingest-gateway/        # Data ingestion service (8080)
-│   ├── core-scorer/           # Technical bias & confidence (8001)
-│   ├── fusion-engine/         # Confluence scoring & opps (8002)
-│   ├── state-api/             # System state & action routing (8000)
-│   ├── exec-retired protocol-svc/        # retired protocol protocol execution (8003)
-│   └── exec-hl-svc/           # Hyperliquid execution (8004)
-│
-├── core/                      # Shared core logic
-│   ├── agent.py               # Agent base classes
-│   ├── processor.py           # Data processing utils
-│   └── scoring.py             # Scoring algorithms
-│
-├── executor/                  # Legacy trade execution logic (Deprecated)
-│   ├── retired protocol_exec.py          # retired protocol protocol executor
-│   ├── hyper_exec.py          # Hyperliquid executor
-│   └── exec_interface.py     # Unified method signature
-│
-├── alerts/                   # Alerting system
-│   └── discord.py            # Discord integration
-│
-├── ops/                      # DevOps & Infrastructure
-│   ├── compose.full.yml      # Full stack Docker compose
-│   ├── compose.infra.yml     # Infrastructure only compose
-│   └── sql/                  # Database schema
-│
-├── docs/                     # Documentation
-├── tests/                    # Test suite
-├── main.py                   # Entry point
-├── requirements.txt          # Python dependencies
-└── README.md                 # This file
-```
-## 🎛️ Environment Configuration (Phase 3C)
-
-TradeSync uses a `.env` file for configuration. Below are the key Phase 3C variables that control safety guardrails and the news feed:
-
-```bash
-# Phase 3C - Market Microstructure & Risk Guardian
-MAX_SPREAD_BPS=50.0            # Max bid-ask spread in bps for hard block
-OPTIMAL_SPREAD_BPS=2.0         # Spread below which no penalty is applied
-MIN_DEPTH_25BP_USD=100000      # Min USD depth required within 25bp of mid
-MAX_IMPACT_BPS_5K=25.0         # Max price impact for $5k order in bps
-MIN_LIQUIDITY_SCORE=0.3        # Min composite liquidity score (0-1)
-MARGIN_STRESS_THRESHOLD=0.8    # Max margin utilization before block
-MAX_EXPOSURE_PER_SYMBOL_USD=25000 # Max USD exposure per individual symbol
-
-# Phase 3C - Macro Feed
-MACRO_FEED_CACHE_TTL=300       # Cache headlines for 5 minutes
-MACRO_RSS_SOURCES='[...]'      # JSON array of RSS news sources
+```powershell
+docker compose `
+  --env-file E:\Projects\TradeSync\dashboard-runtime\runtime.env `
+  -f ops\compose.full.yml `
+  -f ops\compose.market-command.yml `
+  stop cockpit-ui state-api market-data redis postgres
 ```
 
----
+Do not use `down -v`; it would remove persistent volumes.
 
-## 🛠 How to Run TradeSync
+## Mission Control surfaces
 
-### 1. 📦 Install Requirements
-```bash
-pip install -r requirements.txt
+- `/` — authoritative Hyperliquid market pulse, readiness, context-only providers, measured system output, and execution safety.
+- `/market` — detailed market data already exposed by the current snapshot contract.
+- `/opportunities` — paper opportunity review when scorer/fusion output exists.
+- `/sources` — source inspection.
+- `/logs` — decisions and orders evidence.
+- `/execution` — read-only readiness and future activation gates; no arming controls.
+
+## APIs used by the dashboard
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /state/health` | State API and PostgreSQL read health |
+| `GET /state/snapshot` | Stream/output timestamps and fail-closed execution gate |
+| `GET /state/market/snapshots` | Authoritative Hyperliquid snapshots |
+| `GET /state/opportunities` | Paper opportunities |
+| `GET /state/context/overview` | Cached context-only CoinGecko, DefiLlama, and optional FRED data |
+| `GET /state/execution/status` | Read-only execution boundary |
+
+## Provider policy
+
+See [docs/providers/MARKET_PROVIDER_MATRIX.md](docs/providers/MARKET_PROVIDER_MATRIX.md).
+
+- Hyperliquid public API: authoritative for the current market table; free and keyless for the endpoints in use.
+- CoinGecko Demo API: free spot-reference context.
+- DefiLlama: free Hyperliquid TVL context.
+- FRED: free macro context after the operator supplies a free API key; currently optional and disabled.
+
+No paid API is required for the present dashboard.
+
+## Verification
+
+Frontend:
+
+```powershell
+cd services\cockpit-ui
+npm install --prefer-offline --no-audit --no-fund
+npm run build
 ```
 
-### 3. Start the Services (Full Stack)
-```bash
-docker compose -f ops/compose.full.yml --env-file .env up -d --build
+Context-feed tests:
+
+```powershell
+python -m pytest services\state-api\tests\test_context_feed.py -q
 ```
 
-### 4. Start the Dashboard (Cockpit UI)
-```bash
-cd services/cockpit-ui
-npm install
-npm run dev
-```
-The dashboard will be available at `http://localhost:3000`.
+## Architecture and roadmap
 
----
+- [ChaseOS Market Command handover](docs/CHASEOS_MARKET_COMMAND_HANDOVER.md)
+- [Project roadmap](roadmap.md)
+- [Market provider matrix](docs/providers/MARKET_PROVIDER_MATRIX.md)
+- [Dashboard overhaul change record](docs/changes/2026-09-01_mission-control-dashboard-overhaul.md)
+- [Phase 0 resource readiness](docs/PHASE0_RESOURCE_READINESS.md)
 
-## 🎛️ Cockpit UI & Mock Data
-As of **Step 0 / Phase 3A**, the Cockpit UI is fully operational but runs in **Mock/Dry-Run mode**:
-- **Execution**: The backend executors (`exec-*-svc`) are configured with `DRY_RUN=true`.
-- **Wallets**: No real Solana/Hyperliquid private keys are configured yet.
-- **Positions**: The "Live Positions" seen in the UI are generated mock data to demonstrate the dashboard's capabilities.
-
----
-
-## 📡 API & Compatibility (Step 0)
-
-TradeSync uses a standardized API contract for all clients.
-
-### Canonical Routes (state-api)
-- `GET /state/health` - Aggregated health
-- `GET /state/snapshot` - High-level summary
-- `GET /state/opportunities` - Actionable signals
-- `GET /state/evidence` - Signals/Events for an opportunity
-- `POST /actions/preview` - Risk-guarded execution plan
-- `POST /actions/execute` - Confirm and route order
-
-### Legacy Aliases (Backward Compatible)
-| Legacy Path | Canonical Successor |
-| :--- | :--- |
-| `/opps` | `/state/opportunities` |
-| `/preview` | `/actions/preview` |
-| `/execute` | `/actions/execute` |
-| `/execution/status` | `/state/execution/status` |
-
-> [!IMPORTANT]
-> Legacy aliases return `Deprecation: true` headers and point to successors in the `Link` header.
-
----
-
-## 👨‍🔧 Tech Stack
-
-| Layer | Tool | Purpose |
-|-------|------|---------|
-| Core Logic | Python | Main signal logic, modular file structure |
-| Market Data | yfinance, ta, HTTP APIs | Collects live CVD, OI, price, funding |
-| AI Layer (Future) | LangChain, OpenAI | LLM-based reasoning and explanation generation |
-| Voice Parser | openai-whisper | (Optional) Parse voice logs into journal insight |
-| Alerts | discord-webhook, requests | Sends formatted alerts to Discord/Telegram |
-| Execution Layer | retired protocolpy, hyperliquid-sdk | On-chain trade placement logic |
-| Frontend (Future) | Streamlit, Next.js | Build dashboard UI for metrics and control panel |
-| Env Config | python-dotenv | API key storage and environment control |
-
----
-
-## 🧩 Contributions & Customization
-
-You can build custom logic modules in:
-
-- `agent/core.py` → Custom scoring logic
-- `executor/` → Add new protocol backends
-- `alerts/` → Extend to SMS, Email, Slack, etc.
-- `data/fetch_data.py` → Add Binance, Bybit, or on-chain feeds
-- `main.py` → Plug-in prompt overrides, test suites, CLI args
-
-Custom rule templates (like VibeCoding's logic trees) are encouraged — just add your logic modules and import them inside `core.py`.
-
----
-
-## 👨‍🚀 Built For:
-
-- AI traders who want autonomous signal agents
-- On-chain execution researchers
-- Perp strategy developers (solidity, python, pine-script)
-- Builders blending human intuition + AI modeling
-- Trading signal groups that want full control over alerts
-
----
-
-## 🧠 Philosophy
-
-*"A trader's instinct can be cloned — if you have their inputs, structure, and timeframes. TradeSync was made to do exactly that."*
-
-We believe LLMs, delta, trend structure, and perpetual market data can be blended into next-gen AI agents that outperform discretionary traders and unlock automated edge at scale.
-
----
-
-## 📬 Contact
-
-**Created by:** Chasedndt
-- **GitHub:** [https://github.com/chasedndt]
-- **Discord:** [StrikeZone Crypto]
-- **Twitter:** [@Chaser.sol]
-
----
-
-*Made with ❤️ for the crypto trading community*
+Historical documents may describe removed venues or aspirational components. Current source, tests, this README, the Hyperliquid-only migration record, and the canonical ChaseOS control plane take precedence.
