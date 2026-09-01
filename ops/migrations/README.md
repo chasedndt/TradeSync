@@ -17,8 +17,12 @@ Examples:
 Current repository migrations:
 
 - `001_initial_schema.sql` — legacy initial operational schema.
-- `002_regime_rulebooks.sql` — versioned paper rulebooks, activations, experiments, and replayable score events. Authored on 2026-09-01; it is not automatically applied by Compose.
-- `003_market_features.sql` — versioned feature catalogs, time-ordered observations, and replayable ordinary/robust normalization evidence. Authored on 2026-09-01; it is not automatically applied by Compose.
+- `002_regime_rulebooks.sql` — versioned paper rulebooks, activations, experiments, and replayable score events.
+- `003_market_features.sql` — versioned feature catalogs, time-ordered observations, and replayable ordinary/robust normalization evidence.
+
+`schema-init` runs the transactional migration runner after applying the
+legacy-compatible base schema. Existing databases record and skip completed
+versions; the runner never evaluates a migration's `-- DOWN` section.
 
 **Version numbers** should be sequential integers padded with zeros (001, 002, 003, etc.).
 
@@ -41,32 +45,14 @@ DROP TABLE ...;
 
 ## Creating a New Migration
 
-Use the migration tool to generate a new migration file:
-
-```bash
-python ops/migrate.py create <description>
-```
-
-This will create a new file with:
-- Auto-incremented version number
-- Timestamp-based unique identifier
-- Template with UP and DOWN sections
-
-Example:
-```bash
-python ops/migrate.py create add_user_preferences_table
-```
+Create the next zero-padded SQL file manually and include both `-- UP` and
+`-- DOWN` boundaries. The bounded runner does not generate or roll back files.
 
 ## Running Migrations
 
 ### Apply all pending migrations:
 ```bash
 python ops/migrate.py up
-```
-
-### Rollback the last migration:
-```bash
-python ops/migrate.py down
 ```
 
 ### Check migration status:
@@ -90,7 +76,9 @@ CREATE TABLE schema_migrations (
 
 1. **Always test migrations**: Test both UP and DOWN sections before committing
 2. **Keep migrations small**: One logical change per migration file
-3. **Make migrations reversible**: Always provide a proper DOWN section
+3. **Make migrations reversible**: Always provide a proper DOWN section. The
+   bounded runner supports `up` and `status`; rollback remains a manual,
+   separately approved database operation.
 4. **Use transactions**: Migrations are executed in transactions and rollback on failure
 5. **Don't modify existing migrations**: Once applied to production, create a new migration instead
 

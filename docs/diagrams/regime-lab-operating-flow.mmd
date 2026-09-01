@@ -1,0 +1,13 @@
+flowchart LR
+  HL["Hyperliquid public data"] --> MD["Market data snapshots"]
+  MD --> EX["Catalog feature extractor"]
+  EX --> TS["Cadence-governed Redis history"]
+  TS --> API["State API / Regime Lab"]
+  CFG["Versioned catalog + baseline rulebook"] --> API
+  API --> CORE["Shared Python normalization + aggregation"]
+  CORE --> UI["Private Regime Lab panel"]
+  UI --> INPUT["Operator hypothesis, weights, learning answers"]
+  INPUT --> API
+  API --> CMP["Same-evidence baseline / challenger comparison"]
+  CMP --> PG["PostgreSQL draft experiment"]
+  PG -. "No activation endpoint" .-> STOP["Activation remains gated"]

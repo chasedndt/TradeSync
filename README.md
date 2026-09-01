@@ -31,7 +31,7 @@ Tier A must continue when any Tier B connector is unavailable. Tier C always fai
 - The canonical ChaseOS private instance is `C:\Users\chaseos\Documents\chaseos_obsidian`. Its live knowledge connector is not currently available, so the interface in this repository is a proposed versioned contract, not a verified live integration.
 - The first Rust component is a shared contract crate. The Rust alert router and Hyperliquid real-time edge are roadmap work, not complete services.
 - Quant Foundations Book 1 and a versioned paper-only regime-weight engine are implemented locally. They do not yet replace the legacy live dashboard classifier or scorer.
-- A source-governed 17-feature catalog and ordinary/robust paper-shadow normalizer are implemented locally. Feature extraction, persistence, block aggregation, and active-scorer integration remain planned.
+- A source-governed 17-feature catalog, cadence-governed market extractor, ordinary/robust normalizer, backend block aggregation, and private Regime Lab are implemented locally. Container persistence and active-scorer integration remain unverified/planned.
 
 ## Architecture at a glance
 
@@ -101,6 +101,7 @@ Do not use `down -v`; that removes persistent volumes.
 
 - `/` — Mission Control: authoritative market pulse, readiness, context feeds, system output, and safety state.
 - `/market` — detailed market snapshots; the future Market Canvas drilldown starts here.
+- `/regime-lab` — private paper-shadow feature evidence, challenger controls, learning gates, comparison, and draft experiment history.
 - `/opportunities` — paper opportunity review.
 - `/sources` — temporary legacy surface; roadmap replacement is Knowledge Graph intake and provenance.
 - `/logs` — current decisions/orders evidence; roadmap replacement is Activity & Evidence with Decisions, Approvals, Orders, Alerts, and Outcomes.

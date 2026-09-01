@@ -45,6 +45,24 @@ services:
       timeout: 5s
       retries: 30
 
+  schema-init:
+    image: python:3.11-slim
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      DB_HOST: postgres
+      DB_PORT: 5432
+    volumes:
+      - ./:/app/ops:ro
+    working_dir: /app
+    command: >
+      sh -c "pip install --no-cache-dir asyncpg && python ops/apply_schema.py"
+    restart: "no"
+
   # --- Services ---
   state-api:
     build:
@@ -56,6 +74,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      schema-init:
+        condition: service_completed_successfully
     environment:
       # In-container DSN: talk to "postgres" at 5432
       PG_DSN: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
@@ -169,7 +189,8 @@ services:
 
   market-data:
     build:
-      context: ../services/market-data
+      context: ..
+      dockerfile: services/market-data/Dockerfile
     image: tradesync/market-data:dev
     depends_on:
       redis:

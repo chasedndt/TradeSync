@@ -239,6 +239,43 @@ class MarketRedisClient:
                 })
         return result
 
+    async def append_feature_timeseries(
+        self,
+        venue: str,
+        symbol: str,
+        feature_id: str,
+        value: float,
+        ts: int,
+        sampling_interval_ms: int,
+    ):
+        """Store one latest observation per declared sampling bucket for 8 days."""
+        if sampling_interval_ms <= 0:
+            return
+        key = f"market:feature:{venue}:{symbol}:{feature_id}"
+        bucket_start = (ts // sampling_interval_ms) * sampling_interval_ms
+        bucket_end = bucket_start + sampling_interval_ms - 1
+        await self.client.zremrangebyscore(key, bucket_start, bucket_end)
+        await self.client.zadd(key, {f"{ts}:{value}": ts})
+        cutoff = ts - (7 * 86400 * 1000)
+        await self.client.zremrangebyscore(key, 0, cutoff)
+        await self.client.expire(key, 8 * 86400)
+
+    async def get_feature_timeseries(
+        self,
+        venue: str,
+        symbol: str,
+        feature_id: str,
+        window_ms: int,
+    ) -> List[Dict[str, Any]]:
+        key = f"market:feature:{venue}:{symbol}:{feature_id}"
+        now = int(__import__("time").time() * 1000)
+        entries = await self.client.zrangebyscore(key, now - window_ms, now)
+        result = []
+        for entry in entries:
+            ts_text, value_text = entry.split(":", 1)
+            result.append({"ts": int(ts_text), "value": float(value_text)})
+        return result
+
     # === Helpers ===
 
     def _parse_stream_messages(self, messages) -> List[Dict[str, Any]]:

@@ -124,6 +124,7 @@ def validate_catalog(data: Mapping[str, Any]) -> FeatureCatalog:
         numeric_fields = (
             "lookback_points",
             "minimum_history_points",
+            "sampling_interval_ms",
             "fresh_after_ms",
             "stale_after_ms",
         )
@@ -138,6 +139,14 @@ def validate_catalog(data: Mapping[str, Any]) -> FeatureCatalog:
         if values["minimum_history_points"] > values["lookback_points"]:
             raise FeatureValidationError(
                 f"features.{feature_id} minimum history exceeds lookback"
+            )
+        if (
+            definition["availability"] == "implemented"
+            and definition["normalization"] != "none"
+            and values["sampling_interval_ms"] <= 0
+        ):
+            raise FeatureValidationError(
+                f"features.{feature_id} implemented feature requires a positive sampling interval"
             )
         if (
             values["stale_after_ms"]

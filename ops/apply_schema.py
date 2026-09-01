@@ -3,6 +3,7 @@ import asyncpg
 import os
 import time
 from pathlib import Path
+from migrate import apply_pending_migrations
 
 # Get DB config from environment or use defaults
 DB_USER = os.getenv("POSTGRES_USER", "tradesync")
@@ -52,6 +53,9 @@ async def main():
             
         print("Applying schema...")
         await conn.execute(schema_sql)
+        migrations_dir = script_dir / "migrations"
+        applied = await apply_pending_migrations(conn, migrations_dir)
+        print("Applied migrations: " + (", ".join(applied) if applied else "none pending"))
         print("✓ Schema applied successfully")
         return 0
         

@@ -8,6 +8,7 @@
 - [Wallet authority sequence](wallet-authority.mmd)
 - [Versioned regime rulebook flow](regime-rulebook-flow.mmd)
 - [Market feature normalization flow](market-feature-normalization.mmd)
+- [Regime Lab operating flow](regime-lab-operating-flow.mmd)
 
 These Mermaid source files correspond to the current README and roadmap.
 

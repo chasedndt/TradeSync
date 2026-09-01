@@ -12,6 +12,7 @@ This folder is the documentation system of record for the Hyperliquid-only Trade
 6. [Rust boundaries](architecture/RUST_BOUNDARIES.md) — where Rust is adopted and where Python/TypeScript remain appropriate.
 7. [Quant Foundations — Book 1](quant-learning/README.md) — notation-first education, weighting, paper-risk caps, and practice gates.
 8. [Regime Rulebook v1](architecture/REGIME_RULEBOOK_V1.md) — deterministic scoring, provenance, versioning, and outage behavior.
+9. [Regime Lab API](contracts/REGIME_LAB_API.md) — private learning controls, same-evidence comparison, persistence, and fail-closed boundaries.
 
 ## Brand
 
@@ -26,6 +27,7 @@ This folder is the documentation system of record for the Hyperliquid-only Trade
 - [Risk limits](contracts/RISK_LIMITS.md)
 - [Regime weight configuration v1](contracts/REGIME_WEIGHT_CONFIG_V1.md)
 - [Market feature v1](contracts/MARKET_FEATURE_V1.md)
+- [Regime Lab API](contracts/REGIME_LAB_API.md)
 
 ## Quant learning
 
@@ -37,6 +39,7 @@ This folder is the documentation system of record for the Hyperliquid-only Trade
 - [Build-in-public evidence practice](quant-learning/05_BUILD_IN_PUBLIC_PRACTICE.md)
 - [Book 1 handover](quant-learning/BOOK_1_HANDOVER.md)
 - [Applied Lab 1 — rolling normalization and outliers](quant-learning/labs/LAB_01_ROLLING_NORMALIZATION.md)
+- [Applied Lab 2 — regime weights and coverage](quant-learning/labs/LAB_02_REGIME_WEIGHTS_AND_COVERAGE.md)
 
 ## Legacy contracts requiring reconciliation
 

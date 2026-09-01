@@ -20,6 +20,12 @@ from tradesync_core import RiskGuardian
 from tradesync_core import normalize_symbol, normalize_venue
 from app.macro_feed import macro_feed, MacroHeadline
 from app.context_feed import context_feed
+from app.regime_lab import (
+    RegimeLabEngine,
+    RegimeLabValidationError,
+    collect_live_feature_results,
+    persist_experiment,
+)
 
 # --- Logging Setup ---
 logging.basicConfig(
@@ -134,6 +140,7 @@ POOL_MIN_SIZE = int(os.getenv("POOL_MIN_SIZE", "5"))
 POOL_MAX_SIZE = int(os.getenv("POOL_MAX_SIZE", "20"))
 POOL_TIMEOUT = float(os.getenv("POOL_TIMEOUT", "5.0"))
 VALID_TIMEFRAMES = ["1m", "5m", "15m", "30m", "1h", "2h", "4h", "8h", "1d"]
+regime_lab_engine = RegimeLabEngine()
 
 # --- Global Client ---
 redis_client = None
@@ -274,6 +281,19 @@ class ExecuteRequest(BaseModel):
     decision_id: str
     confirm: bool
 
+class RegimeLabExperimentRequest(BaseModel):
+    name: str = Field(default="Local paper challenger", min_length=3, max_length=120)
+    version: str = Field(min_length=1, max_length=40)
+    hypothesis: str = Field(min_length=20, max_length=800)
+    evaluation_window: str = Field(
+        default="current_evidence_snapshot", min_length=3, max_length=120
+    )
+    expected_effect: str = Field(default="uncertain", max_length=80)
+    weights: Dict[str, float]
+    arithmetic_answer: float
+    reflection: str = Field(min_length=1, max_length=1200)
+    risk_flags: List[str] = Field(default_factory=list)
+
 # ExecutionResult is used as the response model for execute_action
 
 # --- Lifespan & State ---
@@ -287,12 +307,21 @@ async def lifespan(app: FastAPI):
     # Startup
     try:
         print(f"Connecting to DB pool: min={POOL_MIN_SIZE} max={POOL_MAX_SIZE}")
-        state.pool = await asyncpg.create_pool(
-            dsn=PG_DSN,
-            min_size=POOL_MIN_SIZE,
-            max_size=POOL_MAX_SIZE,
-            command_timeout=POOL_TIMEOUT
-        )
+        try:
+            state.pool = await asyncpg.create_pool(
+                dsn=PG_DSN,
+                min_size=POOL_MIN_SIZE,
+                max_size=POOL_MAX_SIZE,
+                command_timeout=POOL_TIMEOUT
+            )
+        except Exception as exc:
+            if os.getenv("STATE_API_DEGRADED_START", "false").lower() != "true":
+                raise
+            state.pool = None
+            logger.warning(
+                f"Starting without PostgreSQL for bounded read-only/development surfaces: {exc}",
+                extra={"trace_id": "startup"},
+            )
         yield
     finally:
         # Shutdown
@@ -1253,6 +1282,131 @@ async def get_market_data_status():
                 "error": str(e),
                 "providers": []
             }
+
+# --- Private paper-only Regime Lab ---
+
+async def _regime_lab_evidence(venue: str, symbol: str):
+    normalized_venue = normalize_venue(venue)
+    normalized_symbol = normalize_symbol(symbol)
+    return await collect_live_feature_results(
+        regime_lab_engine,
+        MARKET_DATA_URL,
+        normalized_venue,
+        normalized_symbol,
+    )
+
+
+@app.get("/state/regime-lab/overview", tags=["regime-lab"])
+async def get_regime_lab_overview(
+    venue: str = Query("hyperliquid"),
+    symbol: str = Query("BTC-PERP"),
+):
+    """Return source evidence, baseline math, and the current learning gate."""
+    feature_results, source_status = await _regime_lab_evidence(venue, symbol)
+    return regime_lab_engine.build_overview(feature_results, source_status)
+
+
+@app.post("/state/regime-lab/evaluate", tags=["regime-lab"])
+async def evaluate_regime_lab_experiment(
+    request: RegimeLabExperimentRequest,
+    venue: str = Query("hyperliquid"),
+    symbol: str = Query("BTC-PERP"),
+):
+    """Validate and compare a draft without writing or activating it."""
+    feature_results, source_status = await _regime_lab_evidence(venue, symbol)
+    try:
+        evaluation = regime_lab_engine.evaluate_request(
+            request.model_dump(), feature_results
+        )
+    except RegimeLabValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    evaluation["source_status"] = source_status
+    return evaluation
+
+
+@app.post("/state/regime-lab/experiments", tags=["regime-lab"])
+async def save_regime_lab_experiment(
+    request: RegimeLabExperimentRequest,
+    venue: str = Query("hyperliquid"),
+    symbol: str = Query("BTC-PERP"),
+):
+    """Persist a draft experiment after the deterministic learning gates pass."""
+    feature_results, source_status = await _regime_lab_evidence(venue, symbol)
+    try:
+        evaluation = regime_lab_engine.evaluate_request(
+            request.model_dump(), feature_results
+        )
+    except RegimeLabValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if not evaluation["learning_gate"]["complete"]:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "Complete the weight-sum answer and write at least 20 characters "
+                "explaining coverage before saving."
+            ),
+        )
+    if not state.pool:
+        raise HTTPException(
+            status_code=503,
+            detail="PostgreSQL is unavailable; evaluation succeeded but was not saved",
+        )
+    try:
+        async with state.pool.acquire() as conn:
+            async with conn.transaction():
+                experiment_id = await persist_experiment(
+                    conn, regime_lab_engine, request.model_dump(), evaluation
+                )
+    except Exception as exc:
+        logger.error(
+            f"Regime Lab persistence failed: {exc}",
+            extra={"trace_id": "regime-lab"},
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="Regime Lab persistence is unavailable; verify migrations",
+        ) from exc
+    return {
+        "saved": True,
+        "experiment_id": experiment_id,
+        "status": "draft",
+        "source_status": source_status,
+        "activation_available": False,
+        "evaluation": evaluation,
+    }
+
+
+@app.get("/state/regime-lab/experiments", tags=["regime-lab"])
+async def list_regime_lab_experiments(limit: int = Query(20, ge=1, le=100)):
+    """List immutable draft experiment records; no activation action is exposed."""
+    if not state.pool:
+        raise HTTPException(status_code=503, detail="PostgreSQL is unavailable")
+    try:
+        async with state.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                select e.id, e.name, e.status, e.horizon, e.hypothesis,
+                       e.evaluation_plan, e.results, e.created_at,
+                       champion.version as baseline_version,
+                       challenger.version as challenger_version
+                from regime_experiments e
+                join regime_rulebooks champion on champion.id=e.champion_rulebook_id
+                join regime_rulebooks challenger on challenger.id=e.challenger_rulebook_id
+                order by e.created_at desc
+                limit $1
+                """,
+                limit,
+            )
+        return {"experiments": [dict(row) for row in rows], "count": len(rows)}
+    except Exception as exc:
+        logger.error(
+            f"Regime Lab history failed: {exc}",
+            extra={"trace_id": "regime-lab"},
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="Regime Lab history is unavailable; verify migrations",
+        ) from exc
 
 # --- Phase 3C: Macro Feed Endpoints ---
 

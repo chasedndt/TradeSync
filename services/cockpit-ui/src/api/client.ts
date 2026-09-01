@@ -19,9 +19,19 @@ function getHeaders(): HeadersInit {
   return headers
 }
 
+async function responseError(res: Response): Promise<Error> {
+  try {
+    const payload = await res.json()
+    const detail = typeof payload?.detail === 'string' ? payload.detail : res.statusText
+    return new Error(`${res.status} ${detail}`)
+  } catch {
+    return new Error(`${res.status} ${res.statusText}`)
+  }
+}
+
 export async function apiGet<T>(path: string): Promise<T> {
   const res = await fetch(`${getApiBaseUrl()}${path}`, { headers: getHeaders() })
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+  if (!res.ok) throw await responseError(res)
   return res.json()
 }
 
@@ -31,7 +41,7 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
     headers: getHeaders(),
     body: JSON.stringify(body),
   })
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+  if (!res.ok) throw await responseError(res)
   return res.json()
 }
 

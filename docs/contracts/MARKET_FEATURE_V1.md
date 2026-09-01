@@ -67,6 +67,15 @@ Rules:
 
 These constraints block a basic form of look-ahead bias.
 
+## Sampling cadence
+
+Every catalog feature declares `sampling_interval_ms`. The market-data service
+retains at most one latest value inside each sampling bucket, preventing a
+five-second poll from masquerading as five independent hourly funding samples.
+Normalized feature history is retained for seven days in a dedicated Redis
+series. Redis remains a rebuildable operating history; PostgreSQL observation
+records remain the intended durable evidence boundary.
+
 ## Ordinary normalization
 
 For historical values `x_1 ... x_n`:

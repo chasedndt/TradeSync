@@ -10,6 +10,12 @@ export { useRiskLimits } from './useRiskLimits'
 export { useExecutionStatus } from './useExecutionStatus'
 export { useBackendSync } from './useBackendSync'
 export { useContextOverview } from './useContextOverview'
+export {
+  useRegimeLabOverview,
+  useEvaluateRegimeLab,
+  useSaveRegimeLab,
+  useRegimeLabExperiments,
+} from './useRegimeLab'
 
 // Phase 3B: Market Data
 export {

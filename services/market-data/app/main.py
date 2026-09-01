@@ -21,6 +21,7 @@ from .redis_client import redis_client
 from .providers import HyperliquidProvider
 from .processors import MarketNormalizer, MarketSnapshotter
 from .rate_limiter import rate_limiters
+from .feature_extractor import extract_feature_observations, load_sampling_intervals
 
 # Configure logging
 logging.basicConfig(
@@ -43,6 +44,24 @@ providers = []
 normalizer = MarketNormalizer()
 snapshotter = MarketSnapshotter()
 background_tasks: List[asyncio.Task] = []
+feature_sampling_intervals = load_sampling_intervals()
+
+
+async def store_snapshot_and_features(snapshot):
+    """Store the latest snapshot and its cadence-governed feature history."""
+    payload = snapshot.model_dump()
+    await redis_client.store_snapshot(snapshot.venue, snapshot.symbol, payload)
+    for observation in extract_feature_observations(payload):
+        interval = feature_sampling_intervals.get(observation["feature_id"], 0)
+        if interval:
+            await redis_client.append_feature_timeseries(
+                observation["venue"],
+                observation["symbol"],
+                observation["feature_id"],
+                observation["value"],
+                observation["observed_at_ms"],
+                interval,
+            )
 
 
 async def poll_context_loop():
@@ -74,11 +93,7 @@ async def poll_context_loop():
                         snapshot = snapshotter.process_event(event)
                         if snapshot:
                             # Store snapshot
-                            await redis_client.store_snapshot(
-                                snapshot.venue,
-                                snapshot.symbol,
-                                snapshot.model_dump()
-                            )
+                            await store_snapshot_and_features(snapshot)
 
                             # Check for regime changes
                             alerts = snapshotter.check_regime_change(
@@ -144,11 +159,7 @@ async def poll_orderbook_loop():
                             # Update snapshot
                             snapshot = snapshotter.process_event(event)
                             if snapshot:
-                                await redis_client.store_snapshot(
-                                    snapshot.venue,
-                                    snapshot.symbol,
-                                    snapshot.model_dump()
-                                )
+                                await store_snapshot_and_features(snapshot)
 
                     except Exception as e:
                         logger.error(f"Error polling {provider.venue} orderbook for {symbol}: {e}")
@@ -291,6 +302,51 @@ async def get_snapshot(venue: str, symbol: str):
             content={"error": "not_found", "venue": venue, "symbol": symbol}
         )
     return snapshot
+
+
+@app.get("/features/{venue}/{symbol}")
+async def get_features(venue: str, symbol: str):
+    """Extract current admitted feature values from the latest snapshot."""
+    snapshot = await redis_client.get_snapshot(venue, symbol)
+    if not snapshot:
+        return JSONResponse(
+            status_code=404,
+            content={"error": "not_found", "venue": venue, "symbol": symbol},
+        )
+    observations = extract_feature_observations(snapshot)
+    return {
+        "venue": venue,
+        "symbol": symbol,
+        "observations": observations,
+        "count": len(observations),
+    }
+
+
+@app.get("/feature-history/{venue}/{symbol}/{feature_id}")
+async def get_feature_history(
+    venue: str,
+    symbol: str,
+    feature_id: str,
+    window: str = "7d",
+):
+    """Return cadence-governed feature history used by the shared normalizer."""
+    window_ms = {
+        "1h": 60 * 60 * 1000,
+        "4h": 4 * 60 * 60 * 1000,
+        "24h": 24 * 60 * 60 * 1000,
+        "7d": 7 * 24 * 60 * 60 * 1000,
+    }.get(window, 7 * 24 * 60 * 60 * 1000)
+    data = await redis_client.get_feature_timeseries(
+        venue, symbol, feature_id, window_ms
+    )
+    return {
+        "venue": venue,
+        "symbol": symbol,
+        "feature_id": feature_id,
+        "window": window,
+        "data": data,
+        "count": len(data),
+    }
 
 
 @app.get("/alerts")

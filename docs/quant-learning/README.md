@@ -22,7 +22,8 @@ By the end, the operator should be able to:
 4. [Year 2 module map and practice gates](04_YEAR2_MODULE_MAP_AND_PRACTICE.md)
 5. [Building the quant system in public](05_BUILD_IN_PUBLIC_PRACTICE.md)
 6. [Applied Lab 1 — rolling normalization and outliers](labs/LAB_01_ROLLING_NORMALIZATION.md)
-7. [Book 1 technical handover](BOOK_1_HANDOVER.md)
+7. [Applied Lab 2 — regime weights and coverage](labs/LAB_02_REGIME_WEIGHTS_AND_COVERAGE.md)
+8. [Book 1 technical handover](BOOK_1_HANDOVER.md)
 
 ## Vocabulary rule
 

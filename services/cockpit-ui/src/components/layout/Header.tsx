@@ -1,13 +1,17 @@
 import { useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { DotsThreeVertical, List } from '../icons'
 
 export function Header({ onMenu }: { onMenu: () => void }) {
+  const location = useLocation()
   const [now, setNow] = useState(() => new Date())
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000)
     return () => window.clearInterval(timer)
   }, [])
+
+  const section = location.pathname === '/regime-lab' ? 'Regime Lab' : 'Mission Control'
 
   return (
     <header className="topbar">
@@ -16,7 +20,7 @@ export function Header({ onMenu }: { onMenu: () => void }) {
           <List size={22} />
         </button>
         <h1>TradeSync</h1>
-        <span>Mission Control</span>
+        <span>{section}</span>
       </div>
       <div className="topbar-meta">
         <time dateTime={now.toISOString()}>{now.toISOString().replace('T', ' ').slice(0, 19)} UTC</time>

@@ -78,7 +78,9 @@ The intended tables are:
 - `regime_experiments`: champion/challenger hypotheses and results;
 - `regime_score_events`: replayable calculation traces.
 
-The SQL contract is authored in `ops/migrations/002_regime_rulebooks.sql`. It is not yet applied to the running database.
+The SQL contract is authored in `ops/migrations/002_regime_rulebooks.sql`.
+`schema-init` now invokes the bounded transactional migration runner, but the
+current host database application is unverified while Docker is unavailable.
 
 ## Outage behavior
 
@@ -90,10 +92,16 @@ The SQL contract is authored in `ops/migrations/002_regime_rulebooks.sql`. It is
 
 ## Current/legacy boundary
 
-The market-data snapshotter and enhanced scorer still contain legacy fixed thresholds and bonuses. The paper-shadow feature normalizer now exists, but event extraction, PostgreSQL persistence, feature-to-block aggregation, and State API comparison are not connected. Documentation must not call the new rulebook the active opportunity scorer before that integration and evidence exist.
+The market-data snapshotter and enhanced scorer still contain legacy fixed
+thresholds and bonuses. Feature extraction, cadence-governed Redis history,
+shared block aggregation, State API comparison, and the private Regime Lab are
+connected in source. Docker-backed accumulation and PostgreSQL persistence are
+not yet verified on this host, and the paper-shadow rulebook does not replace
+the active opportunity scorer.
 
 ## References
 
 - [Book 1](../quant-learning/README.md)
 - [Rulebook configuration contract](../contracts/REGIME_WEIGHT_CONFIG_V1.md)
+- [Regime Lab API contract](../contracts/REGIME_LAB_API.md)
 - [Canonical flow diagram](../diagrams/regime-rulebook-flow.mmd)
