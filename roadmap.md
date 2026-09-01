@@ -53,9 +53,11 @@ Exit gate:
 
 ### Week 2 — Regimes, opportunities, knowledge connector, and alert router
 
-Status: planned.
+Status: in progress. The notation-first Quant Foundations Book 1, draft paper rulebook, deterministic weighting library/CLI, and persistence migration are implemented locally. Live feature normalization, database application, paper-shadow integration, and the Regime Lab remain planned.
 
 - Rebuild regime classification from measured trend, volatility, funding, OI, volume, liquidity, and market-structure inputs.
+- Run the versioned rulebook beside the legacy classifier before replacement; retain configuration digest, source lineage, per-block quality, contribution trace, and paper-risk caps for every score.
+- Add a Regime Lab where the operator can inspect notation, edit a draft challenger, validate weights, compare versions, replay a fixed paper window, and request paper activation without exposing live execution controls.
 - Restore scorer/fusion health probes and the paper opportunity pipeline.
 - Implement a read-only ChaseOS graph-snapshot adapter and a local PostgreSQL graph projection.
 - Implement Strike Zone receipt validation into `trade_candidate_v1`; candidates remain paper research.
@@ -130,6 +132,10 @@ No-go: no production-sized deployment, self-increasing limits, self-promotion of
 
 ## Product-surface backlog
 
+### Regime Lab
+
+Show the active paper champion and draft challenger, all block weights, running total, normalization curve, data-quality coverage, contribution trace, risk caps, rulebook digest, experiment hypothesis, evaluation window, outcome KPI, drivers, guardrails, and rollback. The panel must call the shared calculation library through the API rather than reproduce mathematical logic in TypeScript.
+
 ### Regime summary
 
 Show current regime, confidence, evidence components, conflicting factors, source freshness, transition history, and “why not higher confidence.” Never show `UNKNOWN` without the missing inputs.
@@ -174,3 +180,17 @@ Paid data is considered only after a measured gap cannot be closed with venue da
 ## Programme definition of done
 
 TradeSync is not “done” because containers start or panels render. A capability is complete only when its contract, source authority, persistence, restart behavior, failure behavior, tests, operator surface, evidence, security boundary, and documentation agree.
+
+## Quant learning lane
+
+Every mathematical feature follows an education gate alongside its engineering gate:
+
+1. define notation, units, comparator, and formula in plain English;
+2. calculate a small example by hand;
+3. implement the deterministic function and tests;
+4. map the topic to the operator's Year 2 syllabus;
+5. complete the associated practice task;
+6. run paper-shadow evidence before changing the champion;
+7. retain a public-safe development record without publishing secrets, trade calls, or unverified performance claims.
+
+Book 1 covers notation, z-scores, `tanh`, weighted averages, data quality, basis points, paper-risk multipliers, and champion/challenger versioning. Later books will cover covariance, regression, inference, optimization, time series, and Markov models only when the required data and implementation stage exist.

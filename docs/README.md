@@ -10,6 +10,8 @@ This folder is the documentation system of record for the Hyperliquid-only Trade
 4. [Data and knowledge plane](architecture/DATA_AND_KNOWLEDGE_PLANE.md) — database roles, ChaseOS projection, and real-time agent access.
 5. [Mobile alert control plane](architecture/MOBILE_ALERT_CONTROL_PLANE.md) — reusable cross-project notification design.
 6. [Rust boundaries](architecture/RUST_BOUNDARIES.md) — where Rust is adopted and where Python/TypeScript remain appropriate.
+7. [Quant Foundations — Book 1](quant-learning/README.md) — notation-first education, weighting, paper-risk caps, and practice gates.
+8. [Regime Rulebook v1](architecture/REGIME_RULEBOOK_V1.md) — deterministic scoring, provenance, versioning, and outage behavior.
 
 ## Brand
 
@@ -22,6 +24,17 @@ This folder is the documentation system of record for the Hyperliquid-only Trade
 - [Alert event v1](contracts/ALERT_EVENT_V1.md)
 - [Knowledge synchronization v1](contracts/KNOWLEDGE_SYNC_V1.md)
 - [Risk limits](contracts/RISK_LIMITS.md)
+- [Regime weight configuration v1](contracts/REGIME_WEIGHT_CONFIG_V1.md)
+
+## Quant learning
+
+- [Book 1 index](quant-learning/README.md)
+- [Mathematical notation](quant-learning/01_NOTATION_AND_MATH_LANGUAGE.md)
+- [Normalization and tanh](quant-learning/02_NORMALIZATION_AND_TANH.md)
+- [Weights, quality, risk caps, and experiments](quant-learning/03_WEIGHTING_QUALITY_AND_EXPERIMENTS.md)
+- [Year 2 module map and practice](quant-learning/04_YEAR2_MODULE_MAP_AND_PRACTICE.md)
+- [Build-in-public evidence practice](quant-learning/05_BUILD_IN_PUBLIC_PRACTICE.md)
+- [Book 1 handover](quant-learning/BOOK_1_HANDOVER.md)
 
 ## Legacy contracts requiring reconciliation
 

@@ -6,6 +6,7 @@
 - [Data and knowledge plane](data-knowledge-plane.mmd)
 - [Mobile alert control plane](mobile-alert-control-plane.mmd)
 - [Wallet authority sequence](wallet-authority.mmd)
+- [Versioned regime rulebook flow](regime-rulebook-flow.mmd)
 
 These Mermaid source files correspond to the current README and roadmap.
 

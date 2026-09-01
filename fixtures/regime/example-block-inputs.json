@@ -1,0 +1,22 @@
+{
+  "observed_at": "2026-09-01T16:00:00Z",
+  "symbol": "BTC",
+  "timeframe": "1h",
+  "block_scores": {
+    "price_volatility": 0.8,
+    "liquidity": -0.4,
+    "positioning": 0.2,
+    "spot_premium": 0.6,
+    "macro_flows": -0.5
+  },
+  "data_quality": {
+    "price_volatility": 1.0,
+    "liquidity": 1.0,
+    "positioning": 1.0,
+    "spot_premium": 1.0,
+    "macro_flows": 1.0
+  },
+  "risk_flags": [
+    "external_risk_high"
+  ]
+}

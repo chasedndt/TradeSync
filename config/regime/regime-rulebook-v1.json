@@ -1,0 +1,96 @@
+{
+  "schema_version": "regime_rulebook_v1",
+  "rulebook_id": "tradesync-intraday-regime",
+  "version": "1.0.0",
+  "status": "draft",
+  "environment": "paper",
+  "horizon": "intraday_15m_1h",
+  "purpose": "Score playbook suitability from measured market blocks without allowing narrative context to create directional bias by itself.",
+  "normalization": {
+    "method": "tanh_zscore",
+    "compression_k": 2.0,
+    "output_min": -1.0,
+    "output_max": 1.0
+  },
+  "validation": {
+    "weight_sum": 1.0,
+    "weight_tolerance": 1e-09,
+    "max_single_block_weight": 0.4
+  },
+  "blocks": {
+    "price_volatility": {
+      "weight": 0.3,
+      "decision_role": "direction_and_state",
+      "examples": [
+        "multi_horizon_return",
+        "realized_volatility",
+        "trend_structure"
+      ]
+    },
+    "liquidity": {
+      "weight": 0.25,
+      "decision_role": "tradeability_and_fragility",
+      "examples": [
+        "spread_bps",
+        "depth_25bp_usd",
+        "impact_bps"
+      ]
+    },
+    "positioning": {
+      "weight": 0.2,
+      "decision_role": "leverage_and_crowding",
+      "examples": [
+        "funding_zscore",
+        "open_interest_change",
+        "liquidation_pressure"
+      ]
+    },
+    "spot_premium": {
+      "weight": 0.15,
+      "decision_role": "spot_demand_confirmation",
+      "examples": [
+        "coinbase_premium_bps",
+        "spot_perp_basis_bps"
+      ]
+    },
+    "macro_flows": {
+      "weight": 0.1,
+      "decision_role": "slow_context_not_trade_trigger",
+      "examples": [
+        "bitcoin_etf_net_flow",
+        "dollar_or_rates_context",
+        "verified_event_risk"
+      ]
+    }
+  },
+  "quality": {
+    "meaning": "A value from 0 to 1 describing freshness, completeness, provenance, and source authority for each block.",
+    "minimum_coverage_for_normal_paper_risk": 0.7
+  },
+  "paper_risk": {
+    "base_multiplier": 1.0,
+    "minimum_multiplier": 0.0,
+    "maximum_multiplier": 1.0,
+    "combination_rule": "minimum_cap_wins",
+    "unknown_flag_multiplier": 0.0,
+    "caps": {
+      "no_data_coverage": 0.0,
+      "external_risk_high": 0.45,
+      "low_data_coverage": 0.5,
+      "liquidity_fragile": 0.35,
+      "critical_data_stale": 0.0,
+      "conflicting_market_structure": 0.25
+    }
+  },
+  "governance": {
+    "activation_mode": "paper_shadow_only",
+    "editable_strategy": "create_new_version_never_overwrite_history",
+    "required_evidence": [
+      "hypothesis",
+      "fixed_evaluation_window",
+      "champion_challenger_result",
+      "guardrail_result",
+      "operator_approval"
+    ]
+  }
+}

@@ -14,6 +14,11 @@ Examples:
 - `002_add_agent_performance_table.sql`
 - `003_add_index_to_events.sql`
 
+Current repository migrations:
+
+- `001_initial_schema.sql` — legacy initial operational schema.
+- `002_regime_rulebooks.sql` — versioned paper rulebooks, activations, experiments, and replayable score events. Authored on 2026-09-01; it is not automatically applied by Compose.
+
 **Version numbers** should be sequential integers padded with zeros (001, 002, 003, etc.).
 
 ## Migration File Structure

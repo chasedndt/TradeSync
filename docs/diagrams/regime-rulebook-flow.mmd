@@ -1,0 +1,17 @@
+flowchart LR
+    SRC["Measured source events"] --> VALIDATE["Validate unit, time, authority, provenance"]
+    VALIDATE --> FEATURE["Named features and comparators"]
+    FEATURE --> NORMALIZE["Normalize: z score then tanh"]
+    NORMALIZE --> BLOCKS["Five block scores: -1 to 1"]
+    VALIDATE --> QUALITY["Data quality: 0 to 1"]
+    CONFIG["Versioned paper rulebook and digest"] --> WEIGHT["Quality-adjusted weighted score"]
+    BLOCKS --> WEIGHT
+    QUALITY --> WEIGHT
+    RISK["Independent risk flags"] --> CAPS["Minimum paper-risk cap wins"]
+    CONFIG --> CAPS
+    WEIGHT --> PLAYBOOK["Named playbook suitability"]
+    CAPS --> PLAYBOOK
+    PLAYBOOK --> EVENT["PostgreSQL replay record"]
+    EVENT --> STREAM["Redis paper-shadow event"]
+    EVENT --> LAB["Regime Lab comparison - planned"]
+    CHASE["ChaseOS or model context - optional"] -. "advisory only" .-> RISK
