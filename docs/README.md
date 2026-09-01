@@ -25,6 +25,7 @@ This folder is the documentation system of record for the Hyperliquid-only Trade
 - [Knowledge synchronization v1](contracts/KNOWLEDGE_SYNC_V1.md)
 - [Risk limits](contracts/RISK_LIMITS.md)
 - [Regime weight configuration v1](contracts/REGIME_WEIGHT_CONFIG_V1.md)
+- [Market feature v1](contracts/MARKET_FEATURE_V1.md)
 
 ## Quant learning
 
@@ -35,6 +36,7 @@ This folder is the documentation system of record for the Hyperliquid-only Trade
 - [Year 2 module map and practice](quant-learning/04_YEAR2_MODULE_MAP_AND_PRACTICE.md)
 - [Build-in-public evidence practice](quant-learning/05_BUILD_IN_PUBLIC_PRACTICE.md)
 - [Book 1 handover](quant-learning/BOOK_1_HANDOVER.md)
+- [Applied Lab 1 — rolling normalization and outliers](quant-learning/labs/LAB_01_ROLLING_NORMALIZATION.md)
 
 ## Legacy contracts requiring reconciliation
 

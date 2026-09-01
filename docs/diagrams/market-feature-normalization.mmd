@@ -1,0 +1,18 @@
+flowchart LR
+    EVENT["Committed Hyperliquid event"] --> CATALOG["Feature catalog gate"]
+    CATALOG -->|"observed or admitted derived"| HISTORY["Time-ordered PostgreSQL history"]
+    CATALOG -->|"proxy, context, unavailable"| BLOCKED["No generic score"]
+    HISTORY --> LOOKBACK["Prior-only rolling window"]
+    LOOKBACK --> ORDINARY["Mean and sample standard deviation"]
+    LOOKBACK --> ROBUST["Median and scaled MAD"]
+    ORDINARY --> CHOSEN["Catalog-selected z-score"]
+    ROBUST --> CHOSEN
+    CHOSEN --> BOUNDED["tanh(z / 2)"]
+    AGE["Observation age"] --> QUALITY["Freshness factor"]
+    LOOKBACK --> COVERAGE["Sample factor"]
+    QUALITY --> Q["Data quality"]
+    COVERAGE --> Q
+    BOUNDED --> MODE["Direct, inverse, or playbook-specific mode"]
+    Q --> RECORD["Replayable feature-normalization record"]
+    MODE --> RECORD
+    RECORD -. "paper shadow only" .-> BLOCKS["Future feature-to-block adapter"]

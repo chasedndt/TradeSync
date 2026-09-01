@@ -288,8 +288,10 @@ class MarketSnapshotter:
                 elif window_name == "7d":
                     horizons.d7 = avg
 
-        # Compute annualized rate
-        annualized = horizons.h24 * 365
+        # Hyperliquid funding is paid hourly. h24 is the mean hourly rate over
+        # the available 24-hour window, so simple annualization uses 24 hours
+        # per day and 365 days per year.
+        annualized = horizons.h24 * 24 * 365
 
         # Determine regime
         regime = self._classify_funding_regime(annualized)
@@ -513,7 +515,7 @@ class MarketSnapshotter:
 
         metrics = [MetricAvailability(
             metric="microstructure",
-            status=MetricStatus.REAL,  # Derived from real orderbook
+            status=MetricStatus.DERIVED,
             source="orderbook_derived",
             note="Derived from orderbook data",
             last_updated=latest.get("ts")
@@ -573,51 +575,109 @@ class MarketSnapshotter:
         oi_regime = oi.regime if oi else OIRegime.FLAT
         volume_regime = volume.regime if volume else VolumeRegime.NORMAL
 
+        required_values = {
+            "funding": funding,
+            "oi": oi,
+            "volume": volume,
+        }
+        status_by_metric = {
+            metric.metric: metric.status for metric in available_metrics
+        }
+        present_statuses = {
+            MetricStatus.REAL,
+            MetricStatus.DERIVED,
+            MetricStatus.PROXY,
+        }
+        usable_statuses = {MetricStatus.REAL, MetricStatus.DERIVED}
+        present_metrics = {
+            name
+            for name, value in required_values.items()
+            if value is not None and status_by_metric.get(name) in present_statuses
+        }
+        usable_metrics = {
+            name
+            for name, value in required_values.items()
+            if value is not None and status_by_metric.get(name) in usable_statuses
+        }
+
         # Simple trend detection based on OI and volume
         trend_regime = TrendRegime.RANGE
-        if oi_regime == OIRegime.BUILD and volume_regime in [VolumeRegime.HIGH, VolumeRegime.NORMAL]:
+        if (
+            {"oi", "volume"}.issubset(usable_metrics)
+            and oi_regime == OIRegime.BUILD
+            and volume_regime in [VolumeRegime.HIGH, VolumeRegime.NORMAL]
+        ):
             trend_regime = TrendRegime.STRONG_TREND
-        elif oi_regime == OIRegime.BUILD:
+        elif "oi" in usable_metrics and oi_regime == OIRegime.BUILD:
             trend_regime = TrendRegime.WEAK_TREND
 
         # Market condition
         condition = MarketCondition.UNKNOWN
 
         # Check for squeeze risk: extreme funding + OI build
-        if funding_regime in [FundingRegime.EXTREME_POSITIVE, FundingRegime.EXTREME_NEGATIVE]:
+        if (
+            {"funding", "oi"}.issubset(usable_metrics)
+            and funding_regime
+            in [FundingRegime.EXTREME_POSITIVE, FundingRegime.EXTREME_NEGATIVE]
+        ):
             if oi_regime == OIRegime.BUILD:
                 condition = MarketCondition.SQUEEZE_RISK
 
         # Check for capitulation: OI unwind + high volume
-        elif oi_regime == OIRegime.UNWIND and volume_regime == VolumeRegime.HIGH:
+        elif (
+            {"oi", "volume"}.issubset(usable_metrics)
+            and oi_regime == OIRegime.UNWIND
+            and volume_regime == VolumeRegime.HIGH
+        ):
             condition = MarketCondition.CAPITULATION
 
         # Trending healthy
-        elif trend_regime in [TrendRegime.STRONG_TREND, TrendRegime.WEAK_TREND]:
+        elif (
+            {"funding", "oi", "volume"}.issubset(usable_metrics)
+            and trend_regime in [TrendRegime.STRONG_TREND, TrendRegime.WEAK_TREND]
+        ):
             if funding_regime == FundingRegime.NEUTRAL:
                 condition = MarketCondition.TRENDING_HEALTHY
 
         # Choppy
-        elif oi_regime == OIRegime.FLAT and volume_regime == VolumeRegime.LOW:
+        elif (
+            {"oi", "volume"}.issubset(usable_metrics)
+            and oi_regime == OIRegime.FLAT
+            and volume_regime == VolumeRegime.LOW
+        ):
             condition = MarketCondition.CHOPPY
 
-        # Confidence based on metric availability
-        real_count = sum(1 for m in available_metrics if m.status == MetricStatus.REAL)
-        total_count = len(available_metrics)
+        # Confidence requires coverage of all inputs used by this legacy regime
+        # classifier, not merely that every currently-present field is REAL.
+        required_names = set(required_values)
+        missing = sorted(required_names - present_metrics)
+        proxy = sorted(
+            name
+            for name in required_names
+            if status_by_metric.get(name) == MetricStatus.PROXY
+        )
+        derived = sorted(
+            name
+            for name in required_names
+            if status_by_metric.get(name) == MetricStatus.DERIVED
+        )
 
-        if total_count == 0:
-            confidence = "low"
-            confidence_note = "No data available"
-        elif real_count == total_count:
+        if not missing and not proxy and not derived:
             confidence = "high"
             confidence_note = None
-        elif real_count >= total_count * 0.5:
+        elif len(present_metrics) >= 2:
             confidence = "medium"
-            proxy_metrics = [m.metric for m in available_metrics if m.status == MetricStatus.PROXY]
-            confidence_note = f"Proxy data: {', '.join(proxy_metrics)}" if proxy_metrics else None
         else:
             confidence = "low"
-            confidence_note = "Limited data availability"
+
+        note_parts = []
+        if missing:
+            note_parts.append(f"Missing required inputs: {', '.join(missing)}")
+        if proxy:
+            note_parts.append(f"Proxy inputs: {', '.join(proxy)}")
+        if derived:
+            note_parts.append(f"Derived inputs: {', '.join(derived)}")
+        confidence_note = "; ".join(note_parts) or None
 
         return RegimeSummary(
             funding=funding_regime,

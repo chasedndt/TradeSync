@@ -78,7 +78,7 @@ interface FundingData {
   };
 
   // === Derived ===
-  annualized_24h: number;   // horizons["24h"] * 365
+  annualized_24h: number;   // mean hourly rate over 24h * 24 * 365
 
   // === Regime ===
   regime: FundingRegime;

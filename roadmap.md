@@ -53,10 +53,11 @@ Exit gate:
 
 ### Week 2 — Regimes, opportunities, knowledge connector, and alert router
 
-Status: in progress. The notation-first Quant Foundations Book 1, draft paper rulebook, deterministic weighting library/CLI, and persistence migration are implemented locally. Live feature normalization, database application, paper-shadow integration, and the Regime Lab remain planned.
+Status: in progress. Quant Foundations Book 1, the draft paper rulebook, a source-governed 17-feature catalog, ordinary/robust paper-shadow normalization, deterministic CLIs, and persistence migrations are implemented locally. Live feature extraction, database application, feature-to-block aggregation, State API comparison, and the Regime Lab remain planned.
 
 - Rebuild regime classification from measured trend, volatility, funding, OI, volume, liquidity, and market-structure inputs.
 - Run the versioned rulebook beside the legacy classifier before replacement; retain configuration digest, source lineage, per-block quality, contribution trace, and paper-risk caps for every score.
+- Extract and persist only catalog-admitted `market_feature_v1` observations; block proxy/context/unavailable inputs from generic scoring and reject future timestamps to prevent look-ahead.
 - Add a Regime Lab where the operator can inspect notation, edit a draft challenger, validate weights, compare versions, replay a fixed paper window, and request paper activation without exposing live execution controls.
 - Restore scorer/fusion health probes and the paper opportunity pipeline.
 - Implement a read-only ChaseOS graph-snapshot adapter and a local PostgreSQL graph projection.

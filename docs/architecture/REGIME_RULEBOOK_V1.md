@@ -37,6 +37,8 @@ source event
   -> publish paper-shadow event
 ```
 
+The source/unit/comparator/normalization gate is defined by [Market Feature v1](../contracts/MARKET_FEATURE_V1.md). A block adapter may consume only a feature record whose catalog version, digest, provenance, status, score mode, and data quality satisfy that contract.
+
 ## Input authority
 
 | Input | Direction allowed? | Initial role |
@@ -88,7 +90,7 @@ The SQL contract is authored in `ops/migrations/002_regime_rulebooks.sql`. It is
 
 ## Current/legacy boundary
 
-The market-data snapshotter and enhanced scorer still contain legacy fixed thresholds and bonuses. v1 runs separately until paper replay proves the replacement path. Documentation must not call the new rulebook the active opportunity scorer before that integration and evidence exist.
+The market-data snapshotter and enhanced scorer still contain legacy fixed thresholds and bonuses. The paper-shadow feature normalizer now exists, but event extraction, PostgreSQL persistence, feature-to-block aggregation, and State API comparison are not connected. Documentation must not call the new rulebook the active opportunity scorer before that integration and evidence exist.
 
 ## References
 

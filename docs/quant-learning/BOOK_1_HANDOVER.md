@@ -25,7 +25,8 @@ Book 1 converts the initial regime-weight discussion into a teachable and testab
 | current market-data regime classifier | unchanged legacy heuristic |
 | current scorer regime bonuses | unchanged legacy fixed values |
 | Regime Lab UI | specified, not implemented |
-| live historical normalization | not implemented |
+| ordinary/robust paper-shadow normalization library | implemented |
+| live feature extraction and history persistence | not implemented |
 | paper champion/challenger runner | not implemented |
 | wallet/live execution | out of scope and disabled |
 
@@ -60,10 +61,10 @@ The panel must never contain wallet secrets or a live-execution shortcut.
 
 ## Next safe implementation sequence
 
-1. Define `market_feature_v1` fields, units, comparators, lookbacks, and provenance.
-2. Add rolling history persistence and ordinary/robust normalization in paper shadow.
-3. Apply the migration to a disposable or explicitly approved local schema and test `UP` plus `DOWN`.
-4. Add a repository/service layer for rulebooks and score events.
+1. Extract `market_feature_v1` values from committed market events using the catalog.
+2. Persist observations and normalization traces after an approved migration test.
+3. Aggregate admitted features into versioned block scores without changing opportunities.
+4. Add a repository/service layer for feature, rulebook, and score events.
 5. Run the new engine beside the legacy regime summary without changing opportunities.
 6. Build Regime Lab read-only comparison, then draft editing.
 7. Start the first fixed-window champion/challenger paper experiment.

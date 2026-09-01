@@ -153,12 +153,13 @@ def run_fixture_test():
 
     # 6. Check truthfulness
     print("\n6. Checking truthfulness (REAL/PROXY/UNAVAILABLE)...")
-    truthfulness_summary = {"REAL": 0, "PROXY": 0, "UNAVAILABLE": 0, "STALE": 0}
+    truthfulness_summary = {"REAL": 0, "DERIVED": 0, "PROXY": 0, "UNAVAILABLE": 0, "STALE": 0}
 
     for s in snapshots:
         for m in s.available_metrics:
             status_emoji = {
                 MetricStatus.REAL: "[OK]",
+                MetricStatus.DERIVED: "[DERIVED]",
                 MetricStatus.PROXY: "[PROXY]",
                 MetricStatus.UNAVAILABLE: "[N/A]",
                 MetricStatus.STALE: "[STALE]"

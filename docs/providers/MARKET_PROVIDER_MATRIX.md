@@ -19,6 +19,7 @@ This is the current provider authority map for TradeSync. Hyperliquid is the onl
 |---|---|---|---|
 | Mark midpoint | REAL | `l2Book` best bid/ask midpoint | Market Pulse price |
 | Current and historical funding | REAL | `metaAndAssetCtxs`, `fundingHistory` | Funding regime and horizons |
+| Funding simple annualized rate | DERIVED | Mean hourly funding × 24 × 365 | Human-readable comparison, not a persistence forecast |
 | Open interest | REAL | `metaAndAssetCtxs`, converted to USD using mark price | Current OI and horizon deltas |
 | 24h notional volume | REAL | `metaAndAssetCtxs.dayNtlVlm` | Volume regime |
 | L2 order book | REAL | `l2Book` | Spread, depth, imbalance, impact |

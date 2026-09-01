@@ -31,6 +31,7 @@ Tier A must continue when any Tier B connector is unavailable. Tier C always fai
 - The canonical ChaseOS private instance is `C:\Users\chaseos\Documents\chaseos_obsidian`. Its live knowledge connector is not currently available, so the interface in this repository is a proposed versioned contract, not a verified live integration.
 - The first Rust component is a shared contract crate. The Rust alert router and Hyperliquid real-time edge are roadmap work, not complete services.
 - Quant Foundations Book 1 and a versioned paper-only regime-weight engine are implemented locally. They do not yet replace the legacy live dashboard classifier or scorer.
+- A source-governed 17-feature catalog and ordinary/robust paper-shadow normalizer are implemented locally. Feature extraction, persistence, block aggregation, and active-scorer integration remain planned.
 
 ## Architecture at a glance
 
@@ -136,6 +137,7 @@ cargo test --workspace
 - [Roadmap](roadmap.md)
 - [Quant Foundations — Book 1](docs/quant-learning/README.md)
 - [Regime Rulebook v1 architecture](docs/architecture/REGIME_RULEBOOK_V1.md)
+- [Market feature v1 contract](docs/contracts/MARKET_FEATURE_V1.md)
 - [Standalone and federated architecture](docs/architecture/STANDALONE_FEDERATED_ARCHITECTURE.md)
 - [Data and knowledge plane](docs/architecture/DATA_AND_KNOWLEDGE_PLANE.md)
 - [Mobile alert control plane](docs/architecture/MOBILE_ALERT_CONTROL_PLANE.md)

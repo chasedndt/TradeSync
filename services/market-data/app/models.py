@@ -14,6 +14,7 @@ from datetime import datetime
 
 class MetricStatus(str, Enum):
     REAL = "REAL"
+    DERIVED = "DERIVED"
     PROXY = "PROXY"
     UNAVAILABLE = "UNAVAILABLE"
     STALE = "STALE"
