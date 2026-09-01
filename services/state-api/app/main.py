@@ -6,7 +6,7 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 from typing import List, Optional, Any, Dict
-from datetime import datetime
+from datetime import datetime, timezone
 from collections import defaultdict
 
 import asyncpg
@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 from tradesync_core import RiskGuardian
 from tradesync_core import normalize_symbol, normalize_venue
 from app.macro_feed import macro_feed, MacroHeadline
+from app.context_feed import context_feed
 
 # --- Logging Setup ---
 logging.basicConfig(
@@ -295,6 +296,8 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         # Shutdown
+        await macro_feed.close()
+        await context_feed.close()
         if state.pool:
             print("Closing DB pool")
             await state.pool.close()
@@ -1308,6 +1311,22 @@ async def get_macro_headlines(
 async def get_macro_status():
     """Get macro feed service status."""
     return macro_feed.get_status()
+
+
+# --- Free contextual provider feeds (non-authoritative) ---
+
+@app.get("/state/context/overview", tags=["context"])
+async def get_context_overview(
+    refresh: bool = Query(False, description="Force a refresh of enabled context feeds")
+):
+    """Return cached secondary context without granting scoring or execution authority."""
+    return await context_feed.fetch_overview(force_refresh=refresh)
+
+
+@app.get("/state/context/status", tags=["context"])
+async def get_context_status():
+    """Return configuration and cache policy for secondary context feeds."""
+    return context_feed.get_status()
 
 # --- Legacy Aliases (Step 0 Compat) ---
 
