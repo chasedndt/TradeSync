@@ -33,7 +33,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
       {open && <button className="sidebar-backdrop" aria-label="Close navigation" onClick={onClose} />}
       <aside className={`sidebar ${open ? 'sidebar--open' : ''}`} aria-label="Primary navigation">
         <div className="sidebar-brand">
-          <span className="brand-mark" aria-hidden="true">TS</span>
+          <img className="brand-mark" src="/brand/tradesync-mark.png" alt="TradeSync" />
           <span className="sidebar-label brand-name">TradeSync</span>
           <button className="sidebar-close" onClick={onClose} aria-label="Close navigation">
             <X size={20} />

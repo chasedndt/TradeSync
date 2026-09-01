@@ -1,0 +1,33 @@
+flowchart TB
+    subgraph A["Tier A — standalone TradeSync"]
+        HL["Hyperliquid public market data"] --> EDGE["Realtime edge / market-data"]
+        EDGE --> REDIS["Redis Streams"]
+        EDGE --> PG["PostgreSQL"]
+        REDIS --> REGIME["Regime + scorer + fusion"]
+        REGIME --> PG
+        PG --> API["State API"]
+        API --> UI["Cockpit + Market Canvas"]
+        REDIS --> ALERT["Alert router"]
+        ALERT --> UI
+    end
+
+    subgraph B["Tier B — optional federation"]
+        CHASE["ChaseOS graph + Gate"]
+        STRIKE["Strike Zone candidates"]
+        AI["Hermes / Ollama"]
+        MOBILE["Web Push / ntfy"]
+    end
+
+    CHASE <-. "versioned snapshot / proposal" .-> PG
+    STRIKE -. "trade_candidate_v1" .-> PG
+    AI -. "advisory query" .-> API
+    ALERT -. "delivery adapter" .-> MOBILE
+
+    subgraph C["Tier C — governed execution"]
+        APPROVAL["Single-use approval ledger"] --> POLICY["Final risk check"]
+        SIGNER["Isolated signer"] --> EXEC["Hyperliquid executor"]
+        POLICY --> EXEC
+    end
+
+    PG -. "decision + evidence" .-> APPROVAL
+    CHASE -. "Gate decision" .-> APPROVAL

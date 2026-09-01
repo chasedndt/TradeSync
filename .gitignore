@@ -16,6 +16,8 @@ secrets/
 venv/
 *.log
 .pytest_cache/
+.cache/
+target/
 .coverage
 htmlcov/
 dist/

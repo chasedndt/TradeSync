@@ -1,59 +1,61 @@
-# TradeSync Master Guide
+# TradeSync Agent Guide
 
-## 🚀 Core Commands
-- `docker compose -f ops/compose.full.yml up -d` - **Start** full trade stack
-- `docker compose -f ops/compose.full.yml down` - **Stop** all services
-- `docker compose -f ops/compose.full.yml logs -f <service>` - **Live Logs** (e.g., `qdrant`, `ingest-gateway`)
-- `docker compose -f ops/compose.full.yml exec postgres psql -U tradesync -d tradesync` - **DB Access**
+TradeSync is a standalone-first, Hyperliquid-only workstation with optional ChaseOS, Strike Zone, local-AI, notification, and wallet connectors.
 
-## 🧩 Service Logs Reference
-Use these names with the logs command:
-- `ingest-gateway`: Market data polling
-- `core-scorer`: Technical bias & confidence
-- `fusion-engine`: Confluence scoring
-- `state-api`: REST snapshots & UI data
-- `exec-hl-svc`: Hyperliquid order execution
-- `exec-retired protocol-svc`: retired protocol order execution
-- `postgres`, `redis`, `qdrant`: Persistent & memory storage
+## Authority
 
-## 📊 Ultimate Trading Journal Audit
-Run this to see the **Full Thesis** including Symbol, Timestamp, Side, Leverage, Decision Logic, and Status:
-```sql
-SELECT 
-    e.id as order_id, 
-    o.symbol, 
-    e.created_at as timestamp,
-    e.request->>'side' as side, 
-    e.status, -- Shows 'placed', 'completed', 'cancelled', or 'failed'
-    d.risk->>'leverage' as leverage, 
-    s.confidence as conviction, 
-    s.notes as thesis, 
-    o.quality as market_score,
-    o.confluence->'indicators' as indicators, 
-    d.risk->'stop_loss' as sl, 
-    d.risk->'take_profit' as tp
-FROM exec_orders e
-JOIN decisions d ON e.decision_id = d.id
-JOIN opportunities o ON d.opportunity_id = o.id
-JOIN signals s ON o.signal_id = s.id
-ORDER BY e.created_at DESC;
+- Hyperliquid is the only venue and authoritative market source.
+- Paper mode is the default: `DRY_RUN=true`, `EXECUTION_ENABLED=false`.
+- ChaseOS means the private instance at `C:\Users\chaseos\Documents\chaseos_obsidian`.
+- ChaseOS governs canonical knowledge promotion and approval authority; TradeSync must remain usable when the connector is offline.
+- Optional context providers and AI models never grant risk, approval, wallet, or execution authority.
+- No key, signer, wallet, deployment, spend, or live execution without explicit operator approval and passing roadmap gates.
+
+## Working location
+
+Use an isolated E: worktree under `E:\Projects\TradeSync\<task>`. Put caches, test output, builds, and other reproducible artifacts on E:. Route new visual evidence to `E:\Visual QA\TradeSync Visual QA`.
+
+## Core commands
+
+Start the bounded dashboard profile:
+
+```powershell
+docker compose `
+  --env-file E:\Projects\TradeSync\dashboard-runtime\runtime.env `
+  -f ops\compose.full.yml `
+  -f ops\compose.market-command.yml `
+  up -d postgres redis market-data state-api cockpit-ui
 ```
 
-## 🏗️ Project Architecture
-(Services communicate via Redis streams and persist to Postgres/Qdrant)
-- **Status Meanings**:
-  - `placed`: Order sent to venue, awaiting fill.
-  - `completed`: Order filled and confirmed on-chain.
-  - `cancelled`: Order invalidated by market structure breaking or manual stop.
-  - `failed`: Technical error (e.g., API timeout or account balance).
+Stop the same services with `docker compose ... stop cockpit-ui state-api market-data redis postgres`. Never use `down -v` during ordinary development.
 
-## 🗃️ Database Schema Map
-- `signals`: The **Thesis** layer (Agent name, confidence, features, manual notes).
-- `opportunities`: The **Score** layer (Market quality, bias, confluence indicators).
-- `decisions`: The **Risk** layer (Stops, TPs, risk-adjusted leverage/sizing).
-- `exec_orders`: The **Venue** layer (Full raw logs and txid).
+## Current service roles
 
-## 🛠️ Development Style
-- **Python**: FastAPI/Pydantic
-- **Messaging**: Redis streams
-- **Path**: Use `C:\TradeSync` for stable AI/CLI operations.
+- `market-data`: Hyperliquid public data and normalized market snapshots.
+- `state-api`: durable read model and bounded actions.
+- `cockpit-ui`: Mission Control and operator surfaces.
+- `core-scorer`: signal scoring; optional in the lean profile.
+- `fusion-engine`: opportunity construction; optional in the lean profile.
+- `exec-hl-svc`: paper/future Hyperliquid execution boundary; fail-closed.
+- `postgres`: durable truth.
+- `redis`: stream transport and short-lived state.
+- `qdrant`: optional, rebuildable semantic evidence index.
+
+## Documentation order
+
+1. `README.md`
+2. `roadmap.md`
+3. `docs/README.md`
+4. `docs/architecture/STANDALONE_FEDERATED_ARCHITECTURE.md`
+5. `docs/architecture/DATA_AND_KNOWLEDGE_PLANE.md`
+6. relevant contracts, providers, runbooks, and change records
+
+Historical phase reports and PlantUML exports can include retired venues or unimplemented components. They are evidence, not current authority.
+
+## Verification
+
+- Run targeted Python tests.
+- Run `npm run build` for Cockpit changes.
+- Run `cargo test --workspace` for Rust contract/service changes with cache and target output on E:.
+- Verify the bounded Docker profile when runtime behavior changes.
+- Record exact results and keep paper/live, planned/implemented, and local/deployed status separate.

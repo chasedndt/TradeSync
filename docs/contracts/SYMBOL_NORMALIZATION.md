@@ -1,5 +1,7 @@
 # Symbol Normalization Contract
 
+> Legacy multi-venue contract — retained for historical schema context. New TradeSync work is Hyperliquid-only; do not restore retired venue mappings from this file.
+
 > **Purpose**: Define canonical symbol format and venue-specific mappings.
 > **Invariant**: UI and internal systems only see canonical symbols.
 > **Last Updated**: 2026-01-21

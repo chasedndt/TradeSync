@@ -1,5 +1,7 @@
 # MarketSnapshot Contract
 
+> Legacy multi-venue contract — retained for historical schema context. It is not the current Hyperliquid-only contract and must be reconciled before new implementation uses it. See the repository README, roadmap, and documentation index.
+
 > **Purpose**: Single source of truth for the MarketSnapshot schema.
 > **Invariant**: All market data flows through this contract.
 > **Last Updated**: 2026-01-21

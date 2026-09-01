@@ -1,0 +1,23 @@
+sequenceDiagram
+    participant U as Operator
+    participant UI as TradeSync Cockpit
+    participant PG as Approval ledger
+    participant G as ChaseOS Gate
+    participant R as Risk Guardian
+    participant S as Isolated signer
+    participant H as Hyperliquid
+
+    UI->>PG: Store immutable preview and digest
+    UI->>G: Request decision-scoped approval
+    G-->>PG: Approve / deny / expire
+    U->>UI: Confirm exact preview when required
+    UI->>PG: Consume approval exactly once
+    PG->>R: Final market, account, and policy check
+    alt any check fails
+        R-->>UI: Block with reason
+    else all checks pass
+        R->>S: Bounded order intent and digest
+        S->>H: Sign and submit
+        H-->>PG: Venue receipt / fill updates
+        PG-->>UI: Reconciled status
+    end

@@ -1,0 +1,13 @@
+flowchart LR
+    PRODUCERS["TradeSync and other ChaseOS projects"] -->|"alert_event_v1"| STREAM["Redis consumer group"]
+    STREAM --> ROUTER["Rust alert router"]
+    ROUTER --> OUTBOX["PostgreSQL outbox + delivery ledger"]
+    OUTBOX --> INAPP["Cockpit SSE / WebSocket"]
+    OUTBOX --> PUSH["PWA Web Push"]
+    OUTBOX --> NTFY["ntfy adapter"]
+    OUTBOX --> LATER["Email / chat adapters later"]
+    INAPP --> RECEIPTS["attempt / accepted / acknowledged"]
+    PUSH --> RECEIPTS
+    NTFY --> RECEIPTS
+    LATER --> RECEIPTS
+    RECEIPTS --> OUTBOX

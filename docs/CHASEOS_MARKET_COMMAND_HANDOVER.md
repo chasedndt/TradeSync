@@ -1,5 +1,7 @@
 # ChaseOS Market Command
 
+> Architecture status note — 2026-09-01: this handover remains historical programme context. Current standalone/federated boundaries, data choices, Rust adoption, notification control plane, and delivery phases are defined by the repository [README](../README.md), [roadmap](../roadmap.md), and [architecture index](README.md). Where this handover conflicts with those current documents or the Hyperliquid-only source, the current documents and source take precedence.
+
 ## Full System Handover for Architecture and Implementation Planning
 
 - Handover date: 2026-08-20

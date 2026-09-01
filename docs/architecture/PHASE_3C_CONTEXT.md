@@ -2,6 +2,8 @@
 
 ## Overview
 
+> Historical multi-venue phase context. It is retained as evidence and does not override the current Hyperliquid-only architecture.
+
 This document captures the key code locations and architecture for Phase 3C implementation, which includes:
 - Market Microstructure Derivation (liquidity heatmap, slippage guards)
 - Scoring Upgrade (policy + structure aware)

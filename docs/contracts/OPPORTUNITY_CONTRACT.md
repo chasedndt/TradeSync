@@ -1,5 +1,7 @@
 # TradeSync API Contract Documentation
 
+> Legacy multi-venue contract — retained for historical schema context. It is not the current Hyperliquid-only contract and must be reconciled before new implementation uses it. See the repository README, roadmap, and documentation index.
+
 ## Overview
 This document defines the actual data structures returned by the TradeSync state-api endpoints, captured from live system responses on 2026-01-21.
 

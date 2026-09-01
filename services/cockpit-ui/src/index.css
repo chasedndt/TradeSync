@@ -44,7 +44,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--blue); outline-
   display: flex; flex-direction: column; background: var(--rail); border-right: 1px solid var(--border-soft);
 }
 .sidebar-brand { height: 68px; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid var(--border-soft); position: relative; }
-.brand-mark { font-size: 17px; font-style: italic; font-weight: 800; letter-spacing: -2px; color: #f5f7fa; }
+.brand-mark { width: 30px; height: 30px; object-fit: contain; display: block; }
 .brand-name { font-weight: 700; font-size: 18px; }
 .sidebar-label { display: none; }
 .sidebar-nav { flex: 1; padding: 27px 7px; display: flex; flex-direction: column; gap: 12px; }

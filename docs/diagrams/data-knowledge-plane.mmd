@@ -1,0 +1,17 @@
+flowchart LR
+    SOURCES["Hyperliquid / approved artifacts"] --> NORM["Versioned normalization"]
+    NORM --> STREAMS["Redis Streams\ntransport"]
+    NORM --> POSTGRES["PostgreSQL\ndurable truth"]
+    STREAMS --> AGENTS["Regime / scoring / alert consumers"]
+    AGENTS --> POSTGRES
+
+    SNAPSHOT["ChaseOS GraphSnapshot\ncanonical artifact"] --> VERIFY["Digest + schema + provenance validation"]
+    VERIFY --> PROJECTION["PostgreSQL graph projection"]
+    PROJECTION --> QDRANT["Qdrant semantic index\nrebuildable"]
+
+    POSTGRES --> QUERY["Bounded query service"]
+    PROJECTION --> QUERY
+    QDRANT --> QUERY
+    QUERY --> HARNESS["Agent harnesses\nadvisory"]
+    HARNESS --> PROPOSAL["Evidence / knowledge proposal"]
+    PROPOSAL --> GATE["ChaseOS quarantine + promotion Gate"]

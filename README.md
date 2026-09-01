@@ -1,35 +1,77 @@
-# TradeSync Mission Control
+# TradeSync
 
-TradeSync is the Hyperliquid-only market-state, paper-research, risk, evidence, and future fail-closed execution layer inside ChaseOS Market Command.
+<p align="center">
+  <img src="docs/brand/assets/tradesync-mark.png" alt="TradeSync TS mark" width="132">
+</p>
 
-The current system is deliberately **paper-only**:
+TradeSync is a standalone-first Hyperliquid market intelligence, paper-trading, alerting, evidence, and future governed-execution workstation.
 
-- Hyperliquid is the sole venue and authoritative market source.
-- `EXECUTION_ENABLED=false` and `DRY_RUN=true` are the required defaults.
-- No wallet or signer is configured.
-- CoinGecko, DefiLlama, and optional FRED data are context-only and never grant scoring, approval, risk, or execution authority.
-- ChaseOS means the canonical control-plane vault at `C:\Users\chaseos\Documents\chaseos_obsidian`; this repository does not replace or relocate it.
+It becomes more capable when connected to ChaseOS, Strike Zone Crypto, local AI runtimes, or an isolated wallet, but none of those systems is required for its core market, regime, alert, chart, paper-review, and journal functions.
 
-## Current runtime
+## Product contract
 
-The lean operator stack used by the dashboard contains:
+TradeSync has three explicit capability tiers:
 
-| Service | Role | Current operator profile |
+| Tier | Name | Works when | Capability |
+|---|---|---|---|
+| A | Standalone workstation | Hyperliquid public data, PostgreSQL, Redis, State API, and Cockpit are available | Market state, regimes, charting, alerts, paper opportunities, evidence, journal, and historical review |
+| B | Federated intelligence | Optional connectors are healthy | ChaseOS knowledge, Strike Zone candidates, local model explanations, and richer cross-project context |
+| C | Governed execution | Wallet signer, risk policy, approval ledger, and reconciliation all pass | Preview, approval-required paper/live actions, and later bounded autonomous actions |
+
+Tier A must continue when any Tier B connector is unavailable. Tier C always fails closed when ChaseOS approval authority, signer state, risk state, or reconciliation is unavailable.
+
+## Current truth — 2026-09-01
+
+- Hyperliquid is the only venue and authoritative market source.
+- The local operator runtime is paper-only: `EXECUTION_ENABLED=false`, `DRY_RUN=true`.
+- No wallet, private key, signer, live order authority, or mobile push deployment is configured.
+- PostgreSQL 16 and Redis 7 are active dependencies; Qdrant is an optional evidence profile.
+- CoinGecko and DefiLlama are free, context-only feeds. FRED is an optional free-key macro feed.
+- The responsive Mission Control dashboard and read-only execution readiness surface are implemented locally.
+- The canonical ChaseOS private instance is `C:\Users\chaseos\Documents\chaseos_obsidian`. Its live knowledge connector is not currently available, so the interface in this repository is a proposed versioned contract, not a verified live integration.
+- The first Rust component is a shared contract crate. The Rust alert router and Hyperliquid real-time edge are roadmap work, not complete services.
+
+## Architecture at a glance
+
+```mermaid
+flowchart LR
+    HL["Hyperliquid public API / WebSocket"] --> EDGE["Market ingest and normalization"]
+    EDGE --> BUS["Redis Streams"]
+    EDGE --> PG["PostgreSQL durable truth"]
+    BUS --> INTEL["Regime, scorer, and fusion services"]
+    INTEL --> PG
+    PG --> API["State API"]
+    API --> UI["TradeSync Cockpit"]
+    BUS --> ALERT["Rust alert router - planned"]
+    ALERT --> MOBILE["PWA Web Push / ntfy adapter - planned"]
+
+    CHASE["ChaseOS graph snapshot and Gate"] -. optional .-> CONNECT["Versioned ChaseOS connector"]
+    STRIKE["Strike Zone paper candidates"] -. optional .-> CONNECT
+    AI["Hermes / Ollama agent harnesses"] -. optional, advisory .-> CONNECT
+    CONNECT -. read projection .-> PG
+    PG -. evidence and proposals .-> CONNECT
+
+    SIGNER["Isolated wallet signer - future"] -. approval-gated .-> EXEC["Hyperliquid executor"]
+    PG -. decision plus single-use approval .-> EXEC
+```
+
+The detailed architecture lives in [docs/architecture/STANDALONE_FEDERATED_ARCHITECTURE.md](docs/architecture/STANDALONE_FEDERATED_ARCHITECTURE.md).
+
+## Data and knowledge choices
+
+| Technology | Authority | Purpose |
 |---|---|---|
-| `postgres` | Durable market, signal, opportunity, decision, and order records | Running |
-| `redis` | Streams and short-lived coordination state | Running |
-| `market-data` | Hyperliquid public market polling and normalized snapshots | Running |
-| `state-api` | Read model and bounded action API | Running |
-| `cockpit-ui` | Responsive Mission Control dashboard | Running |
-| `core-scorer` | Signal scoring | Optional / not in lean dashboard profile |
-| `fusion-engine` | Opportunity construction | Optional / not in lean dashboard profile |
-| `exec-hl-svc` | Hyperliquid paper executor | Optional profile; fail-closed |
+| PostgreSQL 16 | Durable TradeSync source of truth | Market history, signals, opportunities, decisions, approvals, orders, outcomes, notification ledger, and a queryable projection of ChaseOS graph snapshots |
+| Redis 7 Streams | Transport, never canonical truth | Low-latency fan-out, consumer groups, backpressure, latest-state caches, and reconnect recovery |
+| Qdrant | Rebuildable derived index | Semantic retrieval over approved evidence and knowledge; never approval or execution authority |
+| Content-addressed files on E: | Raw evidence and immutable artifacts | Source documents, graph snapshots, receipts, exports, and large attachments |
+| ChaseOS `GraphSnapshot` | Canonical knowledge artifact | Stable nodes, edges, confidence, provenance, and snapshot identity; database indexes are adapters derived from it |
 
-The dashboard reports measured output. It does not label an unprobed service outage as healthy, and it does not treat the absence of signals as venue disconnection.
+No dedicated graph database is required for the first implementation. PostgreSQL adjacency tables and recursive queries are enough for the initial knowledge projection; a dedicated graph engine is considered only after measured query benchmarks justify it. TimescaleDB also remains an evaluated migration, not a current capability—the repository’s `TimescaleStore` is still a placeholder.
 
-## Start and stop
+## Start the bounded dashboard
 
-Use the governed runtime environment file already prepared on E:. Do not copy secrets into this repository.
+Use the governed runtime environment already stored on E:. Do not copy credentials into this repository.
 
 ```powershell
 docker compose `
@@ -41,7 +83,7 @@ docker compose `
 
 Open [http://localhost:3000/](http://localhost:3000/).
 
-Stop the same bounded services with:
+Stop only the bounded services started above:
 
 ```powershell
 docker compose `
@@ -51,61 +93,51 @@ docker compose `
   stop cockpit-ui state-api market-data redis postgres
 ```
 
-Do not use `down -v`; it would remove persistent volumes.
+Do not use `down -v`; that removes persistent volumes.
 
-## Mission Control surfaces
+## Current dashboard surfaces
 
-- `/` — authoritative Hyperliquid market pulse, readiness, context-only providers, measured system output, and execution safety.
-- `/market` — detailed market data already exposed by the current snapshot contract.
-- `/opportunities` — paper opportunity review when scorer/fusion output exists.
-- `/sources` — source inspection.
-- `/logs` — decisions and orders evidence.
-- `/execution` — read-only readiness and future activation gates; no arming controls.
+- `/` — Mission Control: authoritative market pulse, readiness, context feeds, system output, and safety state.
+- `/market` — detailed market snapshots; the future Market Canvas drilldown starts here.
+- `/opportunities` — paper opportunity review.
+- `/sources` — temporary legacy surface; roadmap replacement is Knowledge Graph intake and provenance.
+- `/logs` — current decisions/orders evidence; roadmap replacement is Activity & Evidence with Decisions, Approvals, Orders, Alerts, and Outcomes.
+- `/execution` — read-only readiness and activation gates; it contains no wallet secrets or arming controls.
+- `/settings` — currently includes legacy browser-local connection fields and requires the operator-settings redesign described in the roadmap.
 
-## APIs used by the dashboard
-
-| Endpoint | Purpose |
-|---|---|
-| `GET /state/health` | State API and PostgreSQL read health |
-| `GET /state/snapshot` | Stream/output timestamps and fail-closed execution gate |
-| `GET /state/market/snapshots` | Authoritative Hyperliquid snapshots |
-| `GET /state/opportunities` | Paper opportunities |
-| `GET /state/context/overview` | Cached context-only CoinGecko, DefiLlama, and optional FRED data |
-| `GET /state/execution/status` | Read-only execution boundary |
-
-## Provider policy
-
-See [docs/providers/MARKET_PROVIDER_MATRIX.md](docs/providers/MARKET_PROVIDER_MATRIX.md).
-
-- Hyperliquid public API: authoritative for the current market table; free and keyless for the endpoints in use.
-- CoinGecko Demo API: free spot-reference context.
-- DefiLlama: free Hyperliquid TVL context.
-- FRED: free macro context after the operator supplies a free API key; currently optional and disabled.
-
-No paid API is required for the present dashboard.
-
-## Verification
+## Verification commands
 
 Frontend:
 
 ```powershell
-cd services\cockpit-ui
-npm install --prefer-offline --no-audit --no-fund
+Set-Location services\cockpit-ui
 npm run build
 ```
 
-Context-feed tests:
+Python context feeds:
 
 ```powershell
 python -m pytest services\state-api\tests\test_context_feed.py -q
 ```
 
-## Architecture and roadmap
+Rust contracts:
 
-- [ChaseOS Market Command handover](docs/CHASEOS_MARKET_COMMAND_HANDOVER.md)
-- [Project roadmap](roadmap.md)
-- [Market provider matrix](docs/providers/MARKET_PROVIDER_MATRIX.md)
-- [Dashboard overhaul change record](docs/changes/2026-09-01_mission-control-dashboard-overhaul.md)
-- [Phase 0 resource readiness](docs/PHASE0_RESOURCE_READINESS.md)
+```powershell
+$tradeSyncRoot=(Resolve-Path '.').Path
+$env:CARGO_HOME=(Join-Path $tradeSyncRoot '.cache\cargo')
+$env:CARGO_TARGET_DIR=(Join-Path $tradeSyncRoot '.cache\cargo-target')
+cargo test --workspace
+```
 
-Historical documents may describe removed venues or aspirational components. Current source, tests, this README, the Hyperliquid-only migration record, and the canonical ChaseOS control plane take precedence.
+## Documentation
+
+- [Documentation index](docs/README.md)
+- [Roadmap](roadmap.md)
+- [Standalone and federated architecture](docs/architecture/STANDALONE_FEDERATED_ARCHITECTURE.md)
+- [Data and knowledge plane](docs/architecture/DATA_AND_KNOWLEDGE_PLANE.md)
+- [Mobile alert control plane](docs/architecture/MOBILE_ALERT_CONTROL_PLANE.md)
+- [Rust boundaries](docs/architecture/RUST_BOUNDARIES.md)
+- [Provider matrix](docs/providers/MARKET_PROVIDER_MATRIX.md)
+- [Historical Market Command handover](docs/CHASEOS_MARKET_COMMAND_HANDOVER.md)
+
+Historical documents and diagrams can describe removed venues or aspirational components. Current source, tests, this README, `roadmap.md`, the Hyperliquid-only migration record, and ChaseOS governance take precedence.

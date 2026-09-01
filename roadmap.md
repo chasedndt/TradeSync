@@ -2,77 +2,175 @@
 
 Last updated: 2026-09-01
 
-## Product direction
+Planning horizon: three-week foundation sprint plus gated continuation
 
-TradeSync is the Hyperliquid-only operator and evidence layer for ChaseOS Market Command. Development remains paper-first. New capability must improve decision quality, auditability, reliability, or safety before it increases automation.
+Operating rule: standalone-first, Hyperliquid-only, paper-first, fail-closed
 
-## Phase 1 — Mission Control foundation (current)
+## Expected outcome
 
-Status: implemented locally; visual QA pending browser availability.
+At the end of the foundation programme, TradeSync is one coherent operator workstation that can:
 
-- Responsive Mission Control shell for desktop, tablet, and mobile.
-- Hyperliquid-authoritative BTC, ETH, and SOL perpetual market pulse.
-- CoinGecko and DefiLlama free context feeds; optional free-key FRED feed.
-- Context-only authority labels in the API and UI.
-- Honest readiness model that separates live market data, scoring output, and execution authority.
-- Read-only execution readiness; no fake arming, kill, or wallet controls.
-- Reconciled README, provider matrix, and change record.
+1. consume and retain authoritative Hyperliquid market data in real time;
+2. calculate explainable regimes and liquidation evidence without presenting proxies as facts;
+3. surface ranked paper opportunities and complete decision evidence;
+4. provide an internal Market Canvas with chart-native alerts;
+5. continue all core functions while ChaseOS, Strike Zone, local models, notification adapters, or wallets are unavailable;
+6. synchronize approved ChaseOS graph snapshots and Strike Zone paper candidates when those connectors are available;
+7. deliver governed alerts to desktop and mobile without an Xcode/native-iOS build;
+8. support later wallet preview and execution only through an isolated signer, single-use approval consumption, risk policy, and reconciliation;
+9. feed outcomes and lessons back as proposals for ChaseOS review, never as autonomous canonical truth.
 
-Acceptance gate: frontend build, context tests, healthy Docker cockpit, browser visual QA, responsive screenshots, and zero critical console errors.
+## Architecture invariants
 
-## Phase 2 — Data truth and journal accuracy
+- **Standalone is a product, not a degraded mode.** Market data, regimes, alerts, charting, paper opportunities, and journaling belong to Tier A.
+- **Connectors enrich; they do not own core availability.** Optional connector outages are visible and recoverable.
+- **Knowledge and authority are separate.** A graph fact, model explanation, or Strike Zone candidate can inform a decision but cannot approve or execute it.
+- **Execution fails closed.** Missing Gate, signer, wallet state, account state, nonce state, risk state, or reconciliation blocks order submission.
+- **Artifacts are truth; indexes are rebuildable.** ChaseOS `GraphSnapshot` JSON and TradeSync Postgres rows are durable. Redis and Qdrant are derived/transport layers.
+- **Hyperliquid is the only venue.** Solana ecosystem research stays in a separate namespace and does not silently become an execution venue.
+- **Paper/live labels are explicit on every record and surface.**
 
-Status: next.
+## Three-week foundation sprint
 
-- Expose authoritative Hyperliquid 24-hour mark-price change instead of borrowing spot context.
-- Add explicit service probes for scorer and fusion so “no output” and “service offline” remain distinct.
-- Audit ingested events, signals, opportunities, decisions, and orders for timestamp, symbol, timeframe, status, and provenance consistency.
-- Build reconciliation views for missing links, duplicates, stale rows, and schema drift.
-- Define deterministic KPI calculations for win rate, expectancy, drawdown, slippage, and thesis adherence.
+### Week 1 — Market truth, contracts, and Rust foothold
 
-Acceptance gate: fixture-backed calculations, database reconciliation report, and no ambiguous simulated/live labels.
+Status: in progress.
 
-## Phase 3 — Market Canvas drilldown (selected future direction 2)
+- Replace polling-only critical paths with a reconnecting Hyperliquid WebSocket design for `activeAssetCtx`, candles, `l2Book`, trades, and later user-scoped fills/events.
+- Correct 24-hour change, market freshness, and service-probe semantics.
+- Define `market_event_v1`, `alert_event_v1`, `knowledge_sync_v1`, and `trade_candidate_v1` boundaries.
+- Add the Rust shared-contract crate and make it the compatibility seam for the future real-time edge and notification router.
+- Audit existing liquidation proxies; label proxy fields unmistakably and prevent 50/50 long/short estimates from appearing authoritative.
+- Design PostgreSQL partitions/indexes for candles, market events, alerts, and graph projections.
+- Add deterministic data-quality tests for duplicate IDs, timestamp order, source authority, stale events, and missing lineage.
 
-Status: planned, not started.
+Exit gate:
 
-- Individual Hyperliquid market workspace opened from a Mission Control row.
-- Multi-timeframe chart, funding/OI/volume overlays, order-book depth, liquidity, regime, and provenance.
-- Evidence timeline linking market observations to signals and paper decisions.
-- Time-range, timeframe, and metric controls with mobile-safe interaction states.
+- Rust contract tests pass.
+- Hyperliquid samples map to versioned fixtures.
+- Liquidation and regime fields declare `observed`, `derived`, `proxy`, or `unavailable` provenance.
+- Restart/replay tests prove no duplicate durable events.
 
-Acceptance gate: a single-market paper review can be reproduced from stored evidence without relying on screenshots or memory.
-
-## Phase 4 — Paper intelligence bridge
+### Week 2 — Regimes, opportunities, knowledge connector, and alert router
 
 Status: planned.
 
-- Versioned Strike Zone receipt to `trade_candidate_v1` adapter.
-- Single-use approval-consumption ledger and replay protection.
-- Scorer/fusion restoration and calibrated opportunity ranking.
-- Paper-only outcome tracking and model/rule evaluation.
-- Optional local Hermes/Ollama explanations that cannot change risk or authority.
+- Rebuild regime classification from measured trend, volatility, funding, OI, volume, liquidity, and market-structure inputs.
+- Restore scorer/fusion health probes and the paper opportunity pipeline.
+- Implement a read-only ChaseOS graph-snapshot adapter and a local PostgreSQL graph projection.
+- Implement Strike Zone receipt validation into `trade_candidate_v1`; candidates remain paper research.
+- Begin the Rust `alert-router-rs` service with PostgreSQL outbox, Redis consumer groups, deduplication, priority, expiry, quiet hours, and delivery receipts.
+- Replace Sources with Knowledge Graph intake: drag/drop enters quarantine, extraction produces a proposed graph delta, and only approved promotion changes canonical knowledge.
+- Replace Decisions/Orders shells with Activity & Evidence tabs: Decisions, Approvals, Orders, Alerts, Outcomes.
 
-Acceptance gate: end-to-end paper receipt, approval, decision, journal, and outcome evidence across restarts.
+Exit gate:
 
-## Phase 5 — Ecosystem screener expansion
+- TradeSync remains fully usable with every optional connector disabled.
+- Disconnect/reconnect tests replay graph deltas and alerts without duplication.
+- No model or connector can write canonical ChaseOS knowledge or consume approval authority.
 
-Status: far-later deferred scope.
+### Week 3 — Mobile alerts, Market Canvas foundation, and reliability
 
-- Start with Solana ecosystem discovery and on-chain token screening only after the Hyperliquid workflow is mature.
-- Keep on-chain token data in a separate source/authority namespace from Hyperliquid perpetual execution.
-- Add provenance, liquidity, contract-risk, holder/distribution, and manipulation-risk gates before any token is surfaced.
-- Reuse the Market Canvas pattern for asset drilldown, not the primary Mission Control table.
+Status: planned; feasible as an MVP without Xcode.
 
-No-go: do not add Solana execution, wallet authority, token routing, or paid feeds as part of the current dashboard phase.
+- Add a PWA manifest, service worker, notification permission flow, and Web Push subscription management.
+- Add an ntfy adapter as a free fast-path while keeping the Rust router vendor-neutral.
+- Add notification preferences by project, symbol, severity, category, quiet hours, and device.
+- Add acknowledgement, retry/backoff, dead-letter, dedupe, rate-limit, and delivery-ledger views.
+- Add the first Market Canvas route with a Hyperliquid chart, timeframe selection, evidence markers, and alert-rule creation.
+- Run desktop/tablet/mobile responsive QA, browser-console checks, restart recovery, and an alert-latency soak.
 
-## Phase 6 — Isolated wallet and bounded canary
+Exit gate:
 
-Status: approval-gated future work.
+- A paper opportunity or critical system-health event reaches an enrolled Android or iOS Home Screen PWA/ntfy client with a durable delivery receipt.
+- iOS setup documents the Home Screen requirement; no Apple Developer membership or Xcode project is required for standards-based Web Push.
+- No alert action can place an order.
+- The service can be reused by another ChaseOS project by changing `project`, routing policy, and producer credentials—not by forking the router.
 
-- Create a separate Hyperliquid wallet only with explicit operator approval.
-- Keep signer secrets outside models, logs, browser storage, and general service environments.
-- Require durable approval consumption, idempotency, reconciliation, risk ceilings, and emergency fail-closed controls.
-- Start with a bounded canary only after paper evidence and security review pass.
+## Phase 4 — Market Canvas and journal maturity
 
-No-go: no wallet creation, credential use, live execution, deployment, spend, or permission changes under the current roadmap authorization.
+- TradingView Lightweight Charts or KLineChart-based per-market workspace.
+- Candles, funding, OI, volume, order-book depth, liquidity, regimes, alerts, drawings, and evidence timeline.
+- Versioned user drawings and alert rules stored server-side.
+- Deterministic outcome metrics: expectancy, drawdown, adverse/favourable excursion, slippage, thesis adherence, and regime fit.
+- Reconciliation views for orphaned events, duplicate candidates, stale approvals, partial orders, and missing outcomes.
+
+Exit gate: a paper trade can be reconstructed from source observation through outcome without screenshots or memory.
+
+## Phase 5 — Wallet and approval foundation
+
+This phase moves earlier than Solana expansion, but remains approval-gated.
+
+- Create a separate Hyperliquid agent/API wallet only after explicit operator action.
+- Keep private keys out of browser storage, logs, prompts, model contexts, PostgreSQL, Redis, Qdrant, and general service environments.
+- Run the signer in an isolated service with the smallest possible API and network scope.
+- Implement preview → approval request → approval decision → single-use consumption → final risk check → order intent → venue receipt → reconciliation.
+- Support modes: `locked`, `observe`, `paper`, `approval_required`, and later `bounded_autonomous`.
+- A ChaseOS Gate outage blocks modes that require approval; it does not stop standalone observation, paper alerts, or journal review.
+
+Exit gate: testnet or non-broadcast signed-intent verification, replay protection, expiration, changed-payload invalidation, kill-switch test, and security review.
+
+## Phase 6 — Bounded Hyperliquid canary
+
+- Separate canary wallet and explicit capital ceiling.
+- One market, one strategy version, low leverage, small notional, and a bounded time window.
+- Pre-trade and post-trade account reconciliation.
+- Automatic block on stale market/account state, policy mismatch, approval mismatch, nonce uncertainty, delivery uncertainty, or daily-loss ceiling.
+- Human-readable incident and rollback runbooks.
+
+No-go: no production-sized deployment, self-increasing limits, self-promotion of a strategy, or model access to signing material.
+
+## Phase 7 — Solana ecosystem research
+
+- Add Solana token discovery and Phantom/Solana wallet visibility in a separate `solana_research` authority namespace.
+- Use Rust where it improves Solana RPC ingestion, transaction decoding, and deterministic validation.
+- Add liquidity, contract/program risk, holder concentration, mint/freeze authority, route quality, and manipulation gates.
+- Reuse Market Canvas and alerting; do not route Solana assets through Hyperliquid execution semantics.
+- Any Solana signing capability gets its own signer, approvals, limits, and threat model.
+
+## Product-surface backlog
+
+### Regime summary
+
+Show current regime, confidence, evidence components, conflicting factors, source freshness, transition history, and “why not higher confidence.” Never show `UNKNOWN` without the missing inputs.
+
+### Liquidations
+
+Separate observed user-fill liquidation events, venue-level liquidation mechanics, inferred pressure, and legacy proxy estimates. Show direction only when the source supports it.
+
+### Opportunities
+
+Show symbol/timeframe, side, regime fit, entry conditions, invalidation, stop, targets, estimated risk/reward, evidence, provenance, age, and paper/live state.
+
+### Activity & Evidence
+
+- Decisions: proposed/allowed/blocked/expired plus policy reasons.
+- Approvals: pending/approved/denied/expired/consumed with immutable payload digest.
+- Orders: preview/submitted/placed/partial/filled/cancelled/failed/reconciled.
+- Alerts: triggered/routed/delivered/acknowledged/expired/dead-lettered.
+- Outcomes: P&L, MFE/MAE, fees, funding, slippage, thesis adherence, and lessons.
+
+### Settings
+
+Replace generic browser-local API fields with operator settings: data connections, connector health, notification devices and quiet hours, display/timezone, risk-policy summaries, execution mode, wallet connection status, retention, exports, and diagnostics. Secrets are configured through governed server-side mechanisms, never pasted into ordinary UI fields.
+
+### Operator profile
+
+Make the profile menu identify the current operator/runtime, trust tier, active mode, approval inbox, device sessions, audit exports, and lock/sign-out actions. It must not imply authentication until real identity/session support exists.
+
+## Free provider plan
+
+| Need | Initial free path | Authority |
+|---|---|---|
+| Perpetual market truth | Hyperliquid public API/WebSocket | Authoritative |
+| Spot cross-check | CoinGecko Demo | Context only |
+| Protocol TVL | DefiLlama | Context only |
+| Macro | FRED free key | Context only |
+| Mobile delivery | Standards-based Web Push plus optional ntfy | Notification transport only |
+| Local explanations | Hermes/Ollama | Advisory only |
+
+Paid data is considered only after a measured gap cannot be closed with venue data, local calculation, or a free source.
+
+## Programme definition of done
+
+TradeSync is not “done” because containers start or panels render. A capability is complete only when its contract, source authority, persistence, restart behavior, failure behavior, tests, operator surface, evidence, security boundary, and documentation agree.

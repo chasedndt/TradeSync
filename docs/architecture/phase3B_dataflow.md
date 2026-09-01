@@ -1,5 +1,7 @@
 # Phase 3B — Market Data Expansion: Dataflow Architecture
 
+> Historical multi-venue phase design. It is not current architecture. See `STANDALONE_FEDERATED_ARCHITECTURE.md` and the repository roadmap.
+
 > **Purpose**: Single source of truth for how market data flows through the system.
 > **Invariant**: Prevents implementation retired protocol across services.
 
