@@ -15,6 +15,7 @@ TradeSync is a standalone-first, event-driven Hyperliquid workstation with optio
 - Optional Qdrant evidence profile.
 - Hyperliquid-only market and future execution boundary.
 - Paper defaults: `DRY_RUN=true`, `EXECUTION_ENABLED=false`.
+- Read-only `integration_pipeline_status_v1` topology probes surfaced in the Cockpit at `/pipeline`.
 
 ## Canonical design documents
 
@@ -30,6 +31,19 @@ TradeSync is a standalone-first, event-driven Hyperliquid workstation with optio
 TradeSync core owns market observation, regimes, alerts, paper opportunities, evidence, and outcomes. ChaseOS owns canonical personal knowledge and Gate/approval authority. Strike Zone owns research and candidate proposals. AI runtimes are advisory. An isolated signer owns key use. Hyperliquid owns venue truth.
 
 Optional systems enrich the core but do not become Tier A startup dependencies. Approval-required or live execution fails closed when any required authority or state is unavailable.
+
+## Runtime inspectability
+
+The State API assembles a read-only integration graph from live probes and
+declared repository contracts. The Cockpit exposes the summary in the top bar
+and the complete graph at `/pipeline`. Each stage shows evidence, missing
+inputs, operational impact, and the next bounded repair or restart target.
+
+The inspector does not execute its displayed commands. It does not turn a
+contract-only adapter into a live connection, and it does not count ChaseOS,
+Strike Zone Crypto, TradingView/Pine Script, or agent harness availability
+against standalone Tier A readiness. See
+[Integration Pipeline status v1](contracts/INTEGRATION_PIPELINE_STATUS_V1.md).
 
 ## Historical notice
 

@@ -1,4 +1,5 @@
 import { Fragment } from 'react'
+import { NavLink } from 'react-router-dom'
 import {
   Bank,
   BracketsCurly,
@@ -64,19 +65,24 @@ interface ReadinessItemProps {
   value: string
   detail: string
   tone: 'good' | 'warn' | 'bad' | 'dim'
+  to?: string
 }
 
-function ReadinessItem({ icon, label, value, detail, tone }: ReadinessItemProps) {
-  return (
-    <div className="readiness-item">
+function ReadinessItem({ icon, label, value, detail, tone, to }: ReadinessItemProps) {
+  const content = (
+    <>
       <span className={`readiness-icon tone-${tone}`}>{icon}</span>
       <div className="readiness-copy">
         <div className="eyebrow">{label}</div>
         <div className={`readiness-value tone-${tone}`}>{value}</div>
         <div className="readiness-detail">{detail}</div>
       </div>
-    </div>
+      {to && <span className="readiness-inspect">Inspect →</span>}
+    </>
   )
+  return to
+    ? <NavLink className="readiness-item readiness-item--link" to={to} title={`Inspect ${label.toLowerCase()} dependencies`}>{content}</NavLink>
+    : <div className="readiness-item">{content}</div>
 }
 
 function MarketPulse({ snapshots }: { snapshots: MarketSnapshotWithMicrostructure[] }) {
@@ -94,7 +100,7 @@ function MarketPulse({ snapshots }: { snapshots: MarketSnapshotWithMicrostructur
         <table className="market-table">
           <thead>
             <tr>
-              <th>Market</th><th>Price (USD)</th><th>24h Price</th><th>Funding (8h)</th>
+              <th>Market</th><th>Price (USD)</th><th>24h Change</th><th>Funding (8h)</th>
               <th>OI Δ (24h)</th><th>Spread</th><th>Liquidity</th><th>Regime</th><th>Freshness</th>
             </tr>
           </thead>
@@ -111,7 +117,7 @@ function MarketPulse({ snapshots }: { snapshots: MarketSnapshotWithMicrostructur
                 <tr key={snapshot.symbol}>
                   <td><div className="market-id"><AssetIcon symbol={symbol} /><div className="market-name"><strong>{symbol}</strong><span>{snapshot.symbol}</span></div></div></td>
                   <td><span className="metric-main">{formatUsd(price, price && price < 1000 ? 2 : 1)}</span><span className="metric-sub">mark midpoint</span></td>
-                  <td><span className="metric-main tone-dim">—</span><span className="metric-sub">not exposed</span></td>
+                  <td><span className="metric-main tone-dim">—</span><span className="metric-sub">deferred</span></td>
                   <td><span className="metric-main">{snapshot.funding ? `${(snapshot.funding.horizons.h8 * 100).toFixed(4)}%` : '—'}</span><span className="metric-sub">{snapshot.funding?.regime?.toUpperCase() || 'UNAVAILABLE'}</span></td>
                   <td><span className={`metric-main ${(oi24?.delta_pct ?? 0) >= 0 ? 'tone-good' : 'tone-bad'}`}>{formatPercent(oi24?.delta_pct)}</span><span className="metric-sub">{formatCompactUsd(oi24?.delta_usd)}</span></td>
                   <td><span className="metric-main tone-good">{spread != null ? `${spread.toFixed(2)} bps` : '—'}</span><span className="metric-sub">{spread != null && spread <= 2 ? 'TIGHT' : 'CHECK'}</span></td>
@@ -125,7 +131,7 @@ function MarketPulse({ snapshots }: { snapshots: MarketSnapshotWithMicrostructur
           </tbody>
         </table>
       </div>
-      <div className="market-footnote">Source: Hyperliquid API &nbsp; • &nbsp; Perpetuals only &nbsp; • &nbsp; 24h price change stays blank until it is exposed by the authoritative feed</div>
+      <div className="market-footnote">Source: Hyperliquid API &nbsp; • &nbsp; Perpetuals only &nbsp; • &nbsp; 24h change is intentionally deferred and does not block the current Tier A slice</div>
     </section>
   )
 }
@@ -202,9 +208,9 @@ export function Overview() {
   return (
     <div className="mission-control">
       <section className="panel readiness-strip" aria-label="System readiness">
-        <ReadinessItem icon={<ChartLineUp size={35} weight="duotone" />} label="Market Data" value={marketLive ? 'LIVE' : 'UNAVAILABLE'} detail={`Hyperliquid · ${freshest == null ? 'waiting for data' : `last update ${formatAge(freshest)}`}`} tone={marketLive ? 'good' : 'bad'} />
-        <ReadinessItem icon={<Heartbeat size={35} weight="duotone" />} label="Intelligence Pipeline" value={hasSignals ? 'ACTIVE' : 'PARTIAL'} detail={hasSignals ? 'Scoring output detected' : 'No current scoring output'} tone={hasSignals ? 'good' : 'warn'} />
-        <ReadinessItem icon={<Prohibit size={35} weight="bold" />} label="Execution" value="DISABLED" detail="Paper-only · No wallet connected" tone="bad" />
+        <ReadinessItem to="/pipeline" icon={<ChartLineUp size={35} weight="duotone" />} label="Market Data" value={marketLive ? 'LIVE' : 'UNAVAILABLE'} detail={`Hyperliquid · ${freshest == null ? 'waiting for data' : `last update ${formatAge(freshest)}`}`} tone={marketLive ? 'good' : 'bad'} />
+        <ReadinessItem to="/pipeline" icon={<Heartbeat size={35} weight="duotone" />} label="Intelligence Pipeline" value={hasSignals ? 'ACTIVE' : 'PARTIAL'} detail={hasSignals ? 'Scoring output detected' : 'No current scoring output'} tone={hasSignals ? 'good' : 'warn'} />
+        <ReadinessItem to="/pipeline" icon={<Prohibit size={35} weight="bold" />} label="Execution" value="DISABLED" detail="Paper-only · No wallet connected" tone="bad" />
       </section>
 
       <div className="primary-grid">

@@ -76,6 +76,13 @@ services:
     mem_limit: 512m
     mem_reservation: 256m
     cpus: 0.75
+    environment:
+      # The bounded profile does not start these services. Empty endpoints keep
+      # the read-only inspector fast and explicit; set a URL when a service is
+      # intentionally admitted to this runtime.
+      INGEST_GATEWAY_URL: ${PIPELINE_INGEST_GATEWAY_URL:-}
+      CORE_SCORER_URL: ${PIPELINE_CORE_SCORER_URL:-}
+      FUSION_ENGINE_URL: ${PIPELINE_FUSION_ENGINE_URL:-}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz', timeout=3)"]
       interval: 10s

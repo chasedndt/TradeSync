@@ -5,6 +5,7 @@ import {
   ChartLineUp,
   BracketsCurly,
   Database,
+  FlowArrow,
   Gear,
   ListChecks,
   ShieldCheck,
@@ -13,15 +14,17 @@ import {
   UserCircle,
   X,
 } from '../icons'
+import { useIntegrationPipeline } from '../../api/hooks'
 
 const navItems = [
-  { to: '/', label: 'Mission Control', icon: Target, end: true },
-  { to: '/market', label: 'Market', icon: ChartBar },
-  { to: '/opportunities', label: 'Opportunities', icon: ChartLineUp },
-  { to: '/regime-lab', label: 'Regime Lab', icon: BracketsCurly },
-  { to: '/sources', label: 'Sources', icon: Database },
-  { to: '/logs', label: 'Evidence ledger', icon: ListChecks },
-  { to: '/execution', label: 'Execution readiness', icon: ShieldCheck },
+  { to: '/', label: 'Mission Control', description: 'Market, opportunities, and health.', icon: Target, end: true },
+  { to: '/market', label: 'Market', description: 'Hyperliquid market evidence.', icon: ChartBar },
+  { to: '/opportunities', label: 'Opportunities', description: 'Ranked paper research setups.', icon: ChartLineUp },
+  { to: '/regime-lab', label: 'Regime Lab', description: 'Feature evidence and rulebook experiments.', icon: BracketsCurly },
+  { to: '/pipeline', label: 'Integration pipeline', description: 'Live dependencies, missing links, and restart targets.', icon: FlowArrow },
+  { to: '/sources', label: 'Sources', description: 'Legacy source intake surface.', icon: Database },
+  { to: '/logs', label: 'Evidence ledger', description: 'Decisions, orders, and receipts.', icon: ListChecks },
+  { to: '/execution', label: 'Execution readiness', description: 'Fail-closed wallet and policy gates.', icon: ShieldCheck },
 ]
 
 interface SidebarProps {
@@ -30,6 +33,9 @@ interface SidebarProps {
 }
 
 export function Sidebar({ open, onClose }: SidebarProps) {
+  const { data: pipeline } = useIntegrationPipeline()
+  const pipelineTone = pipeline?.tier_a.status === 'ready' ? 'good' : pipeline?.tier_a.status === 'offline' ? 'bad' : 'warn'
+
   return (
     <>
       {open && <button className="sidebar-backdrop" aria-label="Close navigation" onClick={onClose} />}
@@ -42,7 +48,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           </button>
         </div>
         <nav className="sidebar-nav">
-          {navItems.map(({ to, label, icon: Icon, end }) => (
+          {navItems.map(({ to, label, description, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}
@@ -53,7 +59,13 @@ export function Sidebar({ open, onClose }: SidebarProps) {
               className={({ isActive }) => `nav-link ${isActive ? 'nav-link--active' : ''}`}
             >
               <Icon size={23} weight="regular" aria-hidden="true" />
+              {to === '/pipeline' && <i className={`nav-status-dot status-dot status-dot--${pipelineTone}`} />}
               <span className="sidebar-label">{label}</span>
+              <span className="nav-hover-card" role="tooltip">
+                <strong>{label}</strong>
+                <small>{description}</small>
+                {to === '/pipeline' && pipeline && <em>Tier A {pipeline.tier_a.status} · {pipeline.tier_a.ready_count}/{pipeline.tier_a.total_count} ready</em>}
+              </span>
             </NavLink>
           ))}
         </nav>

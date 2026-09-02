@@ -20,6 +20,7 @@ from tradesync_core import RiskGuardian
 from tradesync_core import normalize_symbol, normalize_venue
 from app.macro_feed import macro_feed, MacroHeadline
 from app.context_feed import context_feed
+from app.integration_pipeline import collect_integration_pipeline
 from app.regime_lab import (
     RegimeLabEngine,
     RegimeLabValidationError,
@@ -1161,6 +1162,14 @@ async def execute_action(req: ExecuteRequest):
 
 MARKET_DATA_URL = os.getenv("MARKET_DATA_URL", "http://market-data:8005")
 
+
+def _market_data_get(path: str, *, timeout: float = 10.0) -> httpx.Response:
+    """Fetch an internal market-data route without blocking the API worker."""
+
+    with httpx.Client(timeout=timeout, trust_env=False) as client:
+        return client.get(f"{MARKET_DATA_URL}{path}")
+
+
 class MarketSnapshotResponse(BaseModel):
     """Market snapshot with truthfulness indicators."""
     venue: str
@@ -1220,14 +1229,16 @@ async def get_market_snapshot(venue: str, symbol: str):
 @app.get("/state/market/snapshots")
 async def get_all_market_snapshots():
     """Get all current market snapshots."""
-    async with httpx.AsyncClient() as client:
-        try:
-            resp = await client.get(f"{MARKET_DATA_URL}/snapshots", timeout=5.0)
-            resp.raise_for_status()
-            return resp.json()
-        except Exception as e:
-            logger.error(f"Error fetching market snapshots: {e}", extra={"trace_id": "market"})
-            raise HTTPException(status_code=503, detail="Market data service unavailable")
+    try:
+        # Keep the internal proxy off the main event loop: the legacy dashboard
+        # polls several slower routes concurrently and must not create a false
+        # market-data outage.
+        resp = await asyncio.to_thread(_market_data_get, "/snapshots")
+        resp.raise_for_status()
+        return resp.json()
+    except Exception as e:
+        logger.error(f"Error fetching market snapshots: {e}", extra={"trace_id": "market"})
+        raise HTTPException(status_code=503, detail="Market data service unavailable")
 
 @app.get("/state/market/timeseries")
 async def get_market_timeseries(
@@ -1293,6 +1304,18 @@ async def get_market_data_status():
                 "error": str(e),
                 "providers": []
             }
+
+
+@app.get("/state/integration-pipeline", tags=["pipeline"])
+async def get_integration_pipeline():
+    """Return live Tier A probes and honest optional-connector boundaries."""
+
+    return await collect_integration_pipeline(
+        pool=state.pool,
+        redis_client=await get_redis(),
+        market_data_url=MARKET_DATA_URL,
+        catalog_feature_count=len(regime_lab_engine.catalog.features),
+    )
 
 # --- Private paper-only Regime Lab ---
 

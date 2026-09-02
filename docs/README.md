@@ -14,6 +14,7 @@ This folder is the documentation system of record for the Hyperliquid-only Trade
 8. [Regime Rulebook v1](architecture/REGIME_RULEBOOK_V1.md) — deterministic scoring, provenance, versioning, and outage behavior.
 9. [Regime Lab API](contracts/REGIME_LAB_API.md) — private learning controls, same-evidence comparison, persistence, and fail-closed boundaries.
 10. [Regime Lab live-runtime verification](changes/2026-09-02_regime-lab-live-runtime.md) — Docker repair, live feature evidence, restart behavior, tests, and remaining gaps.
+11. [Integration Pipeline status v1](contracts/INTEGRATION_PIPELINE_STATUS_V1.md) — live probes, declared connectors, missing links, and recovery semantics.
 
 ## Brand
 
@@ -29,6 +30,7 @@ This folder is the documentation system of record for the Hyperliquid-only Trade
 - [Regime weight configuration v1](contracts/REGIME_WEIGHT_CONFIG_V1.md)
 - [Market feature v1](contracts/MARKET_FEATURE_V1.md)
 - [Regime Lab API](contracts/REGIME_LAB_API.md)
+- [Integration Pipeline status v1](contracts/INTEGRATION_PIPELINE_STATUS_V1.md)
 
 ## Quant learning
 

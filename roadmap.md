@@ -1,6 +1,6 @@
 # TradeSync Roadmap
 
-Last updated: 2026-09-01
+Last updated: 2026-09-02
 
 Planning horizon: three-week foundation sprint plus gated continuation
 
@@ -53,13 +53,14 @@ Exit gate:
 
 ### Week 2 — Regimes, opportunities, knowledge connector, and alert router
 
-Status: in progress. Quant Foundations Book 1, the draft paper rulebook, 17-feature catalog, cadence-governed feature extraction, ordinary/robust normalization, deterministic block aggregation, State API comparison, persistence migrations/runner, and the private Regime Lab are implemented locally. Docker-backed Redis history accumulation, migration application, PostgreSQL draft persistence, and Cockpit proxy recovery were verified locally on 2026-09-02. Fixed-window replay and active-scorer integration remain unverified/planned.
+Status: in progress. Quant Foundations Book 1, the draft paper rulebook, 17-feature catalog, cadence-governed feature extraction, ordinary/robust normalization, deterministic block aggregation, State API comparison, persistence migrations/runner, the private Regime Lab, and the read-only Integration Pipeline inspector are implemented locally. Docker-backed Redis history accumulation, migration application, PostgreSQL draft persistence, Cockpit proxy recovery, live integration probes, expand/focus inspection, and responsive pipeline layouts were verified locally on 2026-09-02. Fixed-window replay and active-scorer integration remain unverified/planned.
 
 - Rebuild regime classification from measured trend, volatility, funding, OI, volume, liquidity, and market-structure inputs.
 - Run the versioned rulebook beside the legacy classifier before replacement; retain configuration digest, source lineage, per-block quality, contribution trace, and paper-risk caps for every score.
 - Extract and persist only catalog-admitted `market_feature_v1` observations; block proxy/context/unavailable inputs from generic scoring and reject future timestamps to prevent look-ahead.
 - Add a Regime Lab where the operator can inspect notation, edit a draft challenger, validate weights, compare versions, replay a fixed paper window, and request paper activation without exposing live execution controls.
 - Restore scorer/fusion health probes and the paper opportunity pipeline.
+- Use the Integration Pipeline inspector to expose Tier A readiness, optional connector state, workflow edges, missing capabilities, impact, and bounded restart/development targets without adding mutating restart controls.
 - Implement a read-only ChaseOS graph-snapshot adapter and a local PostgreSQL graph projection.
 - Implement Strike Zone receipt validation into `trade_candidate_v1`; candidates remain paper research.
 - Begin the Rust `alert-router-rs` service with PostgreSQL outbox, Redis consumer groups, deduplication, priority, expiry, quiet hours, and delivery receipts.

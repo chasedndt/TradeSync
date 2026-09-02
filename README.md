@@ -33,6 +33,9 @@ Tier A must continue when any Tier B connector is unavailable. Tier C always fai
 - Quant Foundations Book 1 and a versioned paper-only regime-weight engine are implemented locally. They do not yet replace the legacy live dashboard classifier or scorer.
 - A source-governed 17-feature catalog, cadence-governed market extractor, ordinary/robust normalizer, backend block aggregation, and private Regime Lab are implemented locally.
 - The Docker-backed runtime has been verified with live Hyperliquid public data, seven-day Redis feature history, transactional migration application, PostgreSQL draft-experiment persistence, and Cockpit-to-State-API proxy recovery after a State API replacement. Fixed-window replay and active-scorer replacement remain planned.
+- The read-only Integration Pipeline inspector is implemented at `/pipeline`. It combines live runtime probes with declared connector contracts, lists missing links and bounded recovery targets, and keeps Tier B connector health outside the Tier A readiness count.
+- The current bounded profile does not start ingest-gateway, core-scorer, fusion-engine, an agent harness, Strike Zone, ChaseOS, or execution. The inspector reports those gaps instead of presenting repository code as a live integration.
+- Hyperliquid 24-hour change remains deliberately blank and non-blocking in this slice. Direct liquidation flow remains unavailable and is not replaced with an OI proxy.
 
 ## Architecture at a glance
 
@@ -85,7 +88,8 @@ docker compose `
 ```
 
 Open [http://localhost:3000/](http://localhost:3000/) or go directly to
-[Regime Lab](http://localhost:3000/regime-lab).
+[Regime Lab](http://localhost:3000/regime-lab) or the
+[Integration Pipeline inspector](http://localhost:3000/pipeline).
 
 On 2026-09-02 the bounded stack reported live public Hyperliquid observations
 for 10 of the 17 catalog definitions. A non-scoring display value, a feature
@@ -110,6 +114,7 @@ Do not use `down -v`; that removes persistent volumes.
 - `/` — Mission Control: authoritative market pulse, readiness, context feeds, system output, and safety state.
 - `/market` — detailed market snapshots; the future Market Canvas drilldown starts here.
 - `/regime-lab` — private paper-shadow feature evidence, challenger controls, learning gates, comparison, and draft experiment history.
+- `/pipeline` — live Tier A/federated topology, missing-link evidence, workflow edges, capability gaps, and recovery targets. The top-bar status is focus/hover inspectable from every route.
 - `/opportunities` — paper opportunity review.
 - `/sources` — temporary legacy surface; roadmap replacement is Knowledge Graph intake and provenance.
 - `/logs` — current decisions/orders evidence; roadmap replacement is Activity & Evidence with Decisions, Approvals, Orders, Alerts, and Outcomes.
@@ -147,6 +152,7 @@ cargo test --workspace
 - [Quant Foundations — Book 1](docs/quant-learning/README.md)
 - [Regime Rulebook v1 architecture](docs/architecture/REGIME_RULEBOOK_V1.md)
 - [Market feature v1 contract](docs/contracts/MARKET_FEATURE_V1.md)
+- [Integration Pipeline status v1](docs/contracts/INTEGRATION_PIPELINE_STATUS_V1.md)
 - [Standalone and federated architecture](docs/architecture/STANDALONE_FEDERATED_ARCHITECTURE.md)
 - [Data and knowledge plane](docs/architecture/DATA_AND_KNOWLEDGE_PLANE.md)
 - [Mobile alert control plane](docs/architecture/MOBILE_ALERT_CONTROL_PLANE.md)

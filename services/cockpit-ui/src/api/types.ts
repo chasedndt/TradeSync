@@ -560,3 +560,79 @@ export interface RegimeLabExperimentList {
   }>
   count: number
 }
+
+// === Integration Pipeline ===
+
+export type PipelineNodeStatus =
+  | 'live'
+  | 'healthy'
+  | 'partial'
+  | 'offline'
+  | 'contract_only'
+  | 'planned'
+  | 'locked'
+
+export interface PipelineRecovery {
+  kind: string
+  label: string
+  target: string
+  command?: string | null
+}
+
+export interface PipelineNode {
+  id: string
+  label: string
+  owner: string
+  tier: string
+  stage: string
+  status: PipelineNodeStatus
+  required_for_tier_a: boolean
+  authority: string
+  summary: string
+  evidence: string[]
+  missing: string[]
+  impact: string
+  recovery: PipelineRecovery
+}
+
+export interface PipelineRecoveryItem {
+  node_id: string
+  label: string
+  status: PipelineNodeStatus
+  required_for_tier_a: boolean
+  missing: string[]
+  impact: string
+  recovery: PipelineRecovery
+}
+
+export interface IntegrationPipelineStatus {
+  schema_version: 'integration_pipeline_status_v1'
+  generated_at: string
+  mode: 'paper'
+  execution_authority: false
+  tier_a: {
+    status: 'ready' | 'partial' | 'offline'
+    ready_count: number
+    total_count: number
+    principle: string
+  }
+  federated: {
+    status: 'connected' | 'not_connected'
+    connected_count: number
+    total_count: number
+  }
+  nodes: PipelineNode[]
+  edges: Array<{
+    from: string
+    to: string
+    label: string
+    status: 'flowing' | 'partial' | 'not_connected' | 'locked'
+  }>
+  recovery_queue: PipelineRecoveryItem[]
+  capability_gaps: Array<{
+    id: string
+    status: string
+    blocking: string
+    next_action: string
+  }>
+}

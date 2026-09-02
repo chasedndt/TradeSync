@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { DotsThreeVertical, List } from '../icons'
+import { PipelineStatusMenu } from './PipelineStatusMenu'
 
 export function Header({ onMenu }: { onMenu: () => void }) {
   const location = useLocation()
@@ -16,6 +17,7 @@ export function Header({ onMenu }: { onMenu: () => void }) {
     '/market': 'Market',
     '/opportunities': 'Opportunities',
     '/regime-lab': 'Regime Lab',
+    '/pipeline': 'Integration Pipeline',
     '/sources': 'Sources',
     '/logs': 'Evidence Ledger',
     '/execution': 'Execution Readiness',
@@ -34,6 +36,7 @@ export function Header({ onMenu }: { onMenu: () => void }) {
         </div>
       </div>
       <div className="topbar-meta">
+        <PipelineStatusMenu />
         <time dateTime={now.toISOString()}>{now.toISOString().replace('T', ' ').slice(0, 19)} UTC</time>
         <span className="sync-state"><span className="status-dot status-dot--good" />System time synced</span>
         <button className="icon-button" aria-label="More options"><DotsThreeVertical size={20} /></button>

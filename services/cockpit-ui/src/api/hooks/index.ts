@@ -10,6 +10,7 @@ export { useRiskLimits } from './useRiskLimits'
 export { useExecutionStatus } from './useExecutionStatus'
 export { useBackendSync } from './useBackendSync'
 export { useContextOverview } from './useContextOverview'
+export { useIntegrationPipeline } from './useIntegrationPipeline'
 export {
   useRegimeLabOverview,
   useEvaluateRegimeLab,

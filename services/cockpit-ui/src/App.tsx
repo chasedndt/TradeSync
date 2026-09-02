@@ -15,6 +15,7 @@ import {
   Autonomy,
   Logs,
   RegimeLab,
+  Pipeline,
 } from './pages'
 
 export default function App() {
@@ -35,6 +36,7 @@ export default function App() {
         <Route path="/autonomy" element={<Autonomy />} />
         <Route path="/logs" element={<Logs />} />
         <Route path="/regime-lab" element={<RegimeLab />} />
+        <Route path="/pipeline" element={<Pipeline />} />
         <Route path="/risk-policies" element={<RiskPolicies />} />
         <Route path="/settings" element={<Settings />} />
       </Route>
