@@ -1,4 +1,10 @@
-from app.feature_extractor import extract_feature_observations, load_sampling_intervals
+from pathlib import Path
+
+from app.feature_extractor import (
+    _repository_catalog_path,
+    extract_feature_observations,
+    load_sampling_intervals,
+)
 
 
 def test_extracts_only_explicit_snapshot_fields():
@@ -6,6 +12,11 @@ def test_extracts_only_explicit_snapshot_fields():
         "venue": "hyperliquid",
         "symbol": "BTC-PERP",
         "ts": 1767297600000,
+        "price": {
+            "mark_price_usd": 100250.0,
+            "oracle_price_usd": 100000.0,
+            "oracle_premium_bps": 25.0,
+        },
         "orderbook": {"spread_bps": 0.9, "imbalance_1pct": 0.12, "mid_price": 100000},
         "microstructure": {
             "depth_usd": {"25bp": 2500000},
@@ -18,14 +29,20 @@ def test_extracts_only_explicit_snapshot_fields():
     }
     observations = extract_feature_observations(snapshot)
     values = {item["feature_id"]: item["value"] for item in observations}
-    assert len(values) == 9
+    assert len(values) == 11
+    assert values["hl_mark_price_usd"] == 100250.0
     assert values["hl_spread_bps"] == 0.9
     assert values["hl_open_interest_4h_pct"] == 2.4
-    assert "hl_mark_price_usd" not in values
+    assert values["hl_oracle_premium_bps"] == 25.0
 
 
 def test_catalog_declares_sampler_cadences_for_normalized_features():
     intervals = load_sampling_intervals()
     assert intervals["hl_spread_bps"] == 15000
     assert intervals["hl_funding_hourly_rate"] == 3600000
+    assert intervals["hl_oracle_premium_bps"] == 300000
     assert "hl_liquidation_total_proxy_usd" not in intervals
+
+
+def test_repository_catalog_fallback_tolerates_shallow_container_layout():
+    assert _repository_catalog_path(Path("/app/app/feature_extractor.py")) is None

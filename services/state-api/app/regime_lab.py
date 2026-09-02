@@ -27,12 +27,21 @@ from tradesync_core.regime_lab import (
 from tradesync_core.regime_weights import RegimeRulebook, evaluate_blocks, load_rulebook
 
 
+def _repository_config_path(relative: str, module_file: Path | None = None) -> Path | None:
+    """Resolve a checkout-relative config without assuming Docker's depth."""
+
+    module_path = (module_file or Path(__file__)).resolve()
+    if len(module_path.parents) <= 3:
+        return None
+    return module_path.parents[3] / relative
+
+
 def _repo_or_container_path(relative: str, container_path: str) -> Path:
     configured = os.getenv(relative.upper().replace("/", "_").replace(".", "_"))
     candidates = [
         Path(configured) if configured else None,
         Path(container_path),
-        Path(__file__).resolve().parents[3] / relative,
+        _repository_config_path(relative),
     ]
     for candidate in candidates:
         if candidate and candidate.is_file():

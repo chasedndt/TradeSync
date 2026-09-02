@@ -27,6 +27,22 @@ function errorText(error: unknown) {
   return error instanceof Error ? error.message : 'Request failed'
 }
 
+function gateLabel(feature: {
+  scoring_allowed: boolean
+  status: string
+  availability: string
+  score_mode: string
+}) {
+  if (feature.scoring_allowed) return 'admitted'
+  if (feature.status === 'collecting_history') return 'collecting history'
+  if (feature.status === 'not_normalized') return 'display only'
+  if (feature.status === 'ready' && feature.score_mode === 'playbook_specific') {
+    return 'context ready'
+  }
+  if (feature.availability === 'planned') return 'planned'
+  return feature.status.replace(/_/g, ' ')
+}
+
 export function RegimeLab() {
   const [symbol, setSymbol] = useState('BTC-PERP')
   const [weights, setWeights] = useState<Record<string, number>>({})
@@ -89,8 +105,9 @@ export function RegimeLab() {
 
   const data = overview.data
   const readyFeatures = data.feature_results.filter((feature) => feature.scoring_allowed)
+  const currentFeatures = data.feature_results.filter((feature) => feature.current_value != null)
   const collectingFeatures = data.feature_results.filter(
-    (feature) => feature.availability === 'implemented' && !feature.scoring_allowed,
+    (feature) => feature.status === 'collecting_history',
   )
 
   return (
@@ -125,7 +142,12 @@ export function RegimeLab() {
           <small>{data.baseline.status.replace('_', ' ')} · not activated</small>
         </article>
         <article className="regime-stat">
-          <span>Evidence coverage</span>
+          <span>Live inputs</span>
+          <strong>{currentFeatures.length}/{data.catalog.feature_count}</strong>
+          <small>current values from the source contract</small>
+        </article>
+        <article className="regime-stat">
+          <span>Scoring coverage</span>
           <strong>{(data.baseline_evaluation.data_coverage * 100).toFixed(1)}%</strong>
           <small>{readyFeatures.length} scoring features ready</small>
         </article>
@@ -170,7 +192,7 @@ export function RegimeLab() {
                       <td className="mono">{compact(feature.score, 3)}</td>
                       <td>
                         <span className={`lab-gate lab-gate--${feature.scoring_allowed ? 'ready' : 'wait'}`}>
-                          {feature.scoring_allowed ? 'admitted' : feature.status.replace('_', ' ')}
+                          {gateLabel(feature)}
                         </span>
                         {!feature.scoring_allowed && feature.reason && (
                           <small className="lab-gate-reason">{feature.reason}</small>

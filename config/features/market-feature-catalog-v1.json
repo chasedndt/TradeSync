@@ -30,7 +30,7 @@
       "stale_after_ms": 60000,
       "decision_role": "Base measurement used to derive returns; an absolute price is not a direction score.",
       "missing_data": "Do not calculate return features.",
-      "caveats": ["The current snapshot does not yet expose price history."]
+      "caveats": ["Current mark price is retained as a base measurement; return features remain gated until their timestamp-aligned derivation is implemented."]
     },
     "hl_return_1h_pct": {
       "block": "price_volatility",
@@ -66,8 +66,8 @@
       "lookback_points": 120,
       "minimum_history_points": 20,
       "sampling_interval_ms": 15000,
-      "fresh_after_ms": 2000,
-      "stale_after_ms": 5000,
+      "fresh_after_ms": 5000,
+      "stale_after_ms": 15000,
       "decision_role": "Wider-than-history spreads reduce liquidity suitability.",
       "missing_data": "Liquidity block loses spread contribution and coverage.",
       "caveats": ["Polling snapshots can miss brief spread spikes."]
@@ -86,8 +86,8 @@
       "lookback_points": 120,
       "minimum_history_points": 20,
       "sampling_interval_ms": 15000,
-      "fresh_after_ms": 2000,
-      "stale_after_ms": 5000,
+      "fresh_after_ms": 5000,
+      "stale_after_ms": 15000,
       "decision_role": "More nearby two-sided depth improves liquidity suitability.",
       "missing_data": "Liquidity block loses depth contribution and coverage.",
       "caveats": ["Displayed orders may be cancelled and do not guarantee executable depth."]
@@ -106,8 +106,8 @@
       "lookback_points": 120,
       "minimum_history_points": 20,
       "sampling_interval_ms": 15000,
-      "fresh_after_ms": 2000,
-      "stale_after_ms": 5000,
+      "fresh_after_ms": 5000,
+      "stale_after_ms": 15000,
       "decision_role": "Higher estimated buy impact reduces liquidity suitability.",
       "missing_data": "Liquidity block loses impact contribution and coverage.",
       "caveats": ["Current implementation models buy-side impact only and is an estimate, not a fill promise."]
@@ -206,15 +206,15 @@
       "lookback_points": 120,
       "minimum_history_points": 20,
       "sampling_interval_ms": 15000,
-      "fresh_after_ms": 2000,
-      "stale_after_ms": 5000,
+      "fresh_after_ms": 5000,
+      "stale_after_ms": 15000,
       "decision_role": "Short-lived bid/ask depth asymmetry used only as supporting evidence.",
       "missing_data": "Liquidity block loses imbalance contribution and coverage.",
       "caveats": ["Order-book imbalance can be cancelled or spoofed and must not become a standalone signal."]
     },
     "hl_oracle_premium_bps": {
       "block": "positioning",
-      "availability": "planned",
+      "availability": "implemented",
       "provenance": "derived",
       "source_authority": "authoritative_market_derived",
       "source": "Hyperliquid markPx and oraclePx or the venue premium field",
@@ -230,7 +230,7 @@
       "stale_after_ms": 60000,
       "decision_role": "Perpetual-versus-oracle premium; not Coinbase premium and not independent spot demand.",
       "missing_data": "Positioning block loses premium evidence and coverage.",
-      "caveats": ["Provider data exists upstream but is not yet exposed as a versioned snapshot feature."]
+      "caveats": ["Derived from aligned Hyperliquid markPx and oraclePx; it is not Coinbase premium and does not independently prove spot demand."]
     },
     "hl_liquidation_total_proxy_usd": {
       "block": "positioning",

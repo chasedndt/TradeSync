@@ -122,6 +122,22 @@ class MarketFeatureTests(unittest.TestCase):
         self.assertEqual(result["status"], "unavailable")
         self.assertIn("planned", result["reason"])
 
+    def test_insufficient_history_reports_collection_progress(self):
+        request = {
+            "feature_id": "hl_spread_bps",
+            "symbol": "BTC-PERP",
+            "timeframe": "snapshot",
+            "evaluated_at_ms": 1001,
+            "current": {"ts": 1000, "value": 1.0, "source_event_id": "evt"},
+            "history": [
+                {"ts": index + 1, "value": 0.5 + index} for index in range(8)
+            ],
+        }
+        result = normalize_feature(self.catalog, request)
+        self.assertEqual(result["status"], "collecting_history")
+        self.assertEqual(result["history_count"], 8)
+        self.assertFalse(result["scoring_allowed"])
+
     def test_future_history_is_rejected_to_prevent_lookahead(self):
         request = {
             "feature_id": "hl_spread_bps",

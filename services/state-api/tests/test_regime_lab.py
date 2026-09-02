@@ -1,8 +1,10 @@
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
 
 from app.main import app, state
+from app.regime_lab import _repository_config_path
 
 
 client = TestClient(app)
@@ -77,3 +79,13 @@ def test_invalid_weight_total_is_rejected():
         response = client.post("/state/regime-lab/evaluate", json=invalid)
     assert response.status_code == 422
     assert "sum" in response.json()["detail"]
+
+
+def test_repository_config_fallback_tolerates_shallow_container_layout():
+    assert (
+        _repository_config_path(
+            "config/features/market-feature-catalog-v1.json",
+            Path("/app/app/regime_lab.py"),
+        )
+        is None
+    )

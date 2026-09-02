@@ -14,6 +14,17 @@ Returns the immutable baseline and catalog identities, current source status,
 all 17 feature gates, backend-normalized values, backend-aggregated blocks,
 baseline evaluation, and current learning questions.
 
+Feature status is part of the evidence contract:
+
+- `ready` means a scoring-eligible feature passed provenance, freshness,
+  history, and dispersion gates;
+- `collecting_history` means a current real value exists but the declared
+  minimum comparison history has not been reached;
+- `not_normalized` means the value is intentionally display-only, proxy, or
+  context rather than a generic score;
+- `unavailable` includes missing sources, planned adapters, stale values, and
+  zero-dispersion windows, with the exact reason retained.
+
 An unavailable market-data service does not create fixture values. The endpoint
 still returns configuration and 17 explicit unavailable records so the learning
 surface can operate honestly in degraded development mode.
@@ -56,9 +67,24 @@ no activation endpoint.
 One latest observation is retained per sampling bucket. The browser never
 samples or normalizes features.
 
+The current adapter also exposes Hyperliquid mark price and mark/oracle premium
+from `metaAndAssetCtxs`, and seeds the funding window from the available
+seven-day venue history at startup. No liquidation proxy is substituted for a
+direct liquidation feed.
+
 ## Degraded development mode
 
 `STATE_API_DEGRADED_START=true` permits configuration, learning, and stateless
 evaluation when PostgreSQL is unavailable. This is not Tier A readiness.
 Database-dependent endpoints remain blocked, and Compose does not enable it by
 default.
+
+## Local runtime verification
+
+On 2026-09-02 the bounded Docker stack verified live market-data and State API
+health, Cockpit access through `/api/`, Redis feature-history continuity,
+transactional PostgreSQL migrations, and draft experiment persistence. The
+Cockpit reverse proxy uses Docker's resolver so replacing only the State API
+container does not leave it pinned to an obsolete container address. This is
+paper-shadow verification only: `execution_authority` remained `false`, and no
+wallet, signer, approval, or execution service was started.

@@ -21,6 +21,7 @@ from ..models import (
     FundingHorizons,
     FundingSource,
     FundingRegime,
+    PriceData,
     OpenInterestData,
     HorizonValue,
     OIRegime,
@@ -89,7 +90,9 @@ class MarketSnapshotter:
         """
         venue = event.venue
         symbol = event.symbol
-        metric = event.metric_type
+        # Historical funding keeps a distinct event type but contributes to the
+        # same rolling window used for the funding horizons.
+        metric = "funding" if event.metric_type == "funding_history" else event.metric_type
 
         # Add to rolling window
         self._add_to_window(venue, symbol, metric, {
@@ -124,6 +127,32 @@ class MarketSnapshotter:
             funding_data, funding_metrics, funding_age = self._build_funding(windows["funding"], now)
             available_metrics.extend(funding_metrics)
             max_data_age = max(max_data_age, funding_age)
+
+        # Build the authoritative mark/oracle pair already supplied by the
+        # Hyperliquid context endpoint. Order-book midpoint is not substituted.
+        price_data = None
+        if "price" in windows and windows["price"]:
+            latest_price = windows["price"][-1]
+            price_value = latest_price.get("value", {})
+            mark_price = float(price_value.get("mark", 0))
+            oracle_price = float(price_value.get("oracle", 0))
+            if mark_price > 0 and oracle_price > 0:
+                price_data = PriceData(
+                    mark_price_usd=mark_price,
+                    oracle_price_usd=oracle_price,
+                    oracle_premium_bps=((mark_price - oracle_price) / oracle_price)
+                    * 10000,
+                )
+                price_age = now - latest_price.get("ts", now)
+                available_metrics.append(
+                    MetricAvailability(
+                        metric="price",
+                        status=MetricStatus(latest_price.get("status", "REAL")),
+                        source=latest_price.get("source", {}).get("provider"),
+                        last_updated=latest_price.get("ts"),
+                    )
+                )
+                max_data_age = max(max_data_age, price_age)
 
         # Build OI data
         oi_data = None
@@ -164,7 +193,10 @@ class MarketSnapshotter:
         regimes = self._compute_regimes(funding_data, oi_data, volume_data, available_metrics)
 
         # Collect sources
-        for metric_data in [windows.get(m, []) for m in ["funding", "oi", "volume", "orderbook"]]:
+        for metric_data in [
+            windows.get(m, [])
+            for m in ["funding", "price", "oi", "volume", "orderbook"]
+        ]:
             if metric_data:
                 latest = metric_data[-1]
                 if "source" in latest:
@@ -186,6 +218,7 @@ class MarketSnapshotter:
             data_age_ms=max_data_age,
             available_metrics=available_metrics,
             funding=funding_data,
+            price=price_data,
             oi=oi_data,
             volume=volume_data,
             orderbook=orderbook_data,
@@ -252,11 +285,17 @@ class MarketSnapshotter:
         window = self._windows[venue][symbol][metric]
         window.append(data)
 
-        # Prune old entries (keep last 7 days)
+        # Prune old entries, replace repeated provider timestamps, and keep the
+        # window ordered. Funding backfills can arrive after a newer live poll.
         now = int(time.time() * 1000)
         cutoff = now - self.windows["7d"]
+        by_timestamp = {
+            int(item.get("ts", 0)): item
+            for item in window
+            if int(item.get("ts", 0)) > cutoff
+        }
         self._windows[venue][symbol][metric] = [
-            d for d in window if d.get("ts", 0) > cutoff
+            by_timestamp[ts] for ts in sorted(by_timestamp)
         ]
 
     def _build_funding(

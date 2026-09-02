@@ -85,6 +85,14 @@ class FundingData(BaseModel):
     source: FundingSource
 
 
+class PriceData(BaseModel):
+    """Authoritative Hyperliquid mark/oracle pair from one context poll."""
+
+    mark_price_usd: float
+    oracle_price_usd: float
+    oracle_premium_bps: float
+
+
 class HorizonValue(BaseModel):
     value: float = 0.0
     delta_pct: float = 0.0
@@ -202,6 +210,7 @@ class MarketSnapshot(BaseModel):
     available_metrics: List[MetricAvailability] = Field(default_factory=list)
 
     funding: Optional[FundingData] = None
+    price: Optional[PriceData] = None
     oi: Optional[OpenInterestData] = None
     liquidations: Optional[LiquidationData] = None
     volume: Optional[VolumeData] = None

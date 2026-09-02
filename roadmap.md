@@ -53,7 +53,7 @@ Exit gate:
 
 ### Week 2 — Regimes, opportunities, knowledge connector, and alert router
 
-Status: in progress. Quant Foundations Book 1, the draft paper rulebook, 17-feature catalog, cadence-governed feature extraction, ordinary/robust normalization, deterministic block aggregation, State API comparison, persistence migrations/runner, and the private Regime Lab are implemented locally. Docker-backed history accumulation, migration application, fixed-window replay, and active-scorer integration remain unverified/planned.
+Status: in progress. Quant Foundations Book 1, the draft paper rulebook, 17-feature catalog, cadence-governed feature extraction, ordinary/robust normalization, deterministic block aggregation, State API comparison, persistence migrations/runner, and the private Regime Lab are implemented locally. Docker-backed Redis history accumulation, migration application, PostgreSQL draft persistence, and Cockpit proxy recovery were verified locally on 2026-09-02. Fixed-window replay and active-scorer integration remain unverified/planned.
 
 - Rebuild regime classification from measured trend, volatility, funding, OI, volume, liquidity, and market-structure inputs.
 - Run the versioned rulebook beside the legacy classifier before replacement; retain configuration digest, source lineage, per-block quality, contribution trace, and paper-risk caps for every score.

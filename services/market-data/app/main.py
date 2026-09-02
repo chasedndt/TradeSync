@@ -38,6 +38,9 @@ ENABLE_HYPERLIQUID = os.getenv("ENABLE_HYPERLIQUID", "true").lower() == "true"
 POLL_INTERVAL_CONTEXT = int(os.getenv("POLL_INTERVAL_CONTEXT", "5000"))
 POLL_INTERVAL_ORDERBOOK = int(os.getenv("POLL_INTERVAL_ORDERBOOK", "3000"))
 POLL_INTERVAL_FUNDING_HISTORY = int(os.getenv("POLL_INTERVAL_FUNDING_HISTORY", "300000"))  # 5 min
+FUNDING_HISTORY_LOOKBACK_SECONDS = int(
+    os.getenv("FUNDING_HISTORY_LOOKBACK_SECONDS", str(7 * 24 * 60 * 60))
+)
 
 # Global state
 providers = []
@@ -182,8 +185,8 @@ async def poll_funding_history_loop():
 
     while True:
         try:
-            # Fetch last 24 hours
-            start_time = int((time.time() - 86400) * 1000)
+            # Fetch the feature catalog's seven-day funding comparison window.
+            start_time = int((time.time() - FUNDING_HISTORY_LOOKBACK_SECONDS) * 1000)
 
             for provider in providers:
                 if not provider.enabled:
@@ -200,6 +203,16 @@ async def poll_funding_history_loop():
                             for event in events:
                                 # Just update snapshotter, don't flood Redis
                                 snapshotter.process_event(event)
+                                await redis_client.append_feature_timeseries(
+                                    event.venue,
+                                    event.symbol,
+                                    "hl_funding_hourly_rate",
+                                    float(event.value.get("rate", 0)),
+                                    event.ts,
+                                    feature_sampling_intervals[
+                                        "hl_funding_hourly_rate"
+                                    ],
+                                )
 
                     except Exception as e:
                         logger.error(f"Error fetching funding history: {e}")

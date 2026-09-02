@@ -14,15 +14,32 @@ from pathlib import Path
 from typing import Any, Mapping
 
 
+def _repository_catalog_path(module_file: Path | None = None) -> Path | None:
+    """Return the checkout catalog path when the module is nested deeply enough.
+
+    The source checkout places this module four levels below the repository
+    root. The Docker image deliberately uses the shallower ``/app/app`` layout,
+    so indexing ``parents[3]`` there must not abort startup before the copied
+    container catalog can be checked.
+    """
+
+    module_path = (module_file or Path(__file__)).resolve()
+    if len(module_path.parents) <= 3:
+        return None
+    return (
+        module_path.parents[3]
+        / "config"
+        / "features"
+        / "market-feature-catalog-v1.json"
+    )
+
+
 def _catalog_path() -> Path:
     configured = os.getenv("MARKET_FEATURE_CATALOG_PATH")
     candidates = [
         Path(configured) if configured else None,
         Path("/app/config/features/market-feature-catalog-v1.json"),
-        Path(__file__).resolve().parents[3]
-        / "config"
-        / "features"
-        / "market-feature-catalog-v1.json",
+        _repository_catalog_path(),
     ]
     for candidate in candidates:
         if candidate and candidate.is_file():
@@ -67,8 +84,7 @@ def extract_feature_observations(snapshot: Mapping[str, Any]) -> list[dict[str, 
         return []
 
     candidates = {
-        # The current snapshot does not expose authoritative markPx separately.
-        # Mid-price is not silently substituted for hl_mark_price_usd.
+        "hl_mark_price_usd": _path(snapshot, "price", "mark_price_usd"),
         "hl_spread_bps": _path(snapshot, "orderbook", "spread_bps"),
         "hl_depth_25bp_usd": _path(snapshot, "microstructure", "depth_usd", "25bp"),
         "hl_buy_impact_5k_bps": _path(
@@ -79,6 +95,7 @@ def extract_feature_observations(snapshot: Mapping[str, Any]) -> list[dict[str, 
         "hl_open_interest_4h_pct": _path(snapshot, "oi", "horizons", "4h", "delta_pct"),
         "hl_volume_24h_usd": _path(snapshot, "volume", "horizons", "24h"),
         "hl_orderbook_imbalance_1pct": _path(snapshot, "orderbook", "imbalance_1pct"),
+        "hl_oracle_premium_bps": _path(snapshot, "price", "oracle_premium_bps"),
         "hl_liquidation_total_proxy_usd": _path(
             snapshot, "liquidations", "horizons", "1h", "total_usd"
         ),

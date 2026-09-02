@@ -375,6 +375,7 @@ def normalize_feature(
         "score_mode": definition["score_mode"],
         "scoring_allowed": False,
         "data_quality": 0.0,
+        "history_count": 0,
     }
 
     if definition["availability"] != "implemented":
@@ -398,7 +399,9 @@ def normalize_feature(
     lookback = int(definition["lookback_points"])
     minimum = int(definition["minimum_history_points"])
     selected = history[-lookback:] if lookback else []
+    result["history_count"] = len(selected)
     if len(selected) < minimum:
+        result["status"] = "collecting_history"
         result["reason"] = (
             f"needs at least {minimum} prior values; received {len(selected)}"
         )

@@ -21,14 +21,14 @@ The canonical paper-shadow catalog is `config/features/market-feature-catalog-v1
 
 ## Current source truth
 
-The catalog contains 17 feature definitions. “Implemented” means the underlying field or transparent derivation exists in the current Hyperliquid adapter/snapshot path. It does not mean it is already persisted to the new feature tables or connected to the active scorer.
+The catalog contains 17 feature definitions. “Implemented” means the underlying field or transparent derivation exists in the current Hyperliquid adapter/snapshot path. It does not mean the feature has become an active trading signal. On 2026-09-02 the local Docker runtime verified current observations in Redis, migration application in PostgreSQL, and paper-only Regime Lab evaluation; active-scorer integration remains planned.
 
 | Feature group | Current truth | Scoring authority |
 |---|---|---|
 | mark, funding, OI, rolling 24h volume | observed from Hyperliquid | eligible only under declared feature semantics |
 | spread, depth, impact, imbalance | transparently derived from Hyperliquid L2 | eligible with derived provenance |
 | funding APR | display derivation | not separately scored, preventing double-counting |
-| Hyperliquid mark/oracle premium | upstream field exists; versioned feature path planned | not active |
+| Hyperliquid mark/oracle premium | derived from the current Hyperliquid mark and oracle fields | playbook-specific after its cadence-governed history gate |
 | 1h return | durable aligned price history still planned | not active |
 | OI-based liquidation estimate | proxy | never scoring eligible |
 | direct liquidation flow and direct CVD | unavailable in current adapter | unavailable, never substituted |
@@ -63,7 +63,8 @@ Rules:
 - the current observation is not included in its own comparison window;
 - the evaluator timestamp cannot precede the observation;
 - values and statistics must be finite;
-- insufficient history, zero dispersion, staleness, planned state, or unavailable state cannot produce a generic score.
+- insufficient history returns `collecting_history` and its true `history_count`;
+- zero dispersion, staleness, planned state, unavailable state, or insufficient history cannot produce a generic score.
 
 These constraints block a basic form of look-ahead bias.
 
@@ -75,6 +76,12 @@ five-second poll from masquerading as five independent hourly funding samples.
 Normalized feature history is retained for seven days in a dedicated Redis
 series. Redis remains a rebuildable operating history; PostgreSQL observation
 records remain the intended durable evidence boundary.
+
+At market-data startup, the adapter requests the available seven-day
+Hyperliquid funding history before adding the current rate. Backfilled samples
+are timestamp-sorted and deduplicated so an older rate cannot replace the
+current observation. Other rolling features accumulate at their catalog
+cadence and report `collecting_history` until their minimum sample gate passes.
 
 ## Ordinary normalization
 
@@ -171,7 +178,11 @@ Migration `ops/migrations/003_market_features.sql` defines:
 - `market_feature_observations` for one durable value with source event lineage;
 - `market_feature_normalizations` for history window, method, center, dispersion, z-score, bounded value, quality, status, and reason.
 
-The migration is authored but not automatically applied. PostgreSQL remains durable truth; Redis may publish a committed paper-shadow result but cannot replace it.
+The Compose `schema-init` job applies the migration transactionally. Local
+Docker verification on 2026-09-02 confirmed migrations `001`, `002`, and `003`
+and a draft Regime Lab experiment stored in PostgreSQL. Redis remains the
+rebuildable operating history; durable per-observation feature writes and
+fixed-window replay still require their planned pipeline integration.
 
 ## CLI
 

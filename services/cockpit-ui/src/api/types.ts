@@ -428,6 +428,7 @@ export interface RegimeLabFeatureResult {
   normalized_value?: number | null
   data_quality: number
   scoring_allowed: boolean
+  score_mode: string
   reason?: string | null
   history_count?: number
   minimum_history_points: number

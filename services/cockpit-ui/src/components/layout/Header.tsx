@@ -11,7 +11,16 @@ export function Header({ onMenu }: { onMenu: () => void }) {
     return () => window.clearInterval(timer)
   }, [])
 
-  const section = location.pathname === '/regime-lab' ? 'Regime Lab' : 'Mission Control'
+  const section = ({
+    '/': 'Mission Control',
+    '/market': 'Market',
+    '/opportunities': 'Opportunities',
+    '/regime-lab': 'Regime Lab',
+    '/sources': 'Sources',
+    '/logs': 'Evidence Ledger',
+    '/execution': 'Execution Readiness',
+    '/settings': 'Settings',
+  } as Record<string, string>)[location.pathname] || 'TradeSync'
 
   return (
     <header className="topbar">
@@ -19,8 +28,10 @@ export function Header({ onMenu }: { onMenu: () => void }) {
         <button className="mobile-menu" onClick={onMenu} aria-label="Open navigation">
           <List size={22} />
         </button>
-        <h1>TradeSync</h1>
-        <span>{section}</span>
+        <div className="topbar-page-title">
+          <span>TradeSync</span>
+          <h1>{section}</h1>
+        </div>
       </div>
       <div className="topbar-meta">
         <time dateTime={now.toISOString()}>{now.toISOString().replace('T', ' ').slice(0, 19)} UTC</time>

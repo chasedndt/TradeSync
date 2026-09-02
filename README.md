@@ -20,7 +20,7 @@ TradeSync has three explicit capability tiers:
 
 Tier A must continue when any Tier B connector is unavailable. Tier C always fails closed when ChaseOS approval authority, signer state, risk state, or reconciliation is unavailable.
 
-## Current truth — 2026-09-01
+## Current truth — 2026-09-02
 
 - Hyperliquid is the only venue and authoritative market source.
 - The local operator runtime is paper-only: `EXECUTION_ENABLED=false`, `DRY_RUN=true`.
@@ -31,7 +31,8 @@ Tier A must continue when any Tier B connector is unavailable. Tier C always fai
 - The canonical ChaseOS private instance is `C:\Users\chaseos\Documents\chaseos_obsidian`. Its live knowledge connector is not currently available, so the interface in this repository is a proposed versioned contract, not a verified live integration.
 - The first Rust component is a shared contract crate. The Rust alert router and Hyperliquid real-time edge are roadmap work, not complete services.
 - Quant Foundations Book 1 and a versioned paper-only regime-weight engine are implemented locally. They do not yet replace the legacy live dashboard classifier or scorer.
-- A source-governed 17-feature catalog, cadence-governed market extractor, ordinary/robust normalizer, backend block aggregation, and private Regime Lab are implemented locally. Container persistence and active-scorer integration remain unverified/planned.
+- A source-governed 17-feature catalog, cadence-governed market extractor, ordinary/robust normalizer, backend block aggregation, and private Regime Lab are implemented locally.
+- The Docker-backed runtime has been verified with live Hyperliquid public data, seven-day Redis feature history, transactional migration application, PostgreSQL draft-experiment persistence, and Cockpit-to-State-API proxy recovery after a State API replacement. Fixed-window replay and active-scorer replacement remain planned.
 
 ## Architecture at a glance
 
@@ -80,10 +81,17 @@ docker compose `
   --env-file E:\Projects\TradeSync\dashboard-runtime\runtime.env `
   -f ops\compose.full.yml `
   -f ops\compose.market-command.yml `
-  up -d postgres redis market-data state-api cockpit-ui
+  up -d postgres redis schema-init market-data state-api cockpit-ui
 ```
 
-Open [http://localhost:3000/](http://localhost:3000/).
+Open [http://localhost:3000/](http://localhost:3000/) or go directly to
+[Regime Lab](http://localhost:3000/regime-lab).
+
+On 2026-09-02 the bounded stack reported live public Hyperliquid observations
+for 10 of the 17 catalog definitions. A non-scoring display value, a feature
+collecting history, a zero-dispersion feature, and an unavailable source are
+different states; the Regime Lab labels them separately. Counts and scores are
+expected to change as the rolling windows advance.
 
 Stop only the bounded services started above:
 
