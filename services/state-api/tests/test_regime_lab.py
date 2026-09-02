@@ -1,9 +1,10 @@
+import logging
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
 
-from app.main import app, state
+from app.main import DefaultTraceIdFilter, app, state
 from app.regime_lab import _repository_config_path
 
 
@@ -89,3 +90,17 @@ def test_repository_config_fallback_tolerates_shallow_container_layout():
         )
         is None
     )
+
+
+def test_default_trace_filter_supports_dependency_log_records():
+    record = logging.LogRecord(
+        name="httpx",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg="dependency request",
+        args=(),
+        exc_info=None,
+    )
+    assert DefaultTraceIdFilter().filter(record) is True
+    assert record.trace_id == "-"

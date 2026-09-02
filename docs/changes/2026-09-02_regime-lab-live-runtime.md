@@ -23,6 +23,8 @@ authority boundary intact.
 - clarified the top-bar hierarchy as `TradeSync` plus the current page name;
 - made the Cockpit `/api/` proxy re-resolve the State API container after a
   service-only replacement;
+- added a safe default trace field for dependency log records so HTTP client
+  diagnostics cannot break the State API formatter;
 - corrected the hidden mobile sidebar so it cannot cast an off-canvas shadow.
 
 ## Runtime evidence
@@ -54,7 +56,7 @@ then recovered without a Cockpit restart.
 - shared feature and regime suite: 26 passed;
 - focused market-data extraction, rolling-window, and rate-limit suite: 21
   passed;
-- focused Regime Lab State API suite: 4 passed;
+- focused Regime Lab State API suite: 5 passed;
 - Cockpit production build: TypeScript and Vite passed, 1,858 modules
   transformed;
 - Docker Compose configuration passed and all five long-running bounded

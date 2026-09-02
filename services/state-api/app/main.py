@@ -28,11 +28,22 @@ from app.regime_lab import (
 )
 
 # --- Logging Setup ---
+class DefaultTraceIdFilter(logging.Filter):
+    """Supply a safe trace field for dependency and server log records."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if not hasattr(record, "trace_id"):
+            record.trace_id = "-"
+        return True
+
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] trace_id=%(trace_id)s %(message)s",
     datefmt="%Y-%m-%dT%H:%M:%S"
 )
+for handler in logging.getLogger().handlers:
+    handler.addFilter(DefaultTraceIdFilter())
 logger = logging.getLogger("state-api")
 
 # --- Metrics Storage ---
