@@ -2220,7 +2220,9 @@ async def get_outcomes_by_regime(horizon_minutes: int = 60, symbol: Optional[str
                        count(*) FILTER (WHERE signed_return_pct > 0) wins,
                        count(*) FILTER (WHERE forward_return_pct > 0) ups,
                        count(*) FILTER (WHERE direction = 'LONG') longs,
-                       avg(signed_return_pct) mean_signed
+                       avg(signed_return_pct) mean_signed,
+                       count(DISTINCT symbol) symbols,
+                       EXTRACT(EPOCH FROM (max(opened_at) - min(opened_at)))/60 span_minutes
                 FROM tagged GROUP BY regime ORDER BY regime
                 """,
                 horizon_minutes,
@@ -2239,20 +2241,49 @@ async def get_outcomes_by_regime(horizon_minutes: int = 60, symbol: Optional[str
         long_share = r["longs"] / n
         baseline = long_share * up + (1 - long_share) * (1 - up)
         skill = hit - baseline
-        # Standard error of a proportion, assuming independence. Overlapping
-        # windows mean the effective sample is smaller and the true error
-        # larger, so this is a floor on the uncertainty, not an estimate of it.
-        se = math.sqrt(0.25 / n)
+
+        # Independent windows, not observations.
+        #
+        # A verdict is recorded every 60 seconds and a 240-minute horizon covers
+        # 240 minutes of price. Two observations four minutes apart share 98% of
+        # their window: they are very nearly the same trade counted twice.
+        # Treating them as independent understates the error by the square root
+        # of the overcounting, and that is exactly how a 74-observation sample
+        # spanning 5.6 hours reported a "significant" result off roughly four
+        # genuinely independent windows.
+        #
+        # The effective sample is how many non-overlapping windows of this
+        # horizon fit in the span, times the number of symbols. Symbols are
+        # counted as independent, which is generous — BTC, ETH and SOL move
+        # together — so this remains a floor on the uncertainty rather than an
+        # estimate of it.
+        span_minutes = float(r["span_minutes"] or 0)
+        symbols = int(r["symbols"] or 1)
+        windows = span_minutes / horizon_minutes if horizon_minutes else 0
+        effective_n = max(min(n, symbols * windows), 1.0)
+
+        se = math.sqrt(0.25 / effective_n)
+        naive_se = math.sqrt(0.25 / n)
+
         regimes.append({
             "regime": r["regime"],
             "measured": n,
+            # What the sample is actually worth.
+            "effective_observations": round(effective_n, 1),
+            "independent_windows_per_symbol": round(windows, 1),
+            "symbols": symbols,
+            "span_minutes": round(span_minutes),
             "hit_rate": round(hit, 4),
             "market_up_rate": round(up, 4),
             "long_share": round(long_share, 4),
             "expected_hit_rate": round(baseline, 4),
             "skill_vs_baseline": round(skill, 4),
             "standard_error": round(se, 4),
+            "naive_standard_error": round(naive_se, 4),
+            "overlap_inflation": round(se / naive_se, 1) if naive_se else None,
             "skill_in_standard_errors": round(skill / se, 2) if se else None,
+            # Judged against the overlap-adjusted error. The old flag said True
+            # for a result its own note disclaimed in prose.
             "significant": abs(skill) > 2 * se,
             "mean_signed_return_pct": round(r["mean_signed"], 6) if r["mean_signed"] is not None else None,
         })
@@ -2266,8 +2297,12 @@ async def get_outcomes_by_regime(horizon_minutes: int = 60, symbol: Optional[str
             "Regimes are scored separately because pooling them is misleading: "
             "a fixed directional bias across windows with different base rates "
             "produces an apparent effect that is an artefact of aggregation. "
-            "standard_error assumes independent observations; overlapping "
-            "windows make the true uncertainty larger."
+            "standard_error is adjusted for overlap: a verdict every 60 "
+            "seconds over a 240-minute horizon produces observations that are "
+            "very nearly the same trade counted many times, so the sample is "
+            "worth effective_observations, not measured. Symbols are treated "
+            "as independent, which is generous, so this is still a floor on "
+            "the uncertainty rather than an estimate of it."
         ),
     }
 
