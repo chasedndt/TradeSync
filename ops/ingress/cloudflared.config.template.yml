@@ -1,0 +1,38 @@
+# cloudflared configuration for the TradingView / Strike Zone Pine webhook.
+#
+# TEMPLATE. Copy to ops/ingress/cloudflared.config.yml, fill in the two values
+# marked REPLACE, and keep the filled copy out of git — it names your hostname
+# and tunnel. `ops/ingress/.gitignore` already excludes it.
+#
+# Why a tunnel rather than a forwarded port: cloudflared makes an OUTBOUND
+# connection to Cloudflare. Nothing listens on your router, your home IP is
+# never published, and the only reachable path in is one hostname behind
+# Cloudflare's edge — where the four-IP allowlist does most of the work.
+#
+# This exposes EXACTLY ONE PATH. Not the API, not the cockpit, not /state/*.
+# A tunnel that fronted the whole of state-api would put an operator control
+# surface on the public internet to receive alerts from a charting tool.
+
+tunnel: REPLACE_WITH_TUNNEL_ID
+credentials-file: /etc/cloudflared/REPLACE_WITH_TUNNEL_ID.json
+
+# Fail closed on the way in. A request that matches no rule below falls to the
+# catch-all 404 at the end; it never reaches state-api.
+ingress:
+  - hostname: REPLACE_WITH_YOUR_HOSTNAME    # e.g. hooks.example.com
+    path: ^/webhook/tradingview$
+    service: http://state-api:8000
+    originRequest:
+      # TradingView abandons a request after three seconds. The receiver is
+      # built to accept fast and verify afterwards; this bound keeps the tunnel
+      # from holding a connection longer than the sender will wait.
+      connectTimeout: 3s
+      # No keep-alive pooling to the origin for a low-volume webhook: a pooled
+      # connection to an internal service is a small thing to leave open.
+      keepAliveConnections: 0
+      noTLSVerify: false
+      httpHostHeader: REPLACE_WITH_YOUR_HOSTNAME
+
+  # Everything else is refused here, before the origin. Explicit, so that adding
+  # a second exposed path has to be a deliberate edit rather than a side effect.
+  - service: http_status:404

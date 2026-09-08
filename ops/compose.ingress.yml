@@ -1,0 +1,51 @@
+# Public webhook ingress for TradingView / Strike Zone Pine alerts.
+#
+# Deliberately a SEPARATE compose file, not a service in the bounded profile.
+# Bringing this up is the moment a private research workstation gains a public
+# entry point, and that should be an explicit act with its own command — not a
+# container that starts because it was in the same file as the database.
+#
+#   docker compose \
+#     --env-file E:\Projects\TradeSync\dashboard-runtime\runtime.env \
+#     -f ops\compose.full.yml -f ops\compose.market-command.yml \
+#     -f ops\compose.ingress.yml \
+#     up -d cloudflared
+#
+# Before it will do anything useful:
+#   1. Create the tunnel and its credentials on your Cloudflare account
+#      (`cloudflared tunnel create tradesync-webhook`).
+#   2. Copy ops/ingress/cloudflared.config.template.yml to
+#      ops/ingress/cloudflared.config.yml and fill in the two REPLACE values.
+#   3. Add the four-IP WAF allowlist — ops/ingress/waf-allowlist.md.
+#   4. Set TRADINGVIEW_WEBHOOK_SECRET in runtime.env. The receiver refuses every
+#      alert while it is unset, which is the correct behaviour for an
+#      unauthenticated public endpoint into a trading system.
+#
+# Step 3 is not optional. Without it the endpoint is reachable by anyone who
+# learns the hostname, and the only remaining control is the shared secret.
+
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:2024.8.3
+    restart: unless-stopped
+    # Runs the named tunnel from the mounted config. No ports are published:
+    # cloudflared connects OUTBOUND to Cloudflare, which is the entire point.
+    command: tunnel --config /etc/cloudflared/config.yml run
+    volumes:
+      - ./ingress:/etc/cloudflared:ro
+    depends_on:
+      state-api:
+        condition: service_healthy
+    # It only ever needs to reach state-api on the internal network.
+    networks:
+      - default
+    mem_limit: 128m
+    cpus: 0.25
+    healthcheck:
+      test: ["CMD", "cloudflared", "--version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}

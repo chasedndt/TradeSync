@@ -1,0 +1,4 @@
+# The filled config names your hostname and tunnel id; the credentials file is
+# a tunnel secret. Neither belongs in git.
+cloudflared.config.yml
+*.json
