@@ -11,8 +11,8 @@ import json
 import sys
 from pathlib import Path
 
-from app.replay import ReplayEngine
-from app.evaluator import generate_report
+from .replay import ReplayEngine
+from .evaluator import generate_report
 
 
 def main():

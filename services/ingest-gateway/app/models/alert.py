@@ -1,17 +1,7 @@
-from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any
-from datetime import datetime
+from typing import Optional
 
-class NormalizedEvent(BaseModel):
-    id: str
-    ts: datetime
-    source: str
-    kind: str
-    symbol: str
-    timeframe: str
-    payload: Dict[str, Any]
-    provenance: Dict[str, Any]
-    hash: str
+from pydantic import BaseModel, ConfigDict, Field
+
 
 class TradingViewAlert(BaseModel):
     symbol: str = Field(..., description="Trading pair symbol, e.g. BTCUSDT")
@@ -21,6 +11,5 @@ class TradingViewAlert(BaseModel):
     price: Optional[float] = Field(None, description="Price at the time of alert")
     source: str = Field("tradingview", description="Source of the alert")
     passphrase: Optional[str] = Field(None, description="Security passphrase if used")
-    
-    class Config:
-        extra = "ignore"
+
+    model_config = ConfigDict(extra="ignore")

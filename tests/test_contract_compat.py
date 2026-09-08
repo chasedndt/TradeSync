@@ -2,6 +2,14 @@ import httpx
 import pytest
 import time
 
+# Integration: needs the bounded Docker profile up.
+# Contract compatibility is checked against the running state-api.
+# Excluded from a plain unit run, because a service restarting mid-run
+# is not a code failure and reporting it as one trains people to ignore
+# red. Run them with: python tools/run_tests.py --integration
+pytestmark = pytest.mark.integration
+
+
 BASE_URL = "http://localhost:8000"
 
 @pytest.mark.asyncio

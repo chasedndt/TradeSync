@@ -23,13 +23,10 @@ class SourceInfo(BaseModel):
     kind: Optional[str] = None
     symbol: Optional[str] = None
     payload: Optional[Dict[str, Any]] = None
-import sys
-import os
-# Add parent dir to path if not present (for running as app.main)
-# Actually, if running from root, sources should be importable if root is in path.
-# But let's assume standard uvicorn run from ingest-gateway dir.
-# Then 'sources' is top level.
-from sources.hyperliquid import poll_hyperliquid_markets
+# The pollers live inside the package. They used to sit in a sibling "sources"
+# directory that only resolved because the container put its parent on
+# PYTHONPATH, which made the service unimportable anywhere else.
+from .sources.hyperliquid import poll_hyperliquid_markets
 
 # Background tasks
 background_tasks = []

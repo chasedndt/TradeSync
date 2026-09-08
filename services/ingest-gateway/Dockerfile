@@ -16,6 +16,5 @@ COPY libs/tradesync_core /tmp/tradesync_core
 RUN pip install --no-cache-dir /tmp/tradesync_core && rm -rf /tmp/tradesync_core
 
 COPY services/ingest-gateway/app /app/app
-COPY services/ingest-gateway/sources /app/sources
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]

@@ -5,11 +5,15 @@ import os
 from unittest.mock import MagicMock, patch
 
 # Add ingest-gateway to path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../services/ingest-gateway")))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _service_import import load_service_package  # noqa: E402
 
-from app.models.market import MarketSnapshot
-from app.models.event import NormalizedEvent
-from app.ingest import ingest_market_snapshot
+# Private alias: every service packages its code as "app".
+load_service_package("ingest_gateway_app", "ingest-gateway")
+
+from ingest_gateway_app.models.market import MarketSnapshot
+from ingest_gateway_app.models.event import NormalizedEvent
+from ingest_gateway_app.ingest import ingest_market_snapshot
 
 class TestMarketSnapshot(unittest.TestCase):
     def test_validation(self):
@@ -56,7 +60,7 @@ class TestIngestSnapshot(unittest.IsolatedAsyncioTestCase):
             raw={"foo": "bar"}
         )
 
-        with patch("app.ingest.asyncpg.connect") as mock_connect:
+        with patch("ingest_gateway_app.ingest.asyncpg.connect") as mock_connect:
             mock_conn = MagicMock()
             mock_connect.return_value = mock_conn
             

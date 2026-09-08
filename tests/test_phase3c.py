@@ -9,6 +9,14 @@ import httpx
 import pytest
 import json
 
+# Integration: needs the bounded Docker profile up.
+# Phase 3C exercises the running stack over HTTP, as its own docstring says.
+# Excluded from a plain unit run, because a service restarting mid-run
+# is not a code failure and reporting it as one trains people to ignore
+# red. Run them with: python tools/run_tests.py --integration
+pytestmark = pytest.mark.integration
+
+
 STATE_API_URL = "http://localhost:8000"
 MARKET_DATA_URL = "http://localhost:8005"
 

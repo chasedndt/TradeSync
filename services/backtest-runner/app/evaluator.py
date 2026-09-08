@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict
 
-from app.replay import ReplayResults
+from .replay import ReplayResults
 
 
 def generate_report(results: ReplayResults, metadata: Dict[str, Any], output_dir: Path):

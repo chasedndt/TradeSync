@@ -5,10 +5,16 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-MARKET_DATA_ROOT = REPO_ROOT / "services" / "market-data"
-sys.path.insert(0, str(MARKET_DATA_ROOT))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from app.models import (  # noqa: E402
+# Loaded under a private alias: inserting services/market-data on sys.path
+# claimed the global "app" name and broke every later test that needed a
+# different service's app package.
+from _service_import import load_service_module  # noqa: E402
+
+_models = load_service_module("market_data_app", "market-data", "models")
+
+from market_data_app.models import (  # noqa: E402
     FundingData,
     FundingHorizons,
     FundingSource,
@@ -18,7 +24,7 @@ from app.models import (  # noqa: E402
     OpenInterestData,
     VolumeData,
 )
-from app.processors.snapshotter import MarketSnapshotter  # noqa: E402
+from market_data_app.processors.snapshotter import MarketSnapshotter  # noqa: E402
 
 
 class MarketDataMathTests(unittest.TestCase):

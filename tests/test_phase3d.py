@@ -20,8 +20,12 @@ import pytest
 
 # Ensure libs/ is importable for local testing
 sys.path.insert(0, str(Path(__file__).parent.parent / "libs" / "tradesync_core"))
-# Ensure backtest-runner app is importable
-sys.path.insert(0, str(Path(__file__).parent.parent / "services" / "backtest-runner"))
+# Loaded under a private alias rather than by inserting the service directory:
+# every service packages its code as "app", so only one could own that name.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _service_import import load_service_package  # noqa: E402
+
+load_service_package("backtest_runner_app", "backtest-runner")
 
 
 class TestTradesyncCoreImports:
@@ -61,8 +65,18 @@ class TestTradesyncCoreImports:
         assert tradesync_core.__version__ == "0.1.0"
 
     def test_all_exports(self):
+        """Every advertised export must resolve.
+
+        A hard-coded count made this fail whenever the library gained a
+        module, which says nothing about whether the exports work.
+        """
         import tradesync_core
-        assert len(tradesync_core.__all__) == 12
+        assert len(tradesync_core.__all__) == len(set(tradesync_core.__all__))
+        for name in tradesync_core.__all__:
+            assert hasattr(tradesync_core, name), f"{name} is exported but missing"
+        for required in ("EnhancedScorer", "RiskGuardian", "normalize_symbol",
+                         "calculate_score", "decide_paper_signal"):
+            assert required in tradesync_core.__all__
 
 
 class TestNormalizeSymbol:
@@ -299,7 +313,7 @@ class TestReplayEngine:
         os.environ["MIN_QUALITY"] = "1.0"  # Low threshold for sample data
 
     def test_sample_dataset(self):
-        from app.replay import ReplayEngine
+        from backtest_runner_app.replay import ReplayEngine
 
         dataset_path = Path(__file__).parent.parent / "data" / "replay" / "sample"
         engine = ReplayEngine(dataset_path=dataset_path)
@@ -330,7 +344,7 @@ class TestReplayEngine:
         assert len(results.risk_verdicts) == 2
 
     def test_empty_dataset(self, tmp_path):
-        from app.replay import ReplayEngine
+        from backtest_runner_app.replay import ReplayEngine
 
         # Create empty events file
         events_file = tmp_path / "events.jsonl"
@@ -343,8 +357,8 @@ class TestReplayEngine:
         assert len(results.signals) == 0
 
     def test_evaluator(self, tmp_path):
-        from app.replay import ReplayEngine
-        from app.evaluator import generate_report
+        from backtest_runner_app.replay import ReplayEngine
+        from backtest_runner_app.evaluator import generate_report
 
         dataset_path = Path(__file__).parent.parent / "data" / "replay" / "sample"
         engine = ReplayEngine(dataset_path=dataset_path)

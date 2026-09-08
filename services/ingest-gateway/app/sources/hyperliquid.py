@@ -4,9 +4,9 @@ import uuid
 import json
 from datetime import datetime
 from typing import List, Optional
-from app.models import NormalizedEvent
-from app.db import insert_event
-from app.normalize import normalize_symbol
+from ..models import NormalizedEvent
+from ..db import insert_event
+from ..normalize import normalize_symbol
 
 # Configuration
 HYPERLIQUID_API_URL = "https://api.hyperliquid.xyz/info"

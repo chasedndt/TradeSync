@@ -8,9 +8,13 @@ from fastapi.testclient import TestClient
 
 # Add specific app directory to sys.path to handle hyphenated service name
 # Add services/ingest-gateway to sys.path so we can import app as a package
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'services', 'ingest-gateway')))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _service_import import load_service_package  # noqa: E402
 
-from app.main import app
+# Private alias: every service packages its code as "app".
+load_service_package("ingest_gateway_app", "ingest-gateway")
+
+from ingest_gateway_app.main import app
 
 class TestIngestGateway(unittest.TestCase):
     def setUp(self):
@@ -21,8 +25,12 @@ class TestIngestGateway(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"ok": True})
 
-    @patch("app.db.get_db_connection", new_callable=AsyncMock)
-    def test_ingest_tv_valid_payload(self, mock_connect):
+    # "app.db.get_db_connection" named a module that no longer resolves and a
+    # function that never existed: db.py calls asyncpg.connect inline. Patching
+    # a missing attribute raises, so this test could not run at all.
+    @patch("ingest_gateway_app.db.get_redis", new_callable=AsyncMock)
+    @patch("ingest_gateway_app.db.asyncpg.connect", new_callable=AsyncMock)
+    def test_ingest_tv_valid_payload(self, mock_connect, _mock_redis):
         """
         Test that a valid TradingView payload is accepted and returns 200 OK.
         """
@@ -100,8 +108,9 @@ class TestIngestGateway(unittest.TestCase):
         self.assertEqual(data["error"], "validation_failed")
         self.assertIn("confidence", str(data["details"]))
 
-    @patch("app.db.get_db_connection", new_callable=AsyncMock)
-    def test_ingest_tv_db_error(self, mock_connect):
+    @patch("ingest_gateway_app.db.get_redis", new_callable=AsyncMock)
+    @patch("ingest_gateway_app.db.asyncpg.connect", new_callable=AsyncMock)
+    def test_ingest_tv_db_error(self, mock_connect, _mock_redis):
         """
         Test that database errors return 500 db_error without leaking details.
         """

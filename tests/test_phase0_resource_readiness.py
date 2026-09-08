@@ -68,4 +68,15 @@ def test_full_compose_uses_existing_postgres_bootstrap_path_and_python_healthche
     assert "./sql:/docker-entrypoint-initdb.d:ro" in compose
     assert "./ops/sql:/docker-entrypoint-initdb.d:ro" not in compose
     assert "profiles: [analytics]" in compose
-    assert "urllib.request.urlopen('http://localhost:8005/healthz'" in compose
+    # market-data is gated on /readyz, not /healthz. The two answer different
+    # questions: /healthz says the process is alive (restarting it would not
+    # help), /readyz says the data behind it is fresh enough to serve. Compose
+    # uses the healthcheck for "condition: service_healthy", so a dependant
+    # must wait on readiness. On 7 Sept the process stayed up while its feed
+    # had stalled and a /healthz probe reported the service healthy throughout.
+    assert "urllib.request.urlopen('http://localhost:8005/readyz'" in compose
+    # Still a python probe rather than curl: the market-data image is
+    # python:slim with no curl, so a curl healthcheck fails closed for a reason
+    # that has nothing to do with the service. Other images (nginx, the exec
+    # boundary) do ship curl and legitimately use it.
+    assert 'test: [ "CMD", "curl", "-sf", "http://localhost:8005' not in compose
