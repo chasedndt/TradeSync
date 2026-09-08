@@ -154,10 +154,12 @@ Rebuild the snapshot with ChaseOS's own builder rather than anything here:
 Then `POST /state/knowledge/graph/ingest`. Read with
 `/state/knowledge/graph/status`, `/nodes`, and `/neighbours/{node_id}`.
 
-## What is still outstanding for Slot 3.4
+## The Gate
 
-The ChaseOS **Gate** — approval authority — is not part of this. This slice is
-the knowledge half: read a snapshot, project it, answer questions about it. No
-model or connector can write canonical knowledge or consume approval authority,
-which is the exit gate; granting approval is a separate mechanism and is not
-implemented.
+Not part of this slice, which is the knowledge half: read a snapshot, project
+it, answer questions about it. Approval authority is a separate mechanism and
+was wired the same day — see
+[the harness, candidates and Gate record](2026-09-08_harness-boundary-pine-candidates-and-gate.md).
+
+The exit gate holds either way: no model or connector can write canonical
+knowledge or consume approval authority.
