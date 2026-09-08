@@ -10,6 +10,12 @@ from tradesync_core.scoring import EnhancedScorer, compute_enhanced_score
 from tradesync_core.risk import ReasonCode, RiskVerdict, RiskGuardian
 from tradesync_core.symbols import normalize_symbol, normalize_venue
 from tradesync_core.core_score import Event, calculate_score
+from tradesync_core.paper_signal import (
+    AdmissionPolicy,
+    PaperSignalDecision,
+    PaperSignalError,
+    decide_paper_signal,
+)
 
 __all__ = [
     "EnhancedScorer",
@@ -24,6 +30,10 @@ __all__ = [
     "ScoreBreakdown",
     "ExecutionRisk",
     "EnhancedScore",
+    "AdmissionPolicy",
+    "PaperSignalDecision",
+    "PaperSignalError",
+    "decide_paper_signal",
 ]
 
 __version__ = "0.1.0"

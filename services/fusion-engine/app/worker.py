@@ -7,6 +7,7 @@ from tradesync_core import normalize_symbol
 from tradesync_core import EnhancedScorer
 
 STREAM_NAME = "x:signals.funding"
+PAPER_SIGNAL_SCHEMA = "paper_signal_v1"
 MARKET_DATA_URL = os.getenv("MARKET_DATA_URL", "http://market-data:8005")
 GROUP_NAME = "fusion-engine"
 LEGACY_GROUP_NAME = "opportunity-builder"  # For migration
@@ -40,6 +41,60 @@ async def fetch_market_snapshot(symbol: str, venue: str = "hyperliquid"):
         print(f"[Worker] Failed to fetch market snapshot: {e}")
     return None
 
+def is_paper_signal_envelope(payload) -> bool:
+    """Detect an admitted regime-backed paper signal."""
+    paper_signal = payload.get("paper_signal")
+    return (
+        isinstance(paper_signal, dict)
+        and paper_signal.get("schema_version") == PAPER_SIGNAL_SCHEMA
+        and bool(payload.get("evidence_digest"))
+    )
+
+
+async def build_paper_signal_opportunity(payload, msg_id, symbol, signal_id):
+    """Create an opportunity from regime evidence without re-scoring it."""
+    from .db import db
+
+    paper_signal = payload["paper_signal"]
+    if not paper_signal.get("admitted"):
+        print(f"[Worker] Paper signal {signal_id} is a refusal; not an opportunity.")
+        await redis_client.client.xack(STREAM_NAME, GROUP_NAME, msg_id)
+        return
+
+    if paper_signal.get("execution_authority"):
+        print(f"[Worker] Refusing signal {signal_id}: claims execution authority.")
+        await redis_client.client.xack(STREAM_NAME, GROUP_NAME, msg_id)
+        return
+
+    opp_data = {
+        "symbol": symbol,
+        "timeframe": payload.get("timeframe", "1m"),
+        # bias is a directional strength. The blended rulebook score measures
+        # suitability — how tradeable conditions are — and must never be
+        # presented as a side, so it is deliberately not used here.
+        "bias": float(paper_signal.get("directional_score") or 0.0),
+        # Quality reports evidence coverage, not a probability of winning.
+        "quality": float(paper_signal.get("data_coverage", 0.0)) * 100,
+        "dir": paper_signal.get("direction", "NONE"),
+        "links": {
+            "signal_id": signal_id,
+            "evidence_digest": payload.get("evidence_digest"),
+            "event_ids": [],
+        },
+        "signal_id": signal_id,
+        "ttl_seconds": OPPORTUNITY_TTL_SECONDS,
+        "confluence": paper_signal,
+    }
+
+    new_id = await db.insert_opportunity(opp_data)
+    if new_id:
+        print(f"[Worker] Created paper Opportunity {new_id} from signal {signal_id}.")
+        stats["opps_created"] += 1
+    else:
+        print(f"[Worker] Duplicate paper signal {signal_id}; idempotent skip.")
+    await redis_client.client.xack(STREAM_NAME, GROUP_NAME, msg_id)
+
+
 async def process_message(msg_id, data):
     from .db import db
     raw_payload = data.get("data")
@@ -53,7 +108,17 @@ async def process_message(msg_id, data):
         symbol = normalize_symbol(payload.get("symbol", "unknown"))
         signal_id = payload.get("id")
         event_ids = payload.get("event_ids", [])
-        
+        paper_signal = payload.get("paper_signal")
+
+        # A regime-backed paper signal arrives already scored against the
+        # rulebook, and its traceability is the evidence digest rather than rows
+        # in the legacy events table. Re-scoring it here would apply
+        # microstructure twice, because the regime liquidity block already
+        # weighs depth and orderbook imbalance.
+        if is_paper_signal_envelope(payload):
+            await build_paper_signal_opportunity(payload, msg_id, symbol, signal_id)
+            return
+
         # 1. Actionability: Threshold check
         if abs(score) < OPPORTUNITY_THRESHOLD:
             await redis_client.client.xack(STREAM_NAME, GROUP_NAME, msg_id)

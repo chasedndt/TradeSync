@@ -1,7 +1,7 @@
 {
   "schema_version": "market_feature_catalog_v1",
   "catalog_id": "tradesync-hyperliquid-market-features",
-  "version": "1.0.0",
+  "version": "1.5.0",
   "status": "paper_shadow",
   "venue": "hyperliquid",
   "purpose": "Define source, unit, comparator, history, normalization, provenance, and scoring authority before a market feature can reach the regime rulebook.",
@@ -13,6 +13,7 @@
   },
   "features": {
     "hl_mark_price_usd": {
+      "signal_kind": "none",
       "block": "price_volatility",
       "availability": "implemented",
       "provenance": "observed",
@@ -30,16 +31,17 @@
       "stale_after_ms": 60000,
       "decision_role": "Base measurement used to derive returns; an absolute price is not a direction score.",
       "missing_data": "Do not calculate return features.",
-      "caveats": ["Current mark price is retained as a base measurement; return features remain gated until their timestamp-aligned derivation is implemented."]
+      "caveats": ["Current mark price is retained as a base measurement and is the source series for the one-hour return comparator; the price itself remains ineligible to score."]
     },
     "hl_return_1h_pct": {
+      "signal_kind": "directional",
       "block": "price_volatility",
-      "availability": "planned",
+      "availability": "implemented",
       "provenance": "derived",
       "source_authority": "authoritative_market_derived",
       "source": "Hyperliquid mark-price observations",
       "unit": "percent",
-      "comparator": "mark price at or immediately before t minus 1 hour",
+      "comparator": "mark price at or immediately before t minus 1 hour, rejected when the anchor lags the one-hour target by more than the configured tolerance",
       "normalization": "ordinary_zscore",
       "score_mode": "direct",
       "scoring_eligible": true,
@@ -50,9 +52,10 @@
       "stale_after_ms": 60000,
       "decision_role": "Directional price movement over the intraday decision horizon.",
       "missing_data": "Feature unavailable; price/volatility block loses coverage.",
-      "caveats": ["Requires durable, timestamp-aligned mark-price history before activation."]
+      "caveats": ["Requires durable, timestamp-aligned mark-price history; the derivation emits no value when no anchor exists at or before t minus one hour.", "A data gap wider than the anchor tolerance suppresses the feature rather than widening the comparator window."]
     },
     "hl_spread_bps": {
+      "signal_kind": "suitability",
       "block": "liquidity",
       "availability": "implemented",
       "provenance": "derived",
@@ -73,6 +76,7 @@
       "caveats": ["Polling snapshots can miss brief spread spikes."]
     },
     "hl_depth_25bp_usd": {
+      "signal_kind": "suitability",
       "block": "liquidity",
       "availability": "implemented",
       "provenance": "derived",
@@ -93,6 +97,7 @@
       "caveats": ["Displayed orders may be cancelled and do not guarantee executable depth."]
     },
     "hl_buy_impact_5k_bps": {
+      "signal_kind": "suitability",
       "block": "liquidity",
       "availability": "implemented",
       "provenance": "derived",
@@ -113,6 +118,7 @@
       "caveats": ["Current implementation models buy-side impact only and is an estimate, not a fill promise."]
     },
     "hl_funding_hourly_rate": {
+      "signal_kind": "none",
       "block": "positioning",
       "availability": "implemented",
       "provenance": "observed",
@@ -133,6 +139,7 @@
       "caveats": ["Positive funding means longs pay shorts; it does not automatically mean price will fall."]
     },
     "hl_funding_apr_24h": {
+      "signal_kind": "none",
       "block": "positioning",
       "availability": "implemented",
       "provenance": "derived",
@@ -153,6 +160,7 @@
       "caveats": ["Simple annualization is a rate comparison, not a realized or compounded return forecast."]
     },
     "hl_open_interest_4h_pct": {
+      "signal_kind": "none",
       "block": "positioning",
       "availability": "implemented",
       "provenance": "derived",
@@ -173,6 +181,7 @@
       "caveats": ["USD OI changes with both contract quantity and mark price."]
     },
     "hl_volume_24h_usd": {
+      "signal_kind": "none",
       "block": "price_volatility",
       "availability": "implemented",
       "provenance": "observed",
@@ -193,6 +202,7 @@
       "caveats": ["Current 5m, 1h, and 4h volume fields are estimates from 24h volume and are not admitted features."]
     },
     "hl_orderbook_imbalance_1pct": {
+      "signal_kind": "suitability",
       "block": "liquidity",
       "availability": "implemented",
       "provenance": "derived",
@@ -213,6 +223,7 @@
       "caveats": ["Order-book imbalance can be cancelled or spoofed and must not become a standalone signal."]
     },
     "hl_oracle_premium_bps": {
+      "signal_kind": "none",
       "block": "positioning",
       "availability": "implemented",
       "provenance": "derived",
@@ -233,6 +244,7 @@
       "caveats": ["Derived from aligned Hyperliquid markPx and oraclePx; it is not Coinbase premium and does not independently prove spot demand."]
     },
     "hl_liquidation_total_proxy_usd": {
+      "signal_kind": "none",
       "block": "positioning",
       "availability": "implemented",
       "provenance": "proxy",
@@ -253,6 +265,7 @@
       "caveats": ["The current 50/50 long-short split is not observed market truth."]
     },
     "hl_direct_liquidation_flow": {
+      "signal_kind": "none",
       "block": "positioning",
       "availability": "unavailable",
       "provenance": "unavailable",
@@ -273,46 +286,55 @@
       "caveats": ["No current public adapter supplies direct side-labelled liquidations."]
     },
     "hl_direct_cvd": {
+      "signal_kind": "directional",
       "block": "price_volatility",
-      "availability": "unavailable",
-      "provenance": "unavailable",
-      "source_authority": "unavailable",
-      "source": "Requires admitted trade-flow ingestion",
+      "availability": "implemented",
+      "provenance": "observed",
+      "source_authority": "authoritative_market",
+      "source": "Hyperliquid trades websocket, signed taker notional",
       "unit": "USD_delta",
-      "comparator": "none",
-      "normalization": "none",
-      "score_mode": "unavailable",
-      "scoring_eligible": false,
-      "lookback_points": 0,
-      "minimum_history_points": 0,
-      "sampling_interval_ms": 0,
-      "fresh_after_ms": 0,
-      "stale_after_ms": 0,
-      "decision_role": "Reserved for observed taker buy/sell flow.",
-      "missing_data": "Show unavailable.",
-      "caveats": ["Do not present candle or volume estimates as direct CVD."]
+      "comparator": "signed taker notional over a rolling five-minute window",
+      "normalization": "robust_zscore",
+      "score_mode": "direct",
+      "scoring_eligible": true,
+      "lookback_points": 168,
+      "minimum_history_points": 30,
+      "sampling_interval_ms": 60000,
+      "fresh_after_ms": 15000,
+      "stale_after_ms": 120000,
+      "decision_role": "Observed taker buy/sell flow; sustained aggressive buying is directional evidence.",
+      "missing_data": "Show unavailable; never substitute candle or volume estimates.",
+      "caveats": ["Do not present candle or volume estimates as direct CVD.", "Side convention B=aggressive buy, A=aggressive sell was determined empirically against the live order book on 2026-09-08; the venue does not document it.", "Absent rather than zero until trades are observed, since zero is a real reading meaning balanced flow."]
     },
     "coinbase_premium_bps": {
+      "signal_kind": "directional",
       "block": "spot_premium",
-      "availability": "unavailable",
-      "provenance": "unavailable",
-      "source_authority": "unavailable",
-      "source": "No admitted free Coinbase comparator feed",
+      "availability": "implemented",
+      "provenance": "derived",
+      "source_authority": "external_reference_venue",
+      "source": "Coinbase Exchange BTC/ETH/SOL-USD ticker mid versus the Hyperliquid mark",
       "unit": "basis_points",
-      "comparator": "Must define Coinbase pair, broad spot reference, currency, and timestamp tolerance",
-      "normalization": "none",
-      "score_mode": "unavailable",
-      "scoring_eligible": false,
-      "lookback_points": 0,
-      "minimum_history_points": 0,
-      "sampling_interval_ms": 0,
-      "fresh_after_ms": 0,
-      "stale_after_ms": 0,
-      "decision_role": "Future spot-demand confirmation only after provider admission.",
+      "comparator": "Coinbase book mid minus Hyperliquid mark, over the mark, rejected when the two venues were sampled more than 10s apart",
+      "normalization": "robust_zscore",
+      "score_mode": "direct",
+      "scoring_eligible": true,
+      "lookback_points": 120,
+      "minimum_history_points": 20,
+      "sampling_interval_ms": 15000,
+      "fresh_after_ms": 15000,
+      "stale_after_ms": 60000,
+      "decision_role": "Spot demand above the perpetual is read as directional support. Admitted to scoring by operator decision on 2026-09-08; Coinbase remains a price reference and never a trading venue.",
       "missing_data": "Spot-premium block remains uncovered.",
-      "caveats": ["CoinGecko aggregate spot context is not an equivalent replacement."]
+      "caveats": [
+        "Coinbase is an external reference venue, not the trading venue. Hyperliquid remains the only venue TradeSync trades on.",
+        "Robust z-score is used because a premium spikes; an ordinary z-score would let one dislocation distort the baseline for a whole session.",
+        "Book mid is used rather than the last trade, so a single print cannot read as premium.",
+        "A premium is not computed when the two venues were sampled more than 10s apart; sampling lag would otherwise present as market structure.",
+        "CoinGecko aggregate spot context is not an equivalent replacement."
+      ]
     },
     "bitcoin_etf_net_flow_usd": {
+      "signal_kind": "none",
       "block": "macro_flows",
       "availability": "unavailable",
       "provenance": "context_only",
@@ -333,6 +355,7 @@
       "caveats": ["Publication timing and later revisions must be stored to prevent look-ahead bias."]
     },
     "verified_external_event_risk": {
+      "signal_kind": "none",
       "block": "macro_flows",
       "availability": "planned",
       "provenance": "context_only",

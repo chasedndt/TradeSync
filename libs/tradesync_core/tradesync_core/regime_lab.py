@@ -33,6 +33,90 @@ class AggregatedEvidence:
     blocks: dict[str, dict[str, Any]]
 
 
+@dataclass(frozen=True)
+class DirectionalEvidence:
+    """Direction, separated from suitability.
+
+    The rulebook scores *playbook suitability*: whether conditions are
+    tradeable. Most admitted features measure exactly that — two-sided depth,
+    spread, impact. A deep order book does not mean "buy", so the sign of the
+    blended suitability score must never be read as a trade direction.
+
+    Only features the catalog marks ``signal_kind: directional`` may set a
+    direction, and they are aggregated here on their own.
+    """
+
+    score: float | None
+    coverage: float
+    contributors: list[dict[str, Any]]
+    admitted_feature_ids: list[str]
+    ready_feature_ids: list[str]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "score": self.score,
+            "coverage": self.coverage,
+            "contributors": self.contributors,
+            "admitted_feature_ids": self.admitted_feature_ids,
+            "ready_feature_ids": self.ready_feature_ids,
+            "calculation": "sum(score * quality) / sum(quality) over directional features only",
+        }
+
+
+def aggregate_directional_evidence(
+    catalog: FeatureCatalog,
+    feature_results: Sequence[Mapping[str, Any]],
+) -> DirectionalEvidence:
+    """Aggregate only the features permitted to establish a direction."""
+
+    admitted = [
+        feature_id
+        for feature_id, definition in catalog.features.items()
+        if definition.get("signal_kind") == "directional"
+        and definition["scoring_eligible"]
+        and definition["score_mode"] in {"direct", "inverse"}
+    ]
+    result_by_id = {
+        str(item.get("feature_id")): item
+        for item in feature_results
+        if isinstance(item, Mapping) and item.get("feature_id")
+    }
+
+    numerator = 0.0
+    quality_total = 0.0
+    contributors: list[dict[str, Any]] = []
+    for feature_id in admitted:
+        result = result_by_id.get(feature_id)
+        if not result or not result.get("scoring_allowed"):
+            continue
+        score = result.get("score")
+        quality = result.get("data_quality")
+        if not isinstance(score, (int, float)) or not isinstance(quality, (int, float)):
+            continue
+        if not math.isfinite(float(score)) or not math.isfinite(float(quality)):
+            continue
+        safe_quality = min(max(float(quality), 0.0), 1.0)
+        numerator += float(score) * safe_quality
+        quality_total += safe_quality
+        contributors.append(
+            {
+                "feature_id": feature_id,
+                "score": round(float(score), 12),
+                "quality": round(safe_quality, 12),
+            }
+        )
+
+    score = round(numerator / quality_total, 12) if quality_total > 0 else None
+    coverage = round(quality_total / len(admitted), 12) if admitted else 0.0
+    return DirectionalEvidence(
+        score=score,
+        coverage=coverage,
+        contributors=contributors,
+        admitted_feature_ids=admitted,
+        ready_feature_ids=[item["feature_id"] for item in contributors],
+    )
+
+
 def aggregate_feature_evidence(
     catalog: FeatureCatalog,
     rulebook: RegimeRulebook,

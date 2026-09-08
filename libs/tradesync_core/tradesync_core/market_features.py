@@ -64,6 +64,11 @@ def validate_catalog(data: Mapping[str, Any]) -> FeatureCatalog:
     allowed_authority = {
         "authoritative_market",
         "authoritative_market_derived",
+        # A second venue used as a price reference, never as a trading venue.
+        # Added in catalog 1.5.0 for Coinbase spot: calling it
+        # "authoritative_market_derived" would misdescribe Coinbase as the
+        # venue TradeSync trades on, which it is not and will not be.
+        "external_reference_venue",
         "proxy_only",
         "context_only",
         "unavailable",
@@ -78,7 +83,19 @@ def validate_catalog(data: Mapping[str, Any]) -> FeatureCatalog:
         "unavailable",
     }
     scoring_provenance = {"observed", "derived"}
-    scoring_authority = {"authoritative_market", "authoritative_market_derived"}
+    # Which source authorities may influence a score at all. This is the line
+    # separating "TradeSync measured it" from "somebody else said so", and it
+    # is the most consequential whitelist in the catalog.
+    #
+    # `external_reference_venue` was added by operator decision on 2026-09-08,
+    # to admit Coinbase spot premium. It admits a second venue as a *price
+    # reference* only: Hyperliquid remains the sole trading venue, and nothing
+    # here grants an external source approval or execution authority.
+    scoring_authority = {
+        "authoritative_market",
+        "authoritative_market_derived",
+        "external_reference_venue",
+    }
 
     copied_features: dict[str, dict[str, Any]] = {}
     for feature_id, raw_definition in features.items():
@@ -98,6 +115,7 @@ def validate_catalog(data: Mapping[str, Any]) -> FeatureCatalog:
             "comparator",
             "normalization",
             "score_mode",
+            "signal_kind",
             "decision_role",
             "missing_data",
         ):
@@ -106,6 +124,13 @@ def validate_catalog(data: Mapping[str, Any]) -> FeatureCatalog:
                     f"features.{feature_id}.{field} must be a non-empty string"
                 )
 
+        # A feature may only set a trade direction when the catalog says it
+        # measures direction. Suitability describes how tradeable conditions
+        # are and must never be read as a long or short.
+        if definition["signal_kind"] not in {"directional", "suitability", "none"}:
+            raise FeatureValidationError(
+                f"features.{feature_id}.signal_kind is invalid"
+            )
         if definition["availability"] not in allowed_availability:
             raise FeatureValidationError(f"features.{feature_id}.availability is invalid")
         if definition["provenance"] not in allowed_provenance:
