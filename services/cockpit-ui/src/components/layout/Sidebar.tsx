@@ -19,9 +19,11 @@ import { useIntegrationPipeline } from '../../api/hooks'
 const navItems = [
   { to: '/', label: 'Mission Control', description: 'Market, opportunities, and health.', icon: Target, end: true },
   { to: '/market', label: 'Market', description: 'Hyperliquid market evidence.', icon: ChartBar },
+  { to: '/canvas', label: 'Market Canvas', description: 'Candles with recorded paper evidence.', icon: ChartLineUp },
   { to: '/opportunities', label: 'Opportunities', description: 'Ranked paper research setups.', icon: ChartLineUp },
   { to: '/regime-lab', label: 'Regime Lab', description: 'Feature evidence and rulebook experiments.', icon: BracketsCurly },
   { to: '/pipeline', label: 'Integration pipeline', description: 'Live dependencies, missing links, and restart targets.', icon: FlowArrow },
+  { to: '/intake', label: 'Knowledge intake', description: 'Quarantined connector submissions awaiting review.', icon: Database },
   { to: '/sources', label: 'Sources', description: 'Legacy source intake surface.', icon: Database },
   { to: '/logs', label: 'Evidence ledger', description: 'Decisions, orders, and receipts.', icon: ListChecks },
   { to: '/execution', label: 'Execution readiness', description: 'Fail-closed wallet and policy gates.', icon: ShieldCheck },

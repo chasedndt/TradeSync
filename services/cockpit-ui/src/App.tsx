@@ -10,6 +10,8 @@ import {
   RiskPolicies,
   Settings,
   Market,
+  MarketCanvas,
+  KnowledgeIntake,
   Sources,
   Copilot,
   Autonomy,
@@ -29,9 +31,11 @@ export default function App() {
         <Route path="/opportunities" element={<Opportunities />} />
         <Route path="/opportunities/:id" element={<OpportunityDetail />} />
         <Route path="/market" element={<Market />} />
+        <Route path="/canvas" element={<MarketCanvas />} />
         <Route path="/execution" element={<Execution />} />
         <Route path="/positions" element={<Positions />} />
         <Route path="/sources" element={<Sources />} />
+        <Route path="/intake" element={<KnowledgeIntake />} />
         <Route path="/copilot" element={<Copilot />} />
         <Route path="/autonomy" element={<Autonomy />} />
         <Route path="/logs" element={<Logs />} />

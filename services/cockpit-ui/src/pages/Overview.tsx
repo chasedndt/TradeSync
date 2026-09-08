@@ -1,5 +1,6 @@
 import { Fragment } from 'react'
 import { NavLink } from 'react-router-dom'
+import { MarketChartPanel } from '../components/canvas/MarketChartPanel'
 import {
   Bank,
   BracketsCurly,
@@ -94,14 +95,17 @@ function MarketPulse({ snapshots }: { snapshots: MarketSnapshotWithMicrostructur
     <section className="panel market-panel" aria-labelledby="market-pulse-title">
       <div className="panel-heading">
         <div><h2 id="market-pulse-title">Market Pulse</h2><p>Hyperliquid Perpetuals (Authoritative)</p></div>
-        <span>All times UTC</span>
+        <div className="panel-actions">
+          <NavLink to="/canvas" className="panel-action">Open charts →</NavLink>
+          <span>All times UTC</span>
+        </div>
       </div>
       <div className="table-scroll">
         <table className="market-table">
           <thead>
             <tr>
               <th>Market</th><th>Price (USD)</th><th>24h Change</th><th>Funding (8h)</th>
-              <th>OI Δ (24h)</th><th>Spread</th><th>Liquidity</th><th>Regime</th><th>Freshness</th>
+              <th>OI Δ (24h)</th><th>Spread</th><th>Liquidity</th><th>Regime</th><th>Freshness</th><th><span className="sr-only">Chart</span></th>
             </tr>
           </thead>
           <tbody>
@@ -113,25 +117,31 @@ function MarketPulse({ snapshots }: { snapshots: MarketSnapshotWithMicrostructur
               const liquidity = snapshot.microstructure?.liquidity_score
               const regime = snapshot.regimes?.trend || snapshot.regimes?.market_condition || 'unknown'
               const ageSeconds = snapshot.data_age_ms / 1000
+              // Hyperliquid publishes prevDayPx beside the mark, so this is a
+              // derivation of two authoritative values, not a reconstruction.
+              const change24h = snapshot.price?.change_24h_pct ?? null
               return (
                 <tr key={snapshot.symbol}>
                   <td><div className="market-id"><AssetIcon symbol={symbol} /><div className="market-name"><strong>{symbol}</strong><span>{snapshot.symbol}</span></div></div></td>
                   <td><span className="metric-main">{formatUsd(price, price && price < 1000 ? 2 : 1)}</span><span className="metric-sub">mark midpoint</span></td>
-                  <td><span className="metric-main tone-dim">—</span><span className="metric-sub">deferred</span></td>
+                  <td>{change24h == null
+                    ? <><span className="metric-main tone-dim">—</span><span className="metric-sub">unavailable</span></>
+                    : <><span className={`metric-main ${change24h >= 0 ? 'tone-good' : 'tone-bad'}`}>{formatPercent(change24h)}</span><span className="metric-sub">vs prev day</span></>}</td>
                   <td><span className="metric-main">{snapshot.funding ? `${(snapshot.funding.horizons.h8 * 100).toFixed(4)}%` : '—'}</span><span className="metric-sub">{snapshot.funding?.regime?.toUpperCase() || 'UNAVAILABLE'}</span></td>
                   <td><span className={`metric-main ${(oi24?.delta_pct ?? 0) >= 0 ? 'tone-good' : 'tone-bad'}`}>{formatPercent(oi24?.delta_pct)}</span><span className="metric-sub">{formatCompactUsd(oi24?.delta_usd)}</span></td>
                   <td><span className="metric-main tone-good">{spread != null ? `${spread.toFixed(2)} bps` : '—'}</span><span className="metric-sub">{spread != null && spread <= 2 ? 'TIGHT' : 'CHECK'}</span></td>
                   <td><span className={`metric-main ${liquidity != null && liquidity >= .5 ? 'tone-good' : 'tone-warn'}`}>{liquidity != null ? `${Math.round(liquidity * 100)}%` : '—'}</span><span className="metric-sub">{liquidity != null && liquidity >= .7 ? 'GOOD' : 'LIMITED'}</span></td>
                   <td><span className={`regime-badge ${regime.toLowerCase() === 'range' ? 'regime-badge--range' : ''}`}>{regime.toUpperCase()}</span></td>
                   <td><span className={`metric-main ${ageSeconds < 10 ? 'tone-good' : 'tone-warn'}`}>{formatAge(ageSeconds)}</span><span className="metric-sub">{ageSeconds < 10 ? 'LIVE' : 'AGING'}</span></td>
+                  <td><NavLink to={`/canvas?symbol=${snapshot.symbol}`} className="panel-action" aria-label={`Open ${symbol} chart`}>Chart →</NavLink></td>
                 </tr>
               )
             })}
-            {!rows.length && <tr><td colSpan={9} className="tone-dim">Waiting for Hyperliquid market snapshots.</td></tr>}
+            {!rows.length && <tr><td colSpan={10} className="tone-dim">Waiting for Hyperliquid market snapshots.</td></tr>}
           </tbody>
         </table>
       </div>
-      <div className="market-footnote">Source: Hyperliquid API &nbsp; • &nbsp; Perpetuals only &nbsp; • &nbsp; 24h change is intentionally deferred and does not block the current Tier A slice</div>
+      <div className="market-footnote">Source: Hyperliquid API &nbsp; • &nbsp; Perpetuals only &nbsp; • &nbsp; 24h change is derived from the venue&apos;s own previous-day reference, shown as unavailable when Hyperliquid omits it</div>
     </section>
   )
 }
@@ -215,6 +225,7 @@ export function Overview() {
 
       <div className="primary-grid">
         <MarketPulse snapshots={snapshots} />
+        <MarketChartPanel />
         <OpportunitiesPanel count={opportunityCount} loading={opportunitiesLoading} />
       </div>
 

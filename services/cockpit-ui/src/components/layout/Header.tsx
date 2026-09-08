@@ -15,6 +15,8 @@ export function Header({ onMenu }: { onMenu: () => void }) {
   const section = ({
     '/': 'Mission Control',
     '/market': 'Market',
+    '/canvas': 'Market Canvas',
+    '/intake': 'Knowledge intake',
     '/opportunities': 'Opportunities',
     '/regime-lab': 'Regime Lab',
     '/pipeline': 'Integration Pipeline',

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 import os
 import time
@@ -19,6 +18,7 @@ from tradesync_core.market_features import (
 )
 from tradesync_core.regime_lab import (
     RegimeLabValidationError,
+    aggregate_directional_evidence,
     aggregate_feature_evidence,
     assess_learning_gate,
     build_challenger_rulebook,
@@ -207,12 +207,16 @@ class RegimeLabEngine:
             evidence.data_quality,
             [],
         )
+        # Direction is aggregated separately from the blended rulebook score,
+        # which measures suitability rather than a side.
+        directional = aggregate_directional_evidence(self.catalog, feature_results)
         return {
             **self.configuration_summary(),
             "source_status": dict(source_status),
             "feature_results": feature_results,
             "block_evidence": evidence.blocks,
             "baseline_evaluation": baseline_evaluation,
+            "directional_evidence": directional.to_dict(),
             "operator_action_required": (
                 "Enter a testable hypothesis, a complete five-block weight set, "
                 "the arithmetic answer, and your own coverage explanation."
@@ -284,19 +288,26 @@ async def collect_live_feature_results(
                 != "none"
             ]
 
-            async def fetch_history(feature_id: str):
-                response = await client.get(
-                    f"{market_data_url}/feature-history/{venue}/{symbol}/{feature_id}",
-                    params={"window": "7d"},
-                    timeout=5.0,
+            # One batched request rather than one per feature: the per-feature
+            # fan-out cost grew with the catalog and saturated market-data.
+            histories: dict[str, list[Mapping[str, Any]]] = {}
+            if normalized_ids:
+                history_response = await client.get(
+                    f"{market_data_url}/feature-histories/{venue}/{symbol}",
+                    params={
+                        "window": "7d",
+                        "feature_ids": ",".join(normalized_ids),
+                        # The largest lookback_points in the catalog is 168.
+                        "points": 250,
+                    },
+                    timeout=15.0,
                 )
-                response.raise_for_status()
-                return feature_id, response.json().get("data", [])
-
-            history_pairs = await asyncio.gather(
-                *(fetch_history(feature_id) for feature_id in normalized_ids)
-            )
-            histories = dict(history_pairs)
+                history_response.raise_for_status()
+                series = history_response.json().get("series", {})
+                histories = {
+                    feature_id: series.get(feature_id, [])
+                    for feature_id in normalized_ids
+                }
             results = engine.normalize_observations(observations, histories)
             return results, {
                 "status": "live",

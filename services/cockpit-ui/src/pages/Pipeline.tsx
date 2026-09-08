@@ -67,6 +67,16 @@ function PipelineNodeCard({ node }: { node: PipelineNode }) {
         </span>
         <span className={`pipeline-state pipeline-state--${stateTone}`}>
           <span className="status-dot" />{statusLabels[node.status]}
+          {/* A state without a duration is half a fact: "offline" reads the
+              same whether it started ten seconds ago or yesterday. */}
+          {node.state_age && node.state_age !== 'unknown' && (
+            <small className="pipeline-state-age">for {node.state_age}</small>
+          )}
+          {node.flapping && (
+            <small className="pipeline-state-flap" title={`${node.recent_transitions} changes in 15 minutes`}>
+              unstable
+            </small>
+          )}
         </span>
       </summary>
       <div className="pipeline-node-detail">
