@@ -426,15 +426,47 @@ half makes the system safer whether or not the first is ever built.
   its answer spread across an environment variable, a service that may not be
   running, a roadmap gate and a risk policy.
 
-### 6b Enabling-side — closed, and not by omission
+### 6b Signer boundary ✅ specified 2026-09-08 — implementation deliberately absent
 
-Wallet preview and the isolated signer are **not built and will not be** on the
-current evidence. Both are named capabilities in the authority constraint, and
+`signer_boundary.py` defines the shape an isolated signer must fit, and the only
+implementation in this repository is `RefusingSigner`, which refuses everything
+and holds nothing.
+
+**This fixes a real placement defect.** Today `HYPERLIQUID_WALLET_PK` is read in
+`services/exec-hl-svc/app/main.py` — the same process that accepts order
+requests over HTTP, calls the venue, and parses the venue's replies. A key there
+is reachable from every bug in any of those three surfaces. It is unset, so
+nothing is exposed; but the shape is wrong, and a wrong shape stays quiet until
+somebody sets the variable.
+
+Isolation, as now written down: the signer receives **only a digest** (never a
+payload it must parse), cannot be asked what it holds, refuses by default, and
+is authorised per signature rather than per session — the property
+`control_envelope.py` already enforces for paper evaluations.
+
+Two guards keep it honest: no 0x-prefixed 64-hex string or key-shaped
+assignment may exist in any tracked file, and `HYPERLIQUID_WALLET_PK` is pinned
+to have no default and never be printed, logged or returned. Those are the three
+ways an unset secret quietly becomes a set one.
+
+The absence of a working signer is **load-bearing**. A stub returning a
+plausible signature in "test mode" would be worse than nothing: it would let the
+rest of an execution path be built and tested against something that looks like
+it works.
+
+### 6c Wallet preview and a working signer — closed
+
+Not built, and not by omission. Both are named capabilities in the operator's
+authority constraint — "no key, signer, wallet, deployment, spend, or live
+execution without explicit operator approval and passing roadmap gates" — and
 gate 1.2 returned NEGATIVE: no demonstrated skill in any regime at any horizon.
 
+Neither condition is met. A directive to complete outstanding work is not
+explicit approval to create a signing key for a trading system; that inference
+is precisely what the constraint exists to prevent.
+
 **Nothing in the current measurements argues for moving toward execution.**
-`DRY_RUN=true` and `EXECUTION_ENABLED=false` remain unchanged. Opening this
-requires explicit operator approval and a passing skill gate, in that order.
+`DRY_RUN=true` and `EXECUTION_ENABLED=false` remain unchanged.
 
 ---
 
