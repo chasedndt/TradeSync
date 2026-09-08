@@ -1,5 +1,8 @@
 # Slots 3.3, 3.5 and the ChaseOS Gate
 
+<!-- venue-guard-exempt: discusses the removed venue by name
+     records the two assertions that were still using the old substring check -->
+
 Date: 2026-09-08
 Scope: `libs/tradesync_core/{agent_harness,strike_zone,timeparse}.py`,
 `services/state-api/app/{agent_connector,main,integration_pipeline}.py`,

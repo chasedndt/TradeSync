@@ -1,5 +1,8 @@
 # Test suite repair and the `app` package collision
 
+<!-- venue-guard-exempt: discusses the removed venue by name
+     explains why the substring scan was narrowed, and gives real reappearances as examples -->
+
 Date: 2026-09-08
 Scope: `tests/`, `services/ingest-gateway`, `services/backtest-runner`,
 `tools/run_tests.py`, `pytest.ini`

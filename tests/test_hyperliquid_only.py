@@ -8,6 +8,15 @@ ROOT = Path(__file__).resolve().parents[1]
 FORBIDDEN = "dri" + "ft"
 SELF = Path(__file__).relative_to(ROOT).as_posix()
 
+# A file may exempt itself by carrying this marker, and only by carrying it.
+#
+# Documentation that explains this guard has to quote the name to explain it —
+# the change records describing why the scan was narrowed necessarily contain
+# the token, and so does this file. A blanket "docs are exempt" rule would gut
+# the guard, so exemption is a deliberate line somebody wrote on purpose,
+# greppable and reviewable, rather than a silent whitelist that grows.
+EXEMPTION_MARKER = "venue-guard-exempt: discusses the removed venue by name"
+
 # The removed venue's name is also an ordinary English noun, and this codebase
 # uses it constantly: documentation drift, clock drift, policy drift. A bare
 # substring scan flagged every one of those, so the guard failed on prose it had
@@ -21,9 +30,10 @@ VENUE_REFERENCE = re.compile(
         (
             # Part of a longer token: driftpy, drift_client, exec-drift-svc.
             r"[A-Za-z0-9_-]" + FORBIDDEN,
-            # "(?!s\b)" keeps the English plural out: "drifts apart" is
-            # prose, while "driftsdk" would still be caught.
-            FORBIDDEN + r"(?!s\b)[A-Za-z0-9_-]",
+            # The English inflections are prose, not the venue: "drifts",
+            # "drifting", "drifted", "drifter". A token like "driftsdk" still
+            # matches, because "sdk" is not one of them.
+            FORBIDDEN + r"(?!(?:s|ing|ed|er)\b)[A-Za-z0-9_-]",
             # A quoted or dotted literal: "drift", 'drift', drift.trade.
             r"[\"']" + FORBIDDEN + r"[\"']",
             FORBIDDEN + r"\.[a-z_]",
@@ -56,6 +66,8 @@ def test_removed_protocol_has_no_tracked_path_or_text_reference() -> None:
         try:
             text = path.read_text(encoding="utf-8")
         except (UnicodeDecodeError, OSError):
+            continue
+        if EXEMPTION_MARKER in text:
             continue
         match = VENUE_REFERENCE.search(text)
         if match is not None:
@@ -119,3 +131,47 @@ def test_removed_protocol_dependencies_are_absent() -> None:
     requirement_files = [ROOT / "requirements.txt", ROOT / "services" / "ingest-gateway" / "requirements.txt"]
     combined = "\n".join(path.read_text(encoding="utf-8").lower() for path in requirement_files)
     assert FORBIDDEN not in combined
+
+
+def test_english_inflections_are_prose_not_the_venue() -> None:
+    """"drifts", "drifting", "drifted", "drifter" are all ordinary words."""
+    for prose in (
+        "Duplicated data always drifts apart",
+        "The two copies keep drifting",
+        "The config had drifted since March",
+        "a drifter",
+    ):
+        assert not VENUE_REFERENCE.search(prose), prose
+
+    # A suffix that is not an English inflection is still a token match.
+    assert VENUE_REFERENCE.search(FORBIDDEN + "sdk")
+    assert VENUE_REFERENCE.search(FORBIDDEN + "py")
+
+
+def test_the_exemption_must_be_written_deliberately() -> None:
+    """A file is exempt only if it says so, and the guard still runs otherwise.
+
+    The marker exists because documentation explaining this guard has to quote
+    the name to explain it. It is one greppable line, not a whitelist that
+    accumulates quietly.
+    """
+    assert EXEMPTION_MARKER in Path(__file__).read_text(encoding="utf-8")
+
+    exempt = [
+        relative
+        for relative in tracked_files()
+        if (ROOT / relative).exists()
+        and _readable(ROOT / relative)
+        and EXEMPTION_MARKER in (ROOT / relative).read_text(encoding="utf-8")
+    ]
+    # Small enough to read. If this list grows, somebody is using the marker to
+    # avoid a finding rather than to explain one.
+    assert len(exempt) <= 6, exempt
+
+
+def _readable(path: Path) -> bool:
+    try:
+        path.read_text(encoding="utf-8")
+        return True
+    except (UnicodeDecodeError, OSError):
+        return False
