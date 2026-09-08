@@ -229,8 +229,13 @@ enforced where history lives: `approval_id` is unique in `control_envelopes`, so
 a replay collides with the constraint rather than passing a check that could
 race. Verified: authorise 200, replay 409, ceiling denies live execution.
 
-`.chaseos/graph/` in the canonical vault is currently **empty** — ChaseOS has
-not built a snapshot yet. The TradeSync side is complete and waiting.
+Verified against **real knowledge**, not only a fixture: ChaseOS's own
+`runtime/graph/builder.py` was run against the canonical vault, producing 7,314
+nodes and 10,123 edges, written to a TradeSync-side directory and ingested in
+6.3s. Adjacency on a degree-1520 hub answers in 41ms at depth 3.
+
+`.chaseos/graph/` inside the vault stays empty: writing there is ChaseOS's to
+do, and TradeSync's boundary is that it does not write canonical knowledge.
 
 See [the change record](changes/2026-09-08_chaseos-graph-projection.md).
 

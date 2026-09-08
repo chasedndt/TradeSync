@@ -21,12 +21,33 @@ ChaseOS defines the artifact at `chaseos-core/runtime/graph/artifact.py`:
 confidence marker (`EXTRACTED` / `INFERRED` / `AMBIGUOUS`), provenance, and
 community assignments. That contract was read, not reinvented.
 
-`.chaseos/graph/` in the canonical vault is **empty** — no snapshot has been
-built yet. So the TradeSync side is complete and verified, and ingestion of real
-knowledge waits on ChaseOS producing its first artifact. Verification used a
-fixture constructed by importing ChaseOS's own `artifact.py` and building the
-snapshot with its dataclasses, so the fixture is contract-correct by
-construction rather than by my reading of the contract.
+`.chaseos/graph/` in the canonical vault is **empty** — ChaseOS has not written
+a snapshot there. Rather than stop at a fixture, ChaseOS's own
+`runtime/graph/builder.py` was run against the real vault and the result written
+to a TradeSync-side directory. The vault is read; `.chaseos/graph/` is ChaseOS's
+to write, and TradeSync's whole boundary is that it does not write canonical
+knowledge.
+
+**Real snapshot, real projection.** 7,314 nodes and 10,123 edges across 307
+communities, built in 8.5s by ChaseOS's own code, ingested in 6.3s:
+
+```
+node types  doc_section=197, file=217, frontmatter_key=5, manifest_field=167,
+            python_class=231, python_function=3391, python_import=2676,
+            wikilink_ref=395, workflow=35
+relations   defines=3580, file_contains=3206, imports=2676, inherits=69,
+            references=425, workflow_declares=167
+```
+
+Adjacency on a real hub — `runtime/cli/main.py`, degree 1520 — answers in 36ms
+at depth 1 and 41ms at depth 3.
+
+That last figure exposed something worth fixing. Results are ordered
+nearest-first, so a hub fills the whole limit at one hop and a depth-3 request
+returns nothing from hops 2 or 3. `truncated` said something was cut but not
+what you were looking at, so the response now carries `hops_returned` and
+`reached_requested_depth`. A number that quietly means less than it appears to
+is the failure mode this whole system is built against.
 
 ## The boundaries, enforced rather than documented
 
@@ -117,10 +138,18 @@ on both nodes and edges. Full suite 459 passing.
 
 ## Enabling it
 
+Point at wherever snapshots are built. `dashboard-runtime/chaseos-graph` holds
+the one built on 2026-09-08; `.chaseos/graph` inside the vault is the natural
+home once ChaseOS writes there itself.
+
 ```
-CHASEOS_GRAPH_HOST_DIR=C:/Users/chaseos/Documents/chaseos_chaseintech/.chaseos/graph
+CHASEOS_GRAPH_HOST_DIR=E:/Projects/TradeSync/dashboard-runtime/chaseos-graph
 CHASEOS_GRAPH_DIR=/knowledge/chaseos-graph
 ```
+
+Rebuild the snapshot with ChaseOS's own builder rather than anything here:
+`build_snapshot(vault_root)` then `save_snapshot(snapshot, output_dir)` from
+`chaseos-core/runtime/graph/builder.py`.
 
 Then `POST /state/knowledge/graph/ingest`. Read with
 `/state/knowledge/graph/status`, `/nodes`, and `/neighbours/{node_id}`.
