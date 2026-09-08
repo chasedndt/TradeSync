@@ -120,7 +120,11 @@ class HyperliquidProvider(BaseProvider):
                     "price": {
                         "mark": float(ctx.get("markPx", 0)),
                         "oracle": float(ctx.get("oraclePx", 0)),
-                        "premium": float(ctx.get("premium", 0))
+                        "premium": float(ctx.get("premium", 0)),
+                        # Venue-published reference for the previous day, from
+                        # the same response as the mark. The 24h change is
+                        # derived from these two together, never guessed.
+                        "prev_day": float(ctx.get("prevDayPx", 0) or 0),
                     },
                     "meta": {
                         "max_leverage": asset_info.get("maxLeverage", 50),
@@ -231,6 +235,38 @@ class HyperliquidProvider(BaseProvider):
         except Exception as e:
             logger.error(f"Error fetching Hyperliquid orderbook for {symbol}: {e}")
             return None
+
+    async def fetch_candles(
+        self,
+        symbol: str,
+        interval: str,
+        start_time: int,
+        end_time: int,
+    ) -> List[Dict[str, Any]]:
+        """Fetch OHLCV candles for the Market Canvas.
+
+        Display data only. Nothing returned here is admitted to the feature
+        catalog or permitted to influence a paper signal.
+        """
+        venue_symbol = self.denormalize_symbol(symbol)
+        try:
+            data = await self._request({
+                "type": "candleSnapshot",
+                "req": {
+                    "coin": venue_symbol,
+                    "interval": interval,
+                    "startTime": start_time,
+                    "endTime": end_time,
+                },
+            })
+        except Exception as e:
+            logger.error(f"Error fetching Hyperliquid candles for {symbol}: {e}")
+            return []
+
+        if not isinstance(data, list):
+            logger.warning(f"Unexpected candle payload for {symbol}: {type(data)}")
+            return []
+        return data
 
     async def fetch_funding_history(
         self,

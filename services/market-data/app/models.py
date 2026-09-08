@@ -91,6 +91,11 @@ class PriceData(BaseModel):
     mark_price_usd: float
     oracle_price_usd: float
     oracle_premium_bps: float
+    # Both stay None when the venue does not publish a usable previous-day
+    # reference. A missing 24h change is displayed as unavailable rather than
+    # substituted from another venue or inferred from stored history.
+    prev_day_price_usd: Optional[float] = None
+    change_24h_pct: Optional[float] = None
 
 
 class HorizonValue(BaseModel):

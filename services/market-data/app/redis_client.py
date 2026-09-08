@@ -28,6 +28,16 @@ STREAM_ALERTS = "x:market.alerts"
 GROUP_NORMALIZER = "market-normalizer"
 GROUP_SNAPSHOTTER = "market-snapshotter"
 
+# Stream retention. These streams are transport, not durable truth: snapshots
+# and the feature series are the records that must survive. Without a bound an
+# XADD stream grows forever, and on a maxmemory instance with a noeviction
+# policy that eventually rejects every write in the service, which looks like a
+# dead poller rather than a full database. "~" trims approximately, at the
+# radix node boundary, which is much cheaper than an exact trim.
+STREAM_MAXLEN_RAW = int(os.getenv("STREAM_MAXLEN_RAW", "20000"))
+STREAM_MAXLEN_NORM = int(os.getenv("STREAM_MAXLEN_NORM", "20000"))
+STREAM_MAXLEN_ALERTS = int(os.getenv("STREAM_MAXLEN_ALERTS", "5000"))
+
 
 class MarketRedisClient:
     """Redis client optimized for market data streams."""
@@ -74,21 +84,27 @@ class MarketRedisClient:
     async def push_raw(self, event: Dict[str, Any]) -> str:
         """Push raw event to x:market.raw stream."""
         data = {"data": json.dumps(event)}
-        msg_id = await self.client.xadd(STREAM_RAW, data)
+        msg_id = await self.client.xadd(
+            STREAM_RAW, data, maxlen=STREAM_MAXLEN_RAW, approximate=True
+        )
         logger.debug(f"Pushed raw event to {STREAM_RAW}: {msg_id}")
         return msg_id
 
     async def push_normalized(self, event: Dict[str, Any]) -> str:
         """Push normalized event to x:market.norm stream."""
         data = {"data": json.dumps(event)}
-        msg_id = await self.client.xadd(STREAM_NORM, data)
+        msg_id = await self.client.xadd(
+            STREAM_NORM, data, maxlen=STREAM_MAXLEN_NORM, approximate=True
+        )
         logger.debug(f"Pushed normalized event to {STREAM_NORM}: {msg_id}")
         return msg_id
 
     async def push_alert(self, alert: Dict[str, Any]) -> str:
         """Push alert to x:market.alerts stream."""
         data = {"data": json.dumps(alert)}
-        msg_id = await self.client.xadd(STREAM_ALERTS, data)
+        msg_id = await self.client.xadd(
+            STREAM_ALERTS, data, maxlen=STREAM_MAXLEN_ALERTS, approximate=True
+        )
         logger.info(f"Pushed alert to {STREAM_ALERTS}: {msg_id}")
         return msg_id
 
@@ -266,10 +282,25 @@ class MarketRedisClient:
         symbol: str,
         feature_id: str,
         window_ms: int,
+        limit: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
+        """Return a feature's stored series, oldest first.
+
+        ``limit`` returns only the most recent N points. Normalization needs at
+        most ``lookback_points`` (168 today), while a 7-day series holds several
+        thousand, so an unbounded read ships tens of thousands of points that
+        are then discarded — slow enough to time out the caller.
+        """
         key = f"market:feature:{venue}:{symbol}:{feature_id}"
         now = int(__import__("time").time() * 1000)
-        entries = await self.client.zrangebyscore(key, now - window_ms, now)
+        if limit and limit > 0:
+            # Newest-first with a bound, then reversed back to ascending.
+            newest = await self.client.zrevrangebyscore(
+                key, now, now - window_ms, start=0, num=limit
+            )
+            entries = list(reversed(newest))
+        else:
+            entries = await self.client.zrangebyscore(key, now - window_ms, now)
         result = []
         for entry in entries:
             ts_text, value_text = entry.split(":", 1)

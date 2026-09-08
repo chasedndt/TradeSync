@@ -158,6 +158,9 @@ class MarketNormalizer:
                     value={
                         "mark": price.get("mark", 0),
                         "oracle": price.get("oracle", price.get("index", 0)),
+                        # Carried through explicitly so the snapshotter can
+                        # derive the 24h change without re-reading raw.
+                        "prev_day": price.get("prev_day", 0),
                         "raw": price
                     }
                 ))

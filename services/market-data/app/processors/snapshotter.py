@@ -137,11 +137,23 @@ class MarketSnapshotter:
             mark_price = float(price_value.get("mark", 0))
             oracle_price = float(price_value.get("oracle", 0))
             if mark_price > 0 and oracle_price > 0:
+                # The venue publishes its own previous-day reference alongside
+                # the mark, so the 24h change is a transparent derivation of
+                # two authoritative values rather than a reconstruction from
+                # stored history.
+                prev_day = float(price_value.get("prev_day", 0) or 0)
+                change_24h = (
+                    ((mark_price - prev_day) / prev_day) * 100
+                    if prev_day > 0
+                    else None
+                )
                 price_data = PriceData(
                     mark_price_usd=mark_price,
                     oracle_price_usd=oracle_price,
                     oracle_premium_bps=((mark_price - oracle_price) / oracle_price)
                     * 10000,
+                    prev_day_price_usd=prev_day if prev_day > 0 else None,
+                    change_24h_pct=change_24h,
                 )
                 price_age = now - latest_price.get("ts", now)
                 available_metrics.append(
