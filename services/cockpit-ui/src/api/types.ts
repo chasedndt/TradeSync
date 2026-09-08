@@ -257,12 +257,23 @@ export interface RegimeSummary {
   confidence_note?: string
 }
 
+export interface PriceData {
+  mark_price_usd: number
+  oracle_price_usd: number
+  oracle_premium_bps: number
+  /** Venue-published previous-day reference; null when Hyperliquid omits it. */
+  prev_day_price_usd?: number | null
+  /** Derived from mark and prev_day only. Null means unavailable, not zero. */
+  change_24h_pct?: number | null
+}
+
 export interface MarketSnapshot {
   venue: string
   symbol: string
   ts: number
   data_age_ms: number
   available_metrics: MetricAvailability[]
+  price?: PriceData
   funding?: FundingData
   oi?: OpenInterestData
   liquidations?: LiquidationData
@@ -593,6 +604,15 @@ export interface PipelineNode {
   missing: string[]
   impact: string
   recovery: PipelineRecovery
+  /** How long this stage has held its current state. Null when unrecorded. */
+  state_since_epoch_s?: number | null
+  state_duration_seconds?: number | null
+  /** Coarse phrasing, e.g. "2h 15m" or "unknown". */
+  state_age?: string
+  /** State changes in the last 15 minutes. */
+  recent_transitions?: number
+  /** Oscillating rather than settled: read the current state with suspicion. */
+  flapping?: boolean
 }
 
 export interface PipelineRecoveryItem {
@@ -635,4 +655,224 @@ export interface IntegrationPipelineStatus {
     blocking: string
     next_action: string
   }>
+}
+
+export interface Candle {
+  /** UNIX seconds, as the charting library expects. */
+  time: number
+  open: number
+  high: number
+  low: number
+  close: number
+  volume: number
+}
+
+export interface CandleResponse {
+  venue: string
+  symbol: string
+  interval: string
+  requested: number
+  count: number
+  candles: Candle[]
+  /** Always "display_only" — candles are not catalog features. */
+  authority: string
+}
+
+/** One value collapsed onto a candle open. */
+export interface ContextPoint {
+  /** UNIX seconds, aligned to the candle open. */
+  time: number
+  value: number
+  /** How many raw samples fell in this bucket. */
+  samples: number
+}
+
+/**
+ * How much of the chart window a series actually covers.
+ *
+ * Reported rather than inferred: a line that stops has either run out of
+ * recording or run into a collection gap, and those are different problems.
+ */
+export interface ContextCoverage {
+  candles: number
+  covered: number
+  coverage_pct: number
+  first_time: number | null
+  last_time: number | null
+}
+
+export interface ContextSeries {
+  series: ContextPoint[]
+  unit: string
+  source: string
+  coverage: ContextCoverage
+  /** Funding only: it is published hourly whatever the chart interval. */
+  native_period_s?: number
+  /** Open interest only: states why the series cannot reach further back. */
+  limit_note?: string
+}
+
+export interface MarketContextResponse {
+  venue: string
+  symbol: string
+  interval: string
+  bucket_s: number
+  funding: ContextSeries
+  open_interest: ContextSeries
+  /** Always "display_only". */
+  authority: string
+}
+
+export interface DepthLevel {
+  price: number
+  size: number
+  notional_usd: number
+  /** Running notional outward from the touch: the cost to sweep to here. */
+  cumulative_usd: number
+  orders: number
+}
+
+/** A level holding an outsized share of its own side's visible notional. */
+export interface RestingWall {
+  side: 'bid' | 'ask'
+  price: number
+  notional_usd: number
+  share_of_side: number
+}
+
+export interface DepthResponse {
+  venue: string
+  symbol: string
+  poll_ts: number
+  best_bid: number
+  best_ask: number
+  mid_price: number
+  spread_bps: number
+  imbalance_1pct: number
+  depth: {
+    bid_1pct_usd: number
+    ask_1pct_usd: number
+    bid_2pct_usd: number
+    ask_2pct_usd: number
+  }
+  bids: DepthLevel[]
+  asks: DepthLevel[]
+  walls: RestingWall[]
+  /** Always "display_only". */
+  authority: string
+}
+
+export interface QuarantineReason {
+  code: string
+  detail: string
+}
+
+export interface QuarantineItem {
+  id: string
+  source: string
+  /** Whether it passed intake. Acceptance confers no authority. */
+  accepted: boolean
+  content_digest: string
+  payload: Record<string, unknown>
+  reasons: QuarantineReason[]
+  observed_at: string | null
+  received_at: string
+  reviewed_by: string | null
+  /** Null until an operator promotes it. Promotion is never automatic. */
+  promoted_to: string | null
+}
+
+export interface QuarantineList {
+  schema_version: string
+  /** Always "none" — quarantined material carries no authority. */
+  authority: string
+  items: QuarantineItem[]
+  note: string
+}
+
+export interface QuarantineReviewResult {
+  id: string
+  reviewed_by: string
+  promoted: boolean
+  blockers: QuarantineReason[]
+  authority: string
+  note: string
+}
+
+export interface DrawingPoint {
+  /** UNIX seconds, matching the chart. */
+  time_s: number
+  price: number
+}
+
+export type DrawingKind = 'horizontal' | 'trendline' | 'range' | 'note'
+
+export interface DrawingInput {
+  symbol: string
+  interval: string
+  kind: DrawingKind
+  points: DrawingPoint[]
+  label?: string
+  colour?: string
+}
+
+export interface Drawing extends DrawingInput {
+  drawing_id: string
+  /** Increments on every edit; earlier versions are retained server-side. */
+  version: number
+  created_at?: string
+  /** Always "none" — a drawing is annotation, never evidence. */
+  authority?: string
+}
+
+export interface DrawingList {
+  schema_version: string
+  symbol: string
+  interval: string
+  authority: string
+  drawings: Drawing[]
+}
+
+export interface TimelineOutcome {
+  horizon_minutes: number
+  status: 'measured' | 'pending' | 'insufficient_candles'
+  signed_return_pct: number | null
+  forward_return_pct: number | null
+  max_favourable_pct: number | null
+  max_adverse_pct: number | null
+}
+
+export interface TimelineFeature {
+  feature_id: string
+  score: number
+  data_quality: number
+  block?: string
+}
+
+export interface TimelineEntry {
+  opportunity_id: string
+  signal_id: string | null
+  symbol: string
+  direction: string
+  directional_score: number
+  coverage_pct: number
+  opened_at: string
+  signal_at: string | null
+  /** Digests pin the exact configuration, so a replay reproduces it exactly. */
+  catalog_version: string | null
+  catalog_digest: string | null
+  rulebook_version: string | null
+  rulebook_digest: string | null
+  evidence_digest: string | null
+  contributing_features: TimelineFeature[]
+  missing_blocks: string[]
+  paper_risk_multiplier: number | null
+  outcomes: TimelineOutcome[]
+}
+
+export interface EvidenceTimeline {
+  schema_version: string
+  symbol: string
+  entries: TimelineEntry[]
+  note: string
 }
