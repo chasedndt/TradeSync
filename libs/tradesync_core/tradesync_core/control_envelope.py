@@ -13,6 +13,8 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from typing import Any
 
+from .timeparse import TimestampError, parse_utc
+
 
 class ControlEnvelopeError(ValueError):
     """A cross-system packet failed its authority or integrity contract."""
@@ -39,13 +41,16 @@ def canonical_hash(value: Any) -> str:
 
 
 def _utc(value: str, field: str) -> datetime:
+    """Shared parser, re-raised as a ControlEnvelopeError.
+
+    The parsing rules live in one place (`timeparse`) so the envelope, the graph
+    validator and the Gate cannot disagree about what a timestamp means. Only
+    the error type is local, because callers here switch on `.code`.
+    """
     try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except (AttributeError, ValueError) as exc:
-        raise ControlEnvelopeError("invalid_timestamp", f"{field} must be an ISO-8601 timestamp") from exc
-    if parsed.tzinfo is None:
-        raise ControlEnvelopeError("invalid_timestamp", f"{field} must include a UTC offset")
-    return parsed.astimezone(timezone.utc)
+        return parse_utc(value, field)
+    except TimestampError as exc:
+        raise ControlEnvelopeError("invalid_timestamp", str(exc)) from exc
 
 
 def build_paper_control_envelope(
