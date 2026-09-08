@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import subprocess
 from pathlib import Path
+import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -10,6 +11,11 @@ SCRIPT = ROOT / "ops" / "scripts" / "market-command-readiness.ps1"
 OVERLAY = ROOT / "ops" / "compose.market-command.yml"
 
 
+# Shells out to a PowerShell host audit that samples CPU. Under load — a
+# concurrent Docker build, say — it exceeds its own timeout, which says
+# something about the machine rather than about the code. The other two tests
+# in this file read compose files and stay in the unit suite.
+@pytest.mark.integration
 def test_readiness_audit_is_paper_only_and_fail_closed() -> None:
     completed = subprocess.run(
         [
@@ -29,7 +35,13 @@ def test_readiness_audit_is_paper_only_and_fail_closed() -> None:
         cwd=ROOT,
         text=True,
         capture_output=True,
-        timeout=45,
+        # A safety valve against a hang, not a performance assertion. The script
+        # audits the host — PowerShell start-up, Docker state, a CPU sample —
+        # and takes ~28s on an idle machine here. A 45s budget left 17s of
+        # headroom and failed whenever a container happened to be building,
+        # which says nothing about the code this test is checking. What it
+        # asserts is content: paper_only, and a fail-closed authority block.
+        timeout=180,
     )
 
     assert completed.returncode == 0, completed.stderr

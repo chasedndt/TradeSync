@@ -11,6 +11,18 @@ dependencies = [
     "pydantic==2.9.2",
 ]
 
+# Signing is an extra, not a base dependency. Six services install this library
+# and none of them but the signer has any business carrying an ethereum
+# cryptography stack — a heavy, security-sensitive dependency tree belongs only
+# in the one process that actually needs it.
+#
+#     pip install tradesync_core[signing]
+[project.optional-dependencies]
+signing = [
+    "eth-account==0.13.4",
+    "msgpack==1.0.8",
+]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["tradesync_core*"]

@@ -33,3 +33,9 @@ websockets
 asyncpg
 pytest
 pytest-asyncio
+
+# Signing, for the tests that exercise tradesync_core[signing]. The extra is
+# installed only in signer-svc at runtime; this is here so a fresh checkout can
+# run the whole suite.
+eth-account==0.13.4
+msgpack==1.0.8

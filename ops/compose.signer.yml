@@ -1,0 +1,68 @@
+# The isolated signer. Opt-in, separate file, never in the bounded profile.
+#
+#   docker compose \
+#     --env-file E:\Projects\TradeSync\dashboard-runtime\runtime.env \
+#     -f ops\compose.full.yml -f ops\compose.market-command.yml \
+#     -f ops\compose.signer.yml \
+#     up -d signer-svc
+#
+# Starting this is the moment a private key exists inside a running process.
+# It is a separate command for the same reason `compose.ingress.yml` is: an act
+# with that consequence should not happen because a container shared a file with
+# the database.
+#
+# Three things have to be true before it will sign anything, and they are
+# deliberately three rather than one:
+#
+#   1. SIGNER_PRIVATE_KEY is set — you set it, in runtime.env. Nothing in this
+#      repository generates, defaults, writes or logs it.
+#   2. SIGNING_ENABLED=true — having a key is not permission to use it.
+#   3. EXECUTION_ENABLED=true on state-api and exec-hl-svc — the global gate,
+#      which is separate again and stays false until you change it.
+#
+# And the measurement gate is not a variable at all: gate 1.2 returned NEGATIVE.
+# The system's own evidence says there is no demonstrated edge to trade on.
+# Nothing here overrides that; it only makes the machinery exist.
+
+services:
+  signer-svc:
+    build:
+      context: ..
+      dockerfile: services/signer-svc/Dockerfile
+    image: tradesync/signer-svc:dev
+    restart: unless-stopped
+
+    environment:
+      # Set in runtime.env. Absent by default, and absent means refuse.
+      SIGNER_PRIVATE_KEY: ${SIGNER_PRIVATE_KEY:-}
+      SIGNING_ENABLED: ${SIGNING_ENABLED:-false}
+      SIGNER_MAINNET: ${SIGNER_MAINNET:-true}
+
+    # No published ports. Reachable only on the internal compose network, so
+    # the signer is not addressable from the host even by accident.
+    expose:
+      - "8006"
+
+    # It needs nothing else to do its job. No database, no Redis, no venue: it
+    # receives a digest and returns a signature. Depending on nothing is part of
+    # the isolation, not an oversight.
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+    mem_limit: 256m
+    cpus: 0.25
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8006/healthz', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}

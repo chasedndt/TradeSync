@@ -49,6 +49,7 @@ SUITES: tuple[Suite, ...] = (
     Suite("state-api", Path("tests"), ROOT / "services" / "state-api"),
     Suite("market-data", Path("tests"), ROOT / "services" / "market-data"),
     Suite("exec-hl-svc", Path("tests"), ROOT / "services" / "exec-hl-svc"),
+    Suite("signer-svc", Path("tests"), ROOT / "services" / "signer-svc"),
 )
 
 # Needs the bounded Docker profile up. Kept out of the default run: a service

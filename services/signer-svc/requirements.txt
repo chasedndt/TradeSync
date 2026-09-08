@@ -1,0 +1,7 @@
+fastapi==0.104.1
+uvicorn==0.24.0
+pydantic==2.5.2
+# The signing primitive. Reference implementation rather than hand-rolled
+# EIP-712: subtly wrong crypto is worse than none.
+eth-account==0.13.4
+msgpack==1.0.8

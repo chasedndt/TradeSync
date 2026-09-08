@@ -359,6 +359,21 @@ class AppState:
 
 state = AppState()
 
+async def _warm_macro_cache() -> None:
+    """Populate the macro cache once, at startup, without blocking readiness."""
+    try:
+        await macro_feed.fetch_headlines()
+        logger.info(
+            f"Macro cache warmed: {len(macro_feed.cache)} headlines",
+            extra={"trace_id": "startup"},
+        )
+    except Exception as exc:
+        logger.warning(
+            f"Macro cache warm failed; the feed will be fetched on first read: {exc}",
+            extra={"trace_id": "startup"},
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
@@ -379,6 +394,15 @@ async def lifespan(app: FastAPI):
                 f"Starting without PostgreSQL for bounded read-only/development surfaces: {exc}",
                 extra={"trace_id": "startup"},
             )
+        # Warm the macro cache behind startup rather than making the first
+        # caller pay for it. Three external RSS feeds take ~17s cold, and
+        # stale-while-revalidate only helps once there is something to serve;
+        # the very first request after a restart would otherwise still block.
+        #
+        # Deliberately not awaited: the API must come up whether or not a news
+        # feed answers, and a failure here is logged, not fatal.
+        asyncio.create_task(_warm_macro_cache())
+
         yield
     finally:
         # Shutdown
@@ -1246,6 +1270,16 @@ MARKET_DATA_URL = os.getenv("MARKET_DATA_URL", "http://market-data:8005")
 # The paper execution boundary. Outside the bounded profile by default;
 # probing it is how the preflight reports what the venue side thinks.
 EXEC_HL_URL = os.getenv("EXEC_HL_URL", "http://exec-hl-svc:8004")
+SIGNER_URL = os.getenv("SIGNER_URL", "http://signer-svc:8006")
+# The account to preview. An address is public — it appears in every
+# transaction the account has ever made — so this is not a secret and is not
+# treated as one. The key that controls it never appears in this service.
+WALLET_ADDRESS = os.getenv("WALLET_ADDRESS", "").strip()
+# The venue's public info endpoint. Read-only by construction: it takes an
+# address and returns state, and has no authenticated surface at all.
+HYPERLIQUID_INFO_URL = os.getenv(
+    "HYPERLIQUID_INFO_URL", "https://api.hyperliquid.xyz/info"
+)
 
 
 def _market_data_get(path: str, *, timeout: float = 10.0) -> httpx.Response:
@@ -1624,6 +1658,121 @@ async def get_execution_reconciliation(hours: int = Query(24, ge=1, le=720)):
             "Nothing here can place, amend or cancel an order."
         ),
     }
+
+
+@app.get("/state/execution/wallet-preview", tags=["execution"])
+async def get_wallet_preview():
+    """Account state for the configured address, read-only.
+
+    An address is public: it is in every transaction the account has ever made.
+    Reading state for one requires no key and grants nothing, which is why this
+    can exist while the signer stays separate.
+
+    What it answers is the question you want answered *before* an order, not
+    after: what is actually in the account, what is already open, and how much
+    margin is already committed. A preview computed from this system's own
+    records would tell you what TradeSync believes; this tells you what the
+    venue believes, and the difference between those is the interesting part.
+    """
+    if not WALLET_ADDRESS:
+        return {
+            "configured": False,
+            "address": None,
+            "status": "not_configured",
+            "detail": "WALLET_ADDRESS is unset; no account is being previewed",
+            "authority": "read_only",
+        }
+
+    try:
+        async with httpx.AsyncClient(timeout=8.0, trust_env=False) as client:
+            response = await client.post(
+                HYPERLIQUID_INFO_URL,
+                json={"type": "clearinghouseState", "user": WALLET_ADDRESS},
+            )
+            response.raise_for_status()
+            state_payload = response.json()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                f"venue did not answer: {type(exc).__name__}"
+                + (f": {exc}" if str(exc) else "")
+            ),
+        )
+
+    margin = state_payload.get("marginSummary") or {}
+    positions = []
+    for entry in state_payload.get("assetPositions") or []:
+        position = entry.get("position") or {}
+        if not position.get("szi"):
+            continue
+        size = float(position.get("szi") or 0)
+        positions.append({
+            "symbol": f"{position.get('coin')}-PERP",
+            "size": size,
+            # szi is signed; the sign is the side. Reporting it separately means
+            # nobody downstream has to rediscover that convention.
+            "side": "LONG" if size > 0 else "SHORT",
+            "entry_price": _as_float(position.get("entryPx")),
+            "unrealized_pnl": _as_float(position.get("unrealizedPnl")),
+            "position_value": _as_float(position.get("positionValue")),
+            "leverage": (position.get("leverage") or {}).get("value"),
+            "liquidation_price": _as_float(position.get("liquidationPx")),
+        })
+
+    account_value = _as_float(margin.get("accountValue")) or 0.0
+    total_margin_used = _as_float(margin.get("totalMarginUsed")) or 0.0
+
+    return {
+        "configured": True,
+        "address": WALLET_ADDRESS,
+        "account_value_usd": account_value,
+        "withdrawable_usd": _as_float(state_payload.get("withdrawable")),
+        "total_margin_used_usd": total_margin_used,
+        # The number that matters when deciding whether another position is
+        # sane. Reported rather than left for a reader to divide.
+        "margin_utilization": round(total_margin_used / account_value, 4)
+        if account_value > 0
+        else None,
+        "open_positions": positions,
+        "position_count": len(positions),
+        "source": "hyperliquid clearinghouseState",
+        "authority": "read_only",
+        "note": (
+            "Read from a public address. No key is involved and nothing here "
+            "authorises anything; the signer is a separate process."
+        ),
+    }
+
+
+def _as_float(value):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+@app.get("/state/execution/signer-status", tags=["execution"])
+async def get_signer_status():
+    """What the isolated signer reports about itself.
+
+    Proxied rather than inlined, because the signer is deliberately a separate
+    process and state-api must not grow the ability to answer for it.
+    """
+    try:
+        async with httpx.AsyncClient(timeout=3.0, trust_env=False) as client:
+            response = await client.get(f"{SIGNER_URL}/signer/status")
+            response.raise_for_status()
+            return {**response.json(), "reachable": True}
+    except Exception as exc:
+        # Offline is the expected state: the signer is not in the bounded
+        # profile and running one is a deliberate act.
+        return {
+            "reachable": False,
+            "available": False,
+            "status": "offline",
+            "detail": type(exc).__name__ + (f": {exc}" if str(exc) else ""),
+        }
 
 
 @app.get("/state/execution/preflight", tags=["execution"])

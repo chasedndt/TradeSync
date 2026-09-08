@@ -454,19 +454,44 @@ plausible signature in "test mode" would be worse than nothing: it would let the
 rest of an execution path be built and tested against something that looks like
 it works.
 
-### 6c Wallet preview and a working signer — closed
+### 6c Wallet preview and isolated signer ✅ built 2026-09-08 on explicit operator approval
 
-Not built, and not by omission. Both are named capabilities in the operator's
-authority constraint — "no key, signer, wallet, deployment, spend, or live
-execution without explicit operator approval and passing roadmap gates" — and
-gate 1.2 returned NEGATIVE: no demonstrated skill in any regime at any horizon.
+The operator approved this explicitly on 2026-09-08, which satisfies the first
+half of the authority constraint. **The second half is not satisfied**: gate 1.2
+still returns NEGATIVE, and the constraint reads "explicit operator approval
+**and** passing roadmap gates". The machinery now exists; the evidence for using
+it does not.
 
-Neither condition is met. A directive to complete outstanding work is not
-explicit approval to create a signing key for a trading system; that inference
-is precisely what the constraint exists to prevent.
+**`services/signer-svc`** — the only process that may hold a key. It receives a
+32-byte digest and never a payload, so "parse untrusted input" is not a surface
+it has. It cannot be asked what it holds beyond the public address. It refuses
+by default, and enforces single-use approvals itself rather than trusting the
+caller — a compromised caller is exactly the one whose word about its own
+authorisation is worthless. Runs unprivileged, read-only root filesystem, all
+capabilities dropped, no published port.
 
-**Nothing in the current measurements argues for moving toward execution.**
-`DRY_RUN=true` and `EXECUTION_ENABLED=false` remain unchanged.
+**Three independent switches** must all be set before anything is signed:
+`SIGNER_PRIVATE_KEY` (the operator's, never generated or defaulted here),
+`SIGNING_ENABLED`, and `EXECUTION_ENABLED`. Having a key is not permission to
+use it.
+
+**`hyperliquid_signing.py`** computes the EIP-712 action digest separately from
+anything holding a key, so only a hash crosses the boundary. Verified end to end
+with an ephemeral key created inside the test: the signature recovers to the
+signer, and a different action does not.
+
+**Wallet preview** reads `clearinghouseState` for a configured address. An
+address is public — it is in every transaction the account ever made — so this
+needs no key. It reports what the *venue* believes about the account, which is
+the number worth having next to what TradeSync believes.
+
+Found while building: the signer's Pydantic model dropped unknown fields
+silently, so the forbidden-field check was dead code at the HTTP layer while
+looking like enforcement. Extras are now fatal — for the one process holding a
+key, an unrecognised field is not something to guess about.
+
+`DRY_RUN=true` and `EXECUTION_ENABLED=false` remain unchanged, and the signer is
+absent from the bounded profile.
 
 ---
 
