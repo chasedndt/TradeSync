@@ -399,13 +399,42 @@ See [the change record](changes/2026-09-08_canvas-funding-oi-depth-overlays.md).
 
 ---
 
-## Slot 6 — Execution foundation (Phase 5+)
+## Slot 6 — Execution foundation (Phase 5+) — split
 
-Untouched and deliberately distant. Wallet preview, isolated signer, single-use
-approval, risk policy, reconciliation.
+Treating this as one indivisible slot was wrong. The authority constraint names
+**capabilities** — "no key, signer, wallet, deployment, spend, or live
+execution" — not a slot number, and the slot contains both the machinery that
+would *enable* execution and the machinery that would *refuse* it. The second
+half makes the system safer whether or not the first is ever built.
+
+### 6a Refusal-side ✅ delivered 2026-09-08
+
+- **Single-use approval** — the ChaseOS Gate (3.4). An approval binds to one
+  candidate and authorises one paper evaluation; `approval_id` is unique so a
+  replay collides with a constraint rather than a check that could race.
+- **Risk policy** — `RiskGuardian` was already comprehensive and fails closed on
+  `EXECUTION_ENABLED` before any per-symbol rule.
+- **Reconciliation** — `reconciliation.py` and
+  `GET /state/execution/reconciliation`. Reads recorded decisions against
+  recorded orders and reports three divergence classes. An orphan decision does
+  **not** guess whether execution never happened or happened unrecorded: those
+  have opposite remedies. Proven against the live database with a planted clean,
+  mismatched and orphaned decision.
+- **Preflight** — `GET /state/execution/preflight`. Everything that would have
+  to be true before an order could be placed, with the current value of each.
+  It opens nothing and has no counterpart that does; "why can I not trade" had
+  its answer spread across an environment variable, a service that may not be
+  running, a roadmap gate and a risk policy.
+
+### 6b Enabling-side — closed, and not by omission
+
+Wallet preview and the isolated signer are **not built and will not be** on the
+current evidence. Both are named capabilities in the authority constraint, and
+gate 1.2 returned NEGATIVE: no demonstrated skill in any regime at any horizon.
 
 **Nothing in the current measurements argues for moving toward execution.**
-`DRY_RUN=true` and `EXECUTION_ENABLED=false` remain unchanged.
+`DRY_RUN=true` and `EXECUTION_ENABLED=false` remain unchanged. Opening this
+requires explicit operator approval and a passing skill gate, in that order.
 
 ---
 

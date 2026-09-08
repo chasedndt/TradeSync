@@ -43,6 +43,7 @@ from tradesync_core.replay import (
 from app.macro_feed import macro_feed, MacroHeadline
 from app.context_feed import context_feed
 from tradesync_core.agent_harness import HarnessError
+from tradesync_core.reconciliation import reconcile
 from tradesync_core.timeparse import parse_utc
 from tradesync_core.control_envelope import (
     CLOSED_AUTHORITY,
@@ -1242,6 +1243,9 @@ async def execute_action(req: ExecuteRequest):
 # --- Market Data Endpoints (Phase 3B) ---
 
 MARKET_DATA_URL = os.getenv("MARKET_DATA_URL", "http://market-data:8005")
+# The paper execution boundary. Outside the bounded profile by default;
+# probing it is how the preflight reports what the venue side thinks.
+EXEC_HL_URL = os.getenv("EXEC_HL_URL", "http://exec-hl-svc:8004")
 
 
 def _market_data_get(path: str, *, timeout: float = 10.0) -> httpx.Response:
@@ -1561,6 +1565,138 @@ class GateApproval(BaseModel):
     approval_decision_id: str
     approved_at_utc: str
     validity_hours: int = 4
+
+
+@app.get("/state/execution/reconciliation", tags=["execution"])
+async def get_execution_reconciliation(hours: int = Query(24, ge=1, le=720)):
+    """Where the recorded intent and the recorded action disagree.
+
+    Reads two of this system's own tables and reports divergence. It cannot
+    place, amend or cancel anything, and it behaves identically in paper mode —
+    which is the only mode this system runs in.
+
+    A system that cannot tell you when its own records have drifted apart is
+    less safe, and the day that matters is the day something did execute and the
+    ledger disagrees. A clean result is reported as a result, not as silence.
+    """
+    if not state.pool:
+        raise HTTPException(status_code=503, detail="DB Pool not ready")
+
+    async with state.pool.acquire() as conn:
+        decisions = await conn.fetch(
+            """
+            SELECT id::text AS id, requested
+            FROM decisions
+            WHERE created_at > now() - make_interval(hours => $1)
+            ORDER BY created_at DESC
+            """,
+            hours,
+        )
+        orders = await conn.fetch(
+            """
+            SELECT id::text AS id, decision_id::text AS decision_id, request, dry_run
+            FROM exec_orders
+            WHERE created_at > now() - make_interval(hours => $1)
+            ORDER BY created_at DESC
+            """,
+            hours,
+        )
+
+    result = reconcile(
+        [{"id": r["id"], "requested": _as_json(r["requested"])} for r in decisions],
+        [
+            {
+                "id": r["id"],
+                "decision_id": r["decision_id"],
+                "request": _as_json(r["request"]),
+            }
+            for r in orders
+        ],
+    )
+
+    return {
+        "window_hours": hours,
+        **result,
+        "paper_mode": paper_mode_enabled(),
+        "execution_gate_open": execution_gate_enabled(),
+        "note": (
+            "Read-only comparison of recorded decisions against recorded orders. "
+            "Nothing here can place, amend or cancel an order."
+        ),
+    }
+
+
+@app.get("/state/execution/preflight", tags=["execution"])
+async def get_execution_preflight():
+    """Everything that would have to be true before any order could be placed.
+
+    This makes the closed gate **legible**. It opens nothing: every field is a
+    read, and the endpoint has no counterpart that flips any of them.
+
+    The reason it is worth having while execution is disabled is that "why can I
+    not trade" currently has its answer spread across an environment variable, a
+    service that may not be running, a roadmap gate, and a risk policy. One
+    place that lists them, with the current value of each, is the difference
+    between a deliberate closed gate and one nobody can account for.
+    """
+    blockers: list[dict[str, Any]] = []
+
+    if not execution_gate_enabled():
+        blockers.append({
+            "check": "execution_gate",
+            "state": "closed",
+            "detail": "EXECUTION_ENABLED is false. This is the global killswitch "
+                      "and it is checked before any per-symbol rule.",
+        })
+    if paper_mode_enabled():
+        blockers.append({
+            "check": "paper_mode",
+            "state": "on",
+            "detail": "DRY_RUN is true. Orders are simulated at the execution "
+                      "boundary and never reach a venue.",
+        })
+
+    # The measurement gate. This is the one that matters most and is the least
+    # visible, because it lives in a document rather than in a variable.
+    blockers.append({
+        "check": "skill_gate_1_2",
+        "state": "negative",
+        "detail": "Gate 1.2 measured no demonstrated skill in any regime at any "
+                  "horizon. Nothing in the current measurements argues for "
+                  "moving toward execution.",
+    })
+
+    # The venue boundary's own view. Offline is an ordinary answer: exec-hl-svc
+    # is outside the bounded profile and not running one is the normal state.
+    venue: dict[str, Any] = {"status": "offline"}
+    try:
+        async with httpx.AsyncClient(timeout=2.0, trust_env=False) as client:
+            resp = await client.get(f"{EXEC_HL_URL}/exec/hl/preflight")
+        venue = (
+            resp.json()
+            if resp.status_code == 200
+            else {"status": "error", "http_status": resp.status_code}
+        )
+    except Exception as exc:
+        # The type, and the message only when there is one. httpx timeouts
+        # stringify to empty, and "ConnectTimeout: " with nothing after the
+        # colon reads like a truncated message rather than a complete answer.
+        venue = {
+            "status": "offline",
+            "detail": type(exc).__name__ + (f": {exc}" if str(exc) else ""),
+        }
+
+    return {
+        "can_execute": False if blockers else None,
+        "blockers": blockers,
+        "venue_preflight": venue,
+        "authority": "read_only",
+        "note": (
+            "An inventory of what is closed and why. This endpoint opens "
+            "nothing and has no counterpart that does. Opening the gate is an "
+            "operator act requiring explicit approval and a passing skill gate."
+        ),
+    }
 
 
 @app.get("/state/knowledge/gate/status", tags=["knowledge"])
