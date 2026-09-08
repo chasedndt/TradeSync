@@ -19,6 +19,37 @@ import httpx
 HEALTHY_STATES = {"live", "healthy"}
 
 
+def _freshness_evidence(readiness: dict[str, Any]) -> str:
+    """One line describing whether observations are actually arriving."""
+    symbols = readiness.get("symbols") or []
+    if not symbols:
+        return "Snapshot freshness: not reported by market-data"
+    ages = [
+        f"{item.get('symbol')} {item.get('age_seconds')}s"
+        for item in symbols
+        if item.get("age_seconds") is not None
+    ]
+    state = "fresh" if readiness.get("ready") else readiness.get("reason", "not ready")
+    return f"Snapshot freshness ({state}): " + (", ".join(ages) or "no timestamps")
+
+# How recent a stored signal or opportunity must be to count as live evidence.
+RECORD_FRESHNESS_SECONDS = int(os.getenv("PIPELINE_RECORD_FRESHNESS_SECONDS", "900"))
+
+
+def _is_recent(iso_timestamp: str | None) -> bool:
+    """Return whether an ISO timestamp is inside the freshness window."""
+    if not iso_timestamp:
+        return False
+    try:
+        recorded = datetime.fromisoformat(iso_timestamp)
+    except ValueError:
+        return False
+    if recorded.tzinfo is None:
+        recorded = recorded.replace(tzinfo=timezone.utc)
+    age = (datetime.now(timezone.utc) - recorded).total_seconds()
+    return 0 <= age <= RECORD_FRESHNESS_SECONDS
+
+
 def _recovery(
     kind: str,
     label: str,
@@ -84,7 +115,15 @@ def assemble_pipeline_status(
         provider.get("venue") == "hyperliquid" and provider.get("enabled")
         for provider in providers
     )
-    market_live = bool(market_health.get("ok") and hyperliquid_enabled)
+    market_ready = probes.get("market_ready", {})
+    # A 503 from /readyz still returns a body, so the report is available even
+    # when the probe itself is marked not ok.
+    readiness = market_ready.get("data", {}) or {}
+    data_flowing = bool(readiness.get("ready"))
+    # "live" now requires fresh stored observations, not merely a reachable
+    # process. Reporting a frozen poller as live is the exact failure of
+    # 2026-09-07.
+    market_live = bool(market_health.get("ok") and hyperliquid_enabled and data_flowing)
     observation_count = int(market_features.get("data", {}).get("count", 0) or 0)
     market_latency = market_status.get("latency_ms")
 
@@ -104,11 +143,33 @@ def assemble_pipeline_status(
 
     latest_signal = postgres.get("latest_signal_ts")
     latest_opportunity = postgres.get("latest_opportunity_ts")
-    regime_status = "partial" if market_live and observation_count else "offline"
+
+    # A stored record only counts as evidence of a working stage while it is
+    # recent. Without this the pipeline would keep reporting a stage as live on
+    # the strength of a row written days ago.
+    recent_signal = _is_recent(latest_signal)
+    recent_opportunity = _is_recent(latest_opportunity)
+
+    # The regime engine is only "live" once its evaluation actually reaches a
+    # stored signal. Evaluating in isolation, with nothing consuming the
+    # result, is genuinely partial rather than complete.
+    regime_status = (
+        "live"
+        if market_live and observation_count and recent_signal
+        else "partial"
+        if market_live and observation_count
+        else "offline"
+    )
     scorer_status = "live" if scorer_live and fusion_live else (
         "partial" if scorer_live or fusion_live else "offline"
     )
-    performance_status = "partial" if postgres_live else "offline"
+    performance_status = (
+        "live"
+        if postgres_live and (recent_signal or recent_opportunity)
+        else "partial"
+        if postgres_live
+        else "offline"
+    )
 
     optional_probe_specs = {
         "strike_zone": ("Strike Zone Crypto", "Strike Zone Crypto"),
@@ -150,7 +211,13 @@ def assemble_pipeline_status(
                 f"Provider enabled: {str(hyperliquid_enabled).lower()}",
                 f"Status probe: {market_latency:.0f} ms" if market_latency is not None else "Status probe unavailable",
             ],
-            missing=[] if market_live else ["Live provider response"],
+            missing=(
+                []
+                if market_live
+                else ["Fresh stored observations: " + readiness.get("reason", "unknown")]
+                if market_health.get("ok") and hyperliquid_enabled
+                else ["Live provider response"]
+            ),
             impact="Market observation stops when this source is unavailable.",
             recovery=_recovery(
                 "restart",
@@ -172,12 +239,18 @@ def assemble_pipeline_status(
             evidence=[
                 f"Current feature observations: {observation_count}",
                 "Mark, funding, OI, volume, and L2 inputs retain explicit provenance",
+                _freshness_evidence(readiness),
             ],
-            missing=[
-                "Direct liquidation flow",
-                "Direct CVD",
-                "One-hour return derivation",
-            ],
+            missing=(
+                # Direct CVD and the one-hour return were implemented on
+                # 2026-09-07/08; only liquidation flow remains unavailable.
+                ["Direct liquidation flow"]
+                if data_flowing
+                else [
+                    "Direct liquidation flow",
+                    f"Fresh stored observations: {readiness.get('reason', 'unknown')}",
+                ]
+            ),
             impact="Existing observations continue; missing inputs reduce regime coverage rather than becoming zeroes.",
             recovery=_recovery(
                 "inspect",
@@ -239,7 +312,9 @@ def assemble_pipeline_status(
             required_for_tier_a=True,
             authority="deterministic_paper_shadow",
             summary=(
-                "The versioned rulebook is evaluating live evidence, but not every block has admitted inputs."
+                "The versioned rulebook is evaluating live evidence and feeding stored paper signals."
+                if regime_status == "live"
+                else "The versioned rulebook is evaluating live evidence, but not every block has admitted inputs."
                 if regime_status == "partial"
                 else "The regime rulebook has no live market evidence."
             ),
@@ -301,7 +376,13 @@ def assemble_pipeline_status(
             status=performance_status,
             required_for_tier_a=True,
             authority="measured_outcomes",
-            summary="The durable store exists, but the current lean runtime has no complete outcome producer." if postgres_live else "No durable outcome store is reachable.",
+            summary=(
+                "Paper signals and opportunities are being recorded; outcome reconciliation is still outstanding."
+                if performance_status == "live"
+                else "The durable store exists, but the current lean runtime has no complete outcome producer."
+                if postgres_live
+                else "No durable outcome store is reachable."
+            ),
             evidence=["PostgreSQL schema is the intended outcome authority", "No current closed-loop performance job is verified"],
             missing=["Fill/outcome reconciliation", "MFE/MAE and slippage jobs", "Regime-fit feedback receipts"],
             impact="Trade ideas cannot yet learn from complete paper outcomes automatically.",
@@ -343,11 +424,27 @@ def assemble_pipeline_status(
             status=optional_states["strike_zone"][0],
             required_for_tier_a=False,
             authority="paper_candidate",
-            summary="Research and performance evidence may enrich TradeSync, but cannot approve or execute a trade.",
-            evidence=optional_states["strike_zone"][1] + ["trade_candidate_v1 receipt adapter is the declared boundary"],
-            missing=[] if optional_states["strike_zone"][0] == "live" else ["Configured receipt endpoint", "Schema/digest validation", "Replay-safe cursor"],
-            impact="Only new Strike Zone candidate intake is blocked; TradeSync-native analysis continues.",
-            recovery=_recovery("implement", "Implement and configure the signed candidate receipt adapter", "Strike Zone connector"),
+            summary=(
+                "Pine indicators that submit alerts. Research evidence may enrich "
+                "TradeSync, but cannot approve or execute a trade."
+            ),
+            evidence=optional_states["strike_zone"][1]
+            + [
+                # Corrected 2026-09-08: the repository holds Pine Script
+                # indicators, not a service. There is nothing to probe.
+                "Submission source, not a probeable service: Pine indicators "
+                "reach TradeSync as TradingView alerts",
+                "Quarantine intake is the declared boundary",
+            ],
+            missing=[]
+            if optional_states["strike_zone"][0] == "live"
+            else ["Webhook ingress decision", "Alerts configured to post to the receiver"],
+            impact="Only new Strike Zone alert intake is blocked; TradeSync-native analysis continues.",
+            recovery=_recovery(
+                "implement",
+                "Decide webhook ingress, then point Pine alerts at the receiver",
+                "TradingView webhook + quarantine",
+            ),
         ),
         _node(
             node_id="agent_harness",
@@ -359,10 +456,21 @@ def assemble_pipeline_status(
             required_for_tier_a=False,
             authority="advisory_only",
             summary="Agent runtimes may explain, compare, and draft proposals; deterministic policy remains authoritative.",
-            evidence=optional_states["agent_harness"][1] + ["Hermes/Ollama boundary is documented as advisory"],
-            missing=[] if optional_states["agent_harness"][0] == "live" else ["Versioned task/response envelope", "Configured health endpoint", "Evidence writeback receipt"],
+            evidence=optional_states["agent_harness"][1]
+            + [
+                # The envelope, the probe and the receipt all exist now, so the
+                # honest evidence line is what is enforced rather than what is
+                # documented. The boundary was "documented as advisory" until
+                # 2026-09-08; it is now refused in code and proven against a
+                # live model that was prompted into claiming approval.
+                "Boundary enforced in code: agent_response_v1 refuses score/direction/approval/order fields, nested or embedded in JSON content",
+                "Every accepted answer is filed in quarantine; refused escalation attempts are filed too",
+            ],
+            missing=[]
+            if optional_states["agent_harness"][0] == "live"
+            else ["A reachable runtime at AGENT_HARNESS_URL"],
             impact="Deterministic scoring and UI continue without model availability.",
-            recovery=_recovery("implement", "Define the governed agent envelope before connecting a runtime", "agent-harness adapter"),
+            recovery=_recovery("configure", "Set AGENT_HARNESS_URL to a reachable runtime; the envelope and quarantine route are in place", "agent-harness adapter"),
         ),
         _node(
             node_id="chaseos",
@@ -374,10 +482,19 @@ def assemble_pipeline_status(
             required_for_tier_a=False,
             authority="canonical_knowledge_and_approval",
             summary="ChaseOS remains the knowledge and approval authority, never a TradeSync startup dependency.",
-            evidence=optional_states["chaseos"][1] + ["knowledge_sync_v1 contract exists"],
-            missing=[] if optional_states["chaseos"][0] == "live" else ["Read-only GraphSnapshot adapter", "Gate status adapter", "Configured health endpoint"],
+            evidence=optional_states["chaseos"][1]
+            + [
+                "knowledge_sync_v1 contract exists",
+                # Both halves landed 2026-09-08. The honest evidence line is
+                # what is enforced, not what remains to be written.
+                "Read-only GraphSnapshot adapter and PostgreSQL projection: no write path to the vault, mount is :ro",
+                "Gate wired: an approval binds to one candidate and authorises one paper evaluation; single use enforced by a unique constraint",
+            ],
+            missing=[]
+            if optional_states["chaseos"][0] == "live"
+            else ["A built snapshot in .chaseos/graph and CHASEOS_GRAPH_DIR set"],
             impact="Knowledge promotion and ChaseOS approvals are blocked; Tier A market work continues.",
-            recovery=_recovery("implement", "Connect the read-only knowledge adapter before any Gate integration", "ChaseOS connector"),
+            recovery=_recovery("configure", "Build a ChaseOS snapshot, then set CHASEOS_GRAPH_DIR; the adapter and Gate are in place", "ChaseOS connector"),
         ),
         _node(
             node_id="execution",
@@ -486,9 +603,9 @@ def assemble_pipeline_status(
             },
             {
                 "id": "price_change_24h",
-                "status": "deferred_non_blocking",
-                "blocking": "nothing in the current Tier A slice",
-                "next_action": "Leave blank until a timestamp-aligned authoritative derivation is intentionally scheduled.",
+                "status": "implemented",
+                "blocking": "nothing",
+                "next_action": "Derived from the venue's own prevDayPx beside the mark in metaAndAssetCtxs; shown as unavailable when the venue omits it.",
             },
         ],
     }
@@ -558,6 +675,9 @@ async def collect_integration_pipeline(
     )
     market_tasks: dict[str, Any] = {
         "market_health": _probe_json(service_urls["market"], "/healthz", probe_timeout),
+        # Readiness, not just liveness: a reachable service with frozen
+        # pollers must not read as live.
+        "market_ready": _probe_json(service_urls["market"], "/readyz", probe_timeout),
         "market_status": _probe_json(service_urls["market"], "/status", probe_timeout),
         "market_features": _probe_json(
             service_urls["market"],

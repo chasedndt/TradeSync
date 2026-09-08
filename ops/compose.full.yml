@@ -208,10 +208,14 @@ services:
     ports:
       - "8005:8005"
     healthcheck:
-      test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8005/healthz', timeout=3)" ]
-      interval: 10s
+      # /readyz, not /healthz: the container must report unhealthy when the
+      # pollers stop, not merely when the process dies. On 2026-09-07 a
+      # port-only check reported healthy for an hour while no data flowed.
+      test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8005/readyz', timeout=3)" ]
+      interval: 15s
       timeout: 5s
       retries: 3
+      start_period: 120s
 
   backtest-runner:
     profiles: [analytics]

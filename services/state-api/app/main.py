@@ -1,25 +1,69 @@
 import os
 import json
+import math
 import uuid
 import time
 import asyncio
 import logging
 from contextlib import asynccontextmanager
 from typing import List, Optional, Any, Dict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 
 import asyncpg
 import redis.asyncio as redis
 import httpx
 from fastapi import FastAPI, HTTPException, Query, Request, Response
+from fastapi.responses import JSONResponse
 from fastapi.responses import PlainTextResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel, Field
 from tradesync_core import RiskGuardian
 from tradesync_core import normalize_symbol, normalize_venue
+from tradesync_core.paper_signal import AdmissionPolicy
+from tradesync_core.regime_weights import RulebookValidationError, validate_rulebook
+from tradesync_core.quarantine import (
+    content_digest,
+    QuarantineError,
+    evaluate_submission,
+    promotion_blockers,
+)
+from tradesync_core.canvas_drawings import (
+    DrawingError,
+    next_version,
+    validate_drawing,
+)
+from tradesync_core.state_history import annotate_node, detect_transitions
+from tradesync_core.tradingview_webhook import parse_alert
+from tradesync_core.replay import (
+    ReplayError,
+    case_from_stored_evidence,
+    compare_rulebooks,
+)
 from app.macro_feed import macro_feed, MacroHeadline
 from app.context_feed import context_feed
+from tradesync_core.agent_harness import HarnessError
+from tradesync_core.timeparse import parse_utc
+from tradesync_core.control_envelope import (
+    CLOSED_AUTHORITY,
+    ControlEnvelopeError,
+    build_paper_control_envelope,
+)
+from tradesync_core.strike_zone import (
+    ReceiptError,
+    to_trade_candidate,
+    validate_receipt,
+)
+from tradesync_core.graph_snapshot import SnapshotRejected
+from app import agent_connector
+from app.graph_projection import (
+    available_snapshots,
+    current_snapshot,
+    neighbours,
+    project_snapshot,
+    read_snapshot,
+    snapshot_directory,
+)
 from app.integration_pipeline import collect_integration_pipeline
 from app.regime_lab import (
     RegimeLabEngine,
@@ -637,24 +681,32 @@ async def get_opportunities(
     if not state.pool:
         raise HTTPException(status_code=503, detail="DB Pool not ready")
 
+    # "all" is a wildcard, not a stored status. Comparing it literally matched
+    # no row and silently returned an empty list, which the Cockpit rendered as
+    # "no scored opportunities available" even when opportunities existed.
+    filters = []
+    params: list = []
+    if symbol:
+        params.append(symbol)
+        filters.append(f"symbol = ${len(params)}")
+    if status and status.lower() != "all":
+        params.append(status)
+        filters.append(f"status = ${len(params)}")
+    where = f"WHERE {' AND '.join(filters)}" if filters else ""
+    params.append(limit)
+
     try:
         async with state.pool.acquire() as conn:
-            if symbol:
-                rows = await conn.fetch("""
+            rows = await conn.fetch(
+                f"""
                     SELECT id, symbol, timeframe, bias, quality, dir, status, snapshot_ts, links, confluence
                     FROM opportunities
-                    WHERE symbol = $1 AND status = $2
+                    {where}
                     ORDER BY snapshot_ts DESC
-                    LIMIT $3
-                """, symbol, status, limit)
-            else:
-                rows = await conn.fetch("""
-                    SELECT id, symbol, timeframe, bias, quality, dir, status, snapshot_ts, links, confluence
-                    FROM opportunities
-                    WHERE status = $1
-                    ORDER BY snapshot_ts DESC
-                    LIMIT $2
-                """, status, limit)
+                    LIMIT ${len(params)}
+                """,
+                *params,
+            )
 
             return [
                 {
@@ -922,6 +974,33 @@ async def preview_action(req: PreviewRequest):
         print(f"Preview error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+def execution_gate_enabled() -> bool:
+    """Whether the global execution gate is actually open.
+
+    Read rather than assumed: three rejection paths previously reported
+    `execution_enabled: True` from a literal while `EXECUTION_ENABLED` was
+    false, which is precisely the kind of untruthful status this system exists
+    to avoid.
+    """
+    return os.getenv("EXECUTION_ENABLED", "false").strip().lower() == "true"
+
+
+def paper_mode_enabled() -> bool:
+    """Whether the system is in paper mode. Defaults to true, like the boundary.
+
+    Used on paths where nothing was ever sent to a venue — a risk rejection, an
+    RPC failure. Those reported `dry_run: False` from a literal, which asserts
+    "this was a live action" about a request that never left the building. It is
+    the same untruthful-status defect as `execution_enabled` above, one level
+    down, and it reads far worse: a consumer seeing `dry_run: false` would
+    reasonably conclude the system is live.
+
+    Same variable and same fail-safe default as `exec-hl-svc`, so the two cannot
+    disagree about which mode the system is in.
+    """
+    return os.getenv("DRY_RUN", "true").strip().lower() == "true"
+
+
 @app.get("/state/execution/status")
 async def get_execution_status():
     """Aggregates execution status and circuit breaker states from all venues."""
@@ -1046,8 +1125,10 @@ async def execute_action(req: ExecuteRequest):
                 return ExecutionResult(
                     ok=False,
                     venue=dec_row["venue"],
-                    dry_run=False, # Risk check phase
-                    execution_enabled=True,
+                    # Nothing was sent to a venue: report the configured mode,
+                    # not a literal claiming this was a live action.
+                    dry_run=paper_mode_enabled(),
+                    execution_enabled=execution_gate_enabled(),
                     status="rejected",
                     idempotency_key=str(req.decision_id),
                     request_payload=requested_data,
@@ -1093,8 +1174,8 @@ async def execute_action(req: ExecuteRequest):
                         exec_result = ExecutionResult(
                             ok=False,
                             venue=venue,
-                            dry_run=False,
-                            execution_enabled=True,
+                            dry_run=paper_mode_enabled(),
+                            execution_enabled=execution_gate_enabled(),
                             status="error",
                             idempotency_key=str(req.decision_id),
                             request_payload=requested_data,
@@ -1106,8 +1187,8 @@ async def execute_action(req: ExecuteRequest):
                     exec_result = ExecutionResult(
                         ok=False,
                         venue=venue,
-                        dry_run=False,
-                        execution_enabled=True,
+                        dry_run=paper_mode_enabled(),
+                        execution_enabled=execution_gate_enabled(),
                         status="error",
                         idempotency_key=str(req.decision_id),
                         request_payload=requested_data,
@@ -1240,6 +1321,1599 @@ async def get_all_market_snapshots():
         logger.error(f"Error fetching market snapshots: {e}", extra={"trace_id": "market"})
         raise HTTPException(status_code=503, detail="Market data service unavailable")
 
+class ReplayRequest(BaseModel):
+    """A frozen-window replay request. Weights must form a valid rulebook."""
+
+    hours: int = Field(24, ge=1, le=720)
+    symbol: Optional[str] = None
+    horizon_minutes: int = Field(60, ge=1)
+    challenger_weights: Optional[Dict[str, float]] = None
+
+
+@app.post("/state/regime-lab/replay", tags=["regime-lab"])
+async def replay_fixed_window(request: ReplayRequest):
+    """Re-run the rulebook over a frozen window of recorded evidence.
+
+    Champion and challenger see identical stored evidence, so any difference is
+    attributable to the configuration rather than to the market having moved.
+    Paper only: replay cannot activate a rulebook or place an order.
+    """
+    if not state.pool:
+        raise HTTPException(status_code=503, detail="DB Pool not ready")
+
+    symbol = normalize_symbol(request.symbol) if request.symbol else None
+    try:
+        async with state.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT s.id, s.symbol, s.features,
+                       o.signed_return_pct, o.forward_return_pct
+                FROM signals s
+                JOIN opportunities opp ON opp.signal_id = s.id
+                JOIN opportunity_outcomes o
+                  ON o.opportunity_id = opp.id AND o.horizon_minutes = $1
+                WHERE s.agent = 'regime_paper_scorer'
+                  AND s.created_at > now() - ($2 || ' hours')::interval
+                  AND o.status = 'measured'
+                  AND ($3::text IS NULL OR s.symbol = $3)
+                ORDER BY s.created_at
+                """,
+                request.horizon_minutes,
+                str(request.hours),
+                symbol,
+            )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    cases = []
+    skipped = 0
+    for row in rows:
+        stored = row["features"]
+        if isinstance(stored, str):
+            stored = json.loads(stored)
+        try:
+            cases.append(
+                case_from_stored_evidence(
+                    str(row["id"]),
+                    row["symbol"],
+                    stored,
+                    outcome_signed_return_pct=row["signed_return_pct"],
+                    market_move_pct=row["forward_return_pct"],
+                )
+            )
+        except ReplayError:
+            # Evidence recorded before the current schema cannot be replayed
+            # faithfully, so it is counted and excluded rather than guessed at.
+            skipped += 1
+
+    if not cases:
+        return {
+            "schema_version": "regime_replay_v1",
+            "window_cases": 0,
+            "skipped_unreplayable": skipped,
+            "note": (
+                "No measured decision in this window carries replayable "
+                "evidence. Outcomes need the horizon to have closed."
+            ),
+        }
+
+    champion = regime_lab_engine.baseline
+    challenger = champion
+    if request.challenger_weights:
+        try:
+            data = json.loads(json.dumps(champion.data))
+            for block, weight in request.challenger_weights.items():
+                if block not in data["blocks"]:
+                    raise HTTPException(
+                        status_code=400, detail=f"unknown block '{block}'"
+                    )
+                data["blocks"][block]["weight"] = weight
+            data["version"] = f"{champion.version}-challenger"
+            challenger = validate_rulebook(data)
+        except RulebookValidationError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+
+    result = compare_rulebooks(
+        cases,
+        champion,
+        challenger,
+        AdmissionPolicy(),
+        {
+            "catalog_id": regime_lab_engine.catalog.data["catalog_id"],
+            "version": regime_lab_engine.catalog.version,
+            "digest": regime_lab_engine.catalog.digest,
+        },
+    )
+    result["horizon_minutes"] = request.horizon_minutes
+    result["window_hours"] = request.hours
+    result["skipped_unreplayable"] = skipped
+    result["execution_authority"] = False
+    return result
+
+
+class QuarantineSubmission(BaseModel):
+    """One external submission. Nothing here confers authority."""
+
+    source: str
+    payload: Dict[str, Any]
+    observed_at_ms: Optional[int] = None
+
+
+@app.post("/state/quarantine", tags=["quarantine"])
+async def submit_to_quarantine(submission: QuarantineSubmission):
+    """Accept external material for review. This is not admission to anything.
+
+    Tier B connectors submit here. A stored row is untrusted material an
+    operator can inspect; it carries no scoring, approval or execution
+    authority and cannot become evidence without a deliberate promotion.
+    """
+    if not state.pool:
+        raise HTTPException(status_code=503, detail="DB Pool not ready")
+
+    received_ms = int(time.time() * 1000)
+    try:
+        async with state.pool.acquire() as conn:
+            seen = await conn.fetch(
+                "SELECT content_digest FROM quarantine_intake WHERE source = $1",
+                submission.source,
+            )
+            verdict = evaluate_submission(
+                submission.source,
+                submission.payload,
+                received_ms,
+                observed_at_ms=submission.observed_at_ms,
+                seen_digests=[r["content_digest"] for r in seen],
+            )
+            # Refusals are stored too: "what did that connector try to send"
+            # is exactly the question an operator needs answered later.
+            await conn.execute(
+                """
+                INSERT INTO quarantine_intake
+                    (source, accepted, content_digest, payload, reasons, observed_at)
+                VALUES ($1, $2, $3, $4::jsonb, $5::jsonb,
+                        CASE WHEN $6::bigint IS NULL THEN NULL
+                             ELSE to_timestamp($6::bigint / 1000.0) END)
+                ON CONFLICT (source, content_digest) DO NOTHING
+                """,
+                submission.source,
+                verdict.accepted,
+                verdict.content_digest,
+                json.dumps(submission.payload),
+                json.dumps(verdict.reasons),
+                submission.observed_at_ms,
+            )
+    except QuarantineError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return verdict.to_dict()
+
+
+@app.get("/state/quarantine", tags=["quarantine"])
+async def list_quarantine(
+    source: Optional[str] = None,
+    pending_only: bool = False,
+    limit: int = Query(50, le=200),
+):
+    """What connectors have sent, accepted or not, newest first."""
+    if not state.pool:
+        raise HTTPException(status_code=503, detail="DB Pool not ready")
+    try:
+        async with state.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT id, source, accepted, content_digest, payload, reasons,
+                       observed_at, received_at, reviewed_by, reviewed_at, promoted_to
+                FROM quarantine_intake
+                WHERE ($1::text IS NULL OR source = $1)
+                  AND ($2::boolean IS FALSE OR reviewed_at IS NULL)
+                ORDER BY received_at DESC
+                LIMIT $3
+                """,
+                source,
+                pending_only,
+                limit,
+            )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return {
+        "schema_version": "quarantine_v1",
+        "authority": "none",
+        "items": [
+            {
+                "id": str(r["id"]),
+                "source": r["source"],
+                "accepted": r["accepted"],
+                "content_digest": r["content_digest"],
+                "payload": json.loads(r["payload"]) if isinstance(r["payload"], str) else r["payload"],
+                "reasons": json.loads(r["reasons"]) if isinstance(r["reasons"], str) else r["reasons"],
+                "observed_at": r["observed_at"].isoformat() if r["observed_at"] else None,
+                "received_at": r["received_at"].isoformat(),
+                "reviewed_by": r["reviewed_by"],
+                "promoted_to": r["promoted_to"],
+            }
+            for r in rows
+        ],
+        "note": (
+            "Quarantined material is untrusted and confers no authority. "
+            "Promotion to admitted evidence is a separate operator act."
+        ),
+    }
+
+
+class QuarantineReview(BaseModel):
+    """An operator decision on one quarantined item."""
+
+    reviewed_by: str
+    promote: bool = False
+    target_provenance: str = "context_only"
+    note: str = ""
+
+
+class GateApproval(BaseModel):
+    """One authenticated ChaseOS decision, presented by the operator."""
+
+    quarantine_id: str
+    approval_id: str
+    approval_digest: str
+    approval_decision_id: str
+    approved_at_utc: str
+    validity_hours: int = 4
+
+
+@app.get("/state/knowledge/gate/status", tags=["knowledge"])
+async def get_gate_status():
+    """What the ChaseOS Gate can and cannot authorise.
+
+    The Gate is an approval mechanism, not a knowledge one. It is deliberately
+    narrow: an approval binds to exactly one candidate and authorises exactly
+    one paper evaluation. There is no approval this system will accept that
+    authorises an order, a wallet, a credential, a signature, or a live
+    dispatch, and the ceiling below is the one actually enforced rather than a
+    description of it.
+    """
+    unconsumed = consumed = 0
+    if state.pool:
+        async with state.pool.acquire() as conn:
+            unconsumed = await conn.fetchval(
+                "SELECT count(*) FROM control_envelopes WHERE consumed_at IS NULL"
+            )
+            consumed = await conn.fetchval(
+                "SELECT count(*) FROM control_envelopes WHERE consumed_at IS NOT NULL"
+            )
+
+    return {
+        "control_plane": "chaseos",
+        "mode": "paper_only",
+        # Verbatim from the library, not restated here. A copy would drift.
+        "authority_ceiling": CLOSED_AUTHORITY,
+        "scope": "once",
+        "envelopes": {"unconsumed": unconsumed, "consumed": consumed},
+        "execution_gate_open": execution_gate_enabled(),
+        "paper_mode": paper_mode_enabled(),
+        "note": (
+            "An approval authorises one paper evaluation of one candidate. "
+            "Single use is enforced by a unique constraint on approval_id, not "
+            "by convention. TradeSync remains usable when the Gate is offline; "
+            "what stops is approval, not observation."
+        ),
+    }
+
+
+@app.post("/state/knowledge/gate/authorize-paper-evaluation", tags=["knowledge"])
+async def authorize_paper_evaluation(approval: GateApproval):
+    """Bind a ChaseOS approval to one extracted candidate. Fails closed.
+
+    The candidate is re-extracted from its quarantined receipt rather than
+    accepted from the caller, so an approval cannot be attached to a candidate
+    that was edited after the operator looked at it. The envelope carries a hash
+    of exactly what was approved.
+
+    Replaying an approval is refused by a unique constraint, not by a check that
+    could race. Single use is a fact about history, so it is enforced where
+    history lives.
+    """
+    if not state.pool:
+        raise HTTPException(status_code=503, detail="DB Pool not ready")
+
+    # Re-extract rather than trust: the caller supplies an approval, never a
+    # candidate.
+    extracted = await extract_trade_candidate(
+        approval.quarantine_id, validity_hours=approval.validity_hours
+    )
+    candidate = extracted["candidate"]
+
+    try:
+        envelope = build_paper_control_envelope(
+            candidate,
+            approval_id=approval.approval_id,
+            approval_digest=approval.approval_digest,
+            approval_decision_id=approval.approval_decision_id,
+            approved_at_utc=approval.approved_at_utc,
+        )
+    except ControlEnvelopeError as exc:
+        raise HTTPException(status_code=422, detail=f"{exc.code}: {exc}")
+
+    try:
+        async with state.pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO control_envelopes (
+                    envelope_id, approval_id, approval_decision_id, approval_digest,
+                    approved_at, candidate_id, candidate_hash, candidate,
+                    authority, source_quarantine_id
+                ) VALUES ($1,$2,$3,$4,$5::timestamptz,$6,$7,$8::jsonb,$9::jsonb,$10::uuid)
+                """,
+                envelope["envelope_id"],
+                envelope["approval"]["approval_id"],
+                envelope["approval"]["approval_decision_id"],
+                envelope["approval"]["approval_digest"],
+                parse_utc(envelope["approval"]["approved_at_utc"], "approved_at_utc"),
+                candidate["candidate_id"],
+                envelope["candidate_hash"],
+                json.dumps(candidate),
+                json.dumps(envelope["authority"]),
+                approval.quarantine_id,
+            )
+    except asyncpg.UniqueViolationError:
+        # Scope is "once". A replay is refused rather than authorising a second
+        # evaluation on the same decision.
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"approval {approval.approval_id} has already been bound; its "
+                "scope is 'once' and it cannot authorise a second evaluation"
+            ),
+        )
+
+    return {
+        "envelope_id": envelope["envelope_id"],
+        "candidate_id": candidate["candidate_id"],
+        "candidate_hash": envelope["candidate_hash"],
+        "authority": envelope["authority"],
+        "authorizes": envelope["approval"]["authorizes"],
+        "scope": envelope["approval"]["scope"],
+        "consumed": False,
+        "note": (
+            "Authorises one paper evaluation of this exact candidate. Not an "
+            "order, wallet, credential, signature or live dispatch."
+        ),
+    }
+
+
+@app.post("/state/quarantine/{item_id}/extract-candidate", tags=["quarantine"])
+async def extract_trade_candidate(item_id: str, validity_hours: int = Query(4, ge=1, le=72)):
+    """Turn a quarantined Strike Zone / Pine alert into a proposed candidate.
+
+    This is the **extraction** step of quarantine -> extraction -> proposed
+    delta -> approved promotion. It reads stored material and returns a
+    `trade_candidate_v1` proposal. Nothing is promoted here and no authority is
+    granted: the candidate is `review_only` at `level_0_observation_only` with
+    execution disabled, and those fields are written by the adapter rather than
+    read from the alert.
+
+    A receipt that tried to set its own authority is refused with the field
+    named. A Pine script is a text file on a third party's server and anyone
+    holding the alert URL can aim it here; if it could set
+    `live_execution_allowed` this endpoint would be a remote execution
+    primitive.
+    """
+    if not state.pool:
+        raise HTTPException(status_code=503, detail="DB Pool not ready")
+
+    async with state.pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            SELECT id, source, accepted, payload, received_at, observed_at
+            FROM quarantine_intake WHERE id = $1::uuid
+            """,
+            item_id,
+        )
+    if not row:
+        raise HTTPException(status_code=404, detail="quarantine item not found")
+    if row["source"] not in {"tradingview", "strike_zone"}:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"source {row['source']!r} does not carry Pine receipts; "
+                "candidates are extracted from tradingview or strike_zone items"
+            ),
+        )
+    if not row["accepted"]:
+        # A refused submission is stored so the operator can see what was tried.
+        # Building a candidate from one would launder it into research material.
+        raise HTTPException(
+            status_code=409,
+            detail="this item was refused at intake; a candidate cannot be built from it",
+        )
+
+    payload = row["payload"]
+    if isinstance(payload, str):
+        payload = json.loads(payload)
+    # The webhook stores the alert body under "alert"; a direct submission may
+    # carry the receipt at the top level.
+    receipt_body = payload.get("alert") if isinstance(payload.get("alert"), dict) else payload
+
+    try:
+        receipt = validate_receipt(receipt_body)
+        candidate = to_trade_candidate(
+            receipt,
+            canonical_symbol=normalize_symbol(receipt["ticker"]),
+            asset=receipt["ticker"].split("USD")[0] or receipt["ticker"],
+            observed_at=(row["observed_at"] or row["received_at"]),
+            validity=timedelta(hours=validity_hours),
+            source_item_id=str(row["id"]),
+        )
+    except ReceiptError as exc:
+        raise HTTPException(status_code=422, detail=f"{exc.code}: {exc}")
+
+    return {
+        "quarantine_id": str(row["id"]),
+        "candidate": candidate,
+        "status": "proposed",
+        "authority": "none",
+        "note": (
+            "A proposal, not a promotion. The candidate is review_only at "
+            "level_0_observation_only with execution disabled; the paper ledger "
+            "re-checks those invariants independently before evaluating it."
+        ),
+    }
+
+
+@app.post("/state/quarantine/{item_id}/review", tags=["quarantine"])
+async def review_quarantine_item(item_id: str, review: QuarantineReview):
+    """Record an operator decision on quarantined material.
+
+    Promotion is an operator act and stays one. This endpoint records the
+    decision and the blockers that applied; it does not itself grant a
+    quarantined item any scoring or execution authority.
+    """
+    if not state.pool:
+        raise HTTPException(status_code=503, detail="DB Pool not ready")
+    if not review.reviewed_by.strip():
+        raise HTTPException(status_code=400, detail="reviewed_by is required")
+
+    try:
+        async with state.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT id, accepted, promoted_to FROM quarantine_intake WHERE id = $1::uuid",
+                item_id,
+            )
+            if not row:
+                raise HTTPException(status_code=404, detail="quarantine item not found")
+
+            blockers = promotion_blockers(
+                row["accepted"], review.reviewed_by, review.target_provenance
+            )
+            promoted = review.promote and not blockers
+            await conn.execute(
+                """
+                UPDATE quarantine_intake
+                SET reviewed_by = $2, reviewed_at = now(),
+                    promoted_to = CASE WHEN $3 THEN $4 ELSE promoted_to END
+                WHERE id = $1::uuid
+                """,
+                item_id,
+                review.reviewed_by,
+                promoted,
+                review.target_provenance if promoted else None,
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return {
+        "schema_version": "quarantine_v1",
+        "id": item_id,
+        "reviewed_by": review.reviewed_by,
+        "promoted": promoted,
+        "blockers": blockers,
+        "authority": "none",
+        "note": (
+            "Review is recorded. Promotion marks an item as admitted context; "
+            "it never grants scoring, approval or execution authority."
+        ),
+    }
+
+
+TRADINGVIEW_WEBHOOK_SECRET = os.getenv("TRADINGVIEW_WEBHOOK_SECRET", "").strip()
+
+
+@app.post("/webhook/tradingview", tags=["quarantine"])
+async def tradingview_webhook(request: Request):
+    """Receive a TradingView (including Strike Zone Pine) alert.
+
+    The alert lands in quarantine as untrusted material. It is never a signal,
+    and nothing here can approve or execute.
+
+    Disabled unless TRADINGVIEW_WEBHOOK_SECRET is set: an unauthenticated public
+    endpoint into a trading system is not an acceptable default. TradingView
+    cannot send custom headers, so the secret travels in the alert body.
+    """
+    if not TRADINGVIEW_WEBHOOK_SECRET:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "webhook disabled: set TRADINGVIEW_WEBHOOK_SECRET before "
+                "exposing this endpoint"
+            ),
+        )
+    if not state.pool:
+        raise HTTPException(status_code=503, detail="DB Pool not ready")
+
+    body = await request.body()
+    alert = parse_alert(body, TRADINGVIEW_WEBHOOK_SECRET)
+
+    # An unauthenticated alert is refused without touching the database, so a
+    # flood of bad secrets cannot fill the intake table.
+    if not alert.authenticated:
+        logger.warning(
+            f"tradingview alert refused: {[r['code'] for r in alert.reasons]}",
+            extra={"trace_id": "webhook"},
+        )
+        return JSONResponse(
+            status_code=401,
+            content={
+                "accepted": False,
+                "reasons": alert.reasons,
+                "authority": "none",
+            },
+        )
+
+    submission = alert.to_submission()
+    received_ms = int(time.time() * 1000)
+    try:
+        async with state.pool.acquire() as conn:
+            seen = await conn.fetch(
+                "SELECT content_digest FROM quarantine_intake WHERE source = 'tradingview'"
+            )
+            verdict = evaluate_submission(
+                "tradingview",
+                submission,
+                received_ms,
+                seen_digests=[r["content_digest"] for r in seen],
+            )
+            await conn.execute(
+                """
+                INSERT INTO quarantine_intake
+                    (source, accepted, content_digest, payload, reasons)
+                VALUES ('tradingview', $1, $2, $3::jsonb, $4::jsonb)
+                ON CONFLICT (source, content_digest) DO NOTHING
+                """,
+                verdict.accepted,
+                verdict.content_digest,
+                json.dumps(submission),
+                json.dumps(verdict.reasons),
+            )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return verdict.to_dict()
+
+
+@app.get("/state/outcomes/by-regime", tags=["outcomes"])
+async def get_outcomes_by_regime(horizon_minutes: int = 60, symbol: Optional[str] = None):
+    """Skill measured separately in rising and falling markets.
+
+    Pooling regimes is actively misleading. A caller with a fixed directional
+    bias, measured across windows with very different base rates, shows an
+    apparent effect that vanishes once each regime is scored against its own
+    baseline. On 2026-09-08 the pooled figure read -10.2 points (-2.4 SE) while
+    the same data split by regime read -2.9 and -5.6 points, both inside one
+    standard error.
+
+    Regime is assigned from the hour's own aggregate move, not from the
+    individual outcome being scored.
+    """
+    if not state.pool:
+        raise HTTPException(status_code=503, detail="DB Pool not ready")
+    if symbol:
+        symbol = normalize_symbol(symbol)
+
+    try:
+        async with state.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                WITH hourly AS (
+                  SELECT date_trunc('hour', opened_at) hr, avg(forward_return_pct) hr_move
+                  FROM opportunity_outcomes
+                  WHERE status = 'measured' AND horizon_minutes = $1
+                    AND ($2::text IS NULL OR symbol = $2)
+                  GROUP BY 1
+                ),
+                tagged AS (
+                  SELECT o.*, CASE WHEN h.hr_move > 0 THEN 'rising' ELSE 'falling' END regime
+                  FROM opportunity_outcomes o
+                  JOIN hourly h ON h.hr = date_trunc('hour', o.opened_at)
+                  WHERE o.status = 'measured' AND o.horizon_minutes = $1
+                    AND ($2::text IS NULL OR o.symbol = $2)
+                )
+                SELECT regime, count(*) n,
+                       count(*) FILTER (WHERE signed_return_pct > 0) wins,
+                       count(*) FILTER (WHERE forward_return_pct > 0) ups,
+                       count(*) FILTER (WHERE direction = 'LONG') longs,
+                       avg(signed_return_pct) mean_signed
+                FROM tagged GROUP BY regime ORDER BY regime
+                """,
+                horizon_minutes,
+                symbol,
+            )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    regimes = []
+    for r in rows:
+        n = r["n"]
+        if not n:
+            continue
+        hit = r["wins"] / n
+        up = r["ups"] / n
+        long_share = r["longs"] / n
+        baseline = long_share * up + (1 - long_share) * (1 - up)
+        skill = hit - baseline
+        # Standard error of a proportion, assuming independence. Overlapping
+        # windows mean the effective sample is smaller and the true error
+        # larger, so this is a floor on the uncertainty, not an estimate of it.
+        se = math.sqrt(0.25 / n)
+        regimes.append({
+            "regime": r["regime"],
+            "measured": n,
+            "hit_rate": round(hit, 4),
+            "market_up_rate": round(up, 4),
+            "long_share": round(long_share, 4),
+            "expected_hit_rate": round(baseline, 4),
+            "skill_vs_baseline": round(skill, 4),
+            "standard_error": round(se, 4),
+            "skill_in_standard_errors": round(skill / se, 2) if se else None,
+            "significant": abs(skill) > 2 * se,
+            "mean_signed_return_pct": round(r["mean_signed"], 6) if r["mean_signed"] is not None else None,
+        })
+
+    return {
+        "schema_version": "opportunity_outcome_v1",
+        "horizon_minutes": horizon_minutes,
+        "symbol": symbol,
+        "regimes": regimes,
+        "note": (
+            "Regimes are scored separately because pooling them is misleading: "
+            "a fixed directional bias across windows with different base rates "
+            "produces an apparent effect that is an artefact of aggregation. "
+            "standard_error assumes independent observations; overlapping "
+            "windows make the true uncertainty larger."
+        ),
+    }
+
+
+class DrawingPayload(BaseModel):
+    """One operator drawing. Annotation only; confers no authority."""
+
+    symbol: str
+    interval: str
+    kind: str
+    points: List[Dict[str, Any]]
+    label: str = ""
+    colour: str = ""
+
+
+@app.get("/state/canvas/drawings", tags=["canvas"])
+async def list_drawings(symbol: str, interval: str):
+    """Current drawings for one chart: each drawing at its live version."""
+    if not state.pool:
+        raise HTTPException(status_code=503, detail="DB Pool not ready")
+    resolved = normalize_symbol(symbol)
+    try:
+        async with state.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT drawing_id, version, kind, points, label, colour, created_at
+                FROM canvas_drawings
+                WHERE symbol = $1 AND interval = $2
+                  AND superseded_at IS NULL AND deleted = false
+                ORDER BY created_at
+                """,
+                resolved,
+                interval,
+            )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return {
+        "schema_version": "canvas_drawing_v1",
+        "symbol": resolved,
+        "interval": interval,
+        "authority": "none",
+        "drawings": [
+            {
+                "drawing_id": str(r["drawing_id"]),
+                "version": r["version"],
+                "kind": r["kind"],
+                "points": json.loads(r["points"]) if isinstance(r["points"], str) else r["points"],
+                "label": r["label"],
+                "colour": r["colour"],
+                "created_at": r["created_at"].isoformat(),
+            }
+            for r in rows
+        ],
+    }
+
+
+async def _insert_drawing_version(conn, drawing, drawing_id, version, deleted=False):
+    """Insert one version. Callers supersede the previous row first."""
+    await conn.execute(
+        """
+        INSERT INTO canvas_drawings
+            (drawing_id, version, symbol, interval, kind, points, label, colour, deleted)
+        VALUES ($1::uuid, $2, $3, $4, $5, $6::jsonb, $7, $8, $9)
+        """,
+        str(drawing_id),
+        version,
+        drawing.symbol,
+        drawing.interval,
+        drawing.kind,
+        json.dumps([p.to_dict() for p in drawing.points]),
+        drawing.label,
+        drawing.colour,
+        deleted,
+    )
+
+
+@app.post("/state/canvas/drawings", tags=["canvas"])
+async def create_drawing(payload: DrawingPayload):
+    """Record a new drawing at version 1."""
+    if not state.pool:
+        raise HTTPException(status_code=503, detail="DB Pool not ready")
+    body = payload.model_dump()
+    body["symbol"] = normalize_symbol(body["symbol"])
+    try:
+        drawing = validate_drawing(body)
+    except DrawingError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    drawing_id = uuid.uuid4()
+    try:
+        async with state.pool.acquire() as conn:
+            await _insert_drawing_version(conn, drawing, drawing_id, next_version(None))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return {**drawing.to_dict(), "drawing_id": str(drawing_id), "version": 1}
+
+
+@app.put("/state/canvas/drawings/{drawing_id}", tags=["canvas"])
+async def update_drawing(drawing_id: str, payload: DrawingPayload):
+    """Supersede a drawing with a new version. The old version is kept."""
+    if not state.pool:
+        raise HTTPException(status_code=503, detail="DB Pool not ready")
+    body = payload.model_dump()
+    body["symbol"] = normalize_symbol(body["symbol"])
+    try:
+        drawing = validate_drawing(body)
+    except DrawingError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    try:
+        async with state.pool.acquire() as conn:
+            async with conn.transaction():
+                current = await conn.fetchrow(
+                    """
+                    SELECT version FROM canvas_drawings
+                    WHERE drawing_id = $1::uuid AND superseded_at IS NULL
+                    ORDER BY version DESC LIMIT 1
+                    """,
+                    drawing_id,
+                )
+                if not current:
+                    raise HTTPException(status_code=404, detail="drawing not found")
+                await conn.execute(
+                    """
+                    UPDATE canvas_drawings SET superseded_at = now()
+                    WHERE drawing_id = $1::uuid AND superseded_at IS NULL
+                    """,
+                    drawing_id,
+                )
+                version = next_version(current["version"])
+                await _insert_drawing_version(conn, drawing, drawing_id, version)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return {**drawing.to_dict(), "drawing_id": drawing_id, "version": version}
+
+
+@app.delete("/state/canvas/drawings/{drawing_id}", tags=["canvas"])
+async def delete_drawing(drawing_id: str):
+    """Remove a drawing from the chart. Its history is retained."""
+    if not state.pool:
+        raise HTTPException(status_code=503, detail="DB Pool not ready")
+    try:
+        async with state.pool.acquire() as conn:
+            result = await conn.execute(
+                """
+                UPDATE canvas_drawings SET superseded_at = now(), deleted = true
+                WHERE drawing_id = $1::uuid AND superseded_at IS NULL
+                """,
+                drawing_id,
+            )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    if result.endswith(" 0"):
+        raise HTTPException(status_code=404, detail="drawing not found")
+    return {"drawing_id": drawing_id, "deleted": True, "history_retained": True}
+
+
+@app.get("/state/canvas/drawings/{drawing_id}/history", tags=["canvas"])
+async def drawing_history(drawing_id: str):
+    """Every version of one drawing, oldest first."""
+    if not state.pool:
+        raise HTTPException(status_code=503, detail="DB Pool not ready")
+    try:
+        async with state.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT version, kind, points, label, colour, created_at,
+                       superseded_at, deleted
+                FROM canvas_drawings WHERE drawing_id = $1::uuid
+                ORDER BY version
+                """,
+                drawing_id,
+            )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    if not rows:
+        raise HTTPException(status_code=404, detail="drawing not found")
+
+    return {
+        "schema_version": "canvas_drawing_v1",
+        "drawing_id": drawing_id,
+        "versions": [
+            {
+                "version": r["version"],
+                "kind": r["kind"],
+                "points": json.loads(r["points"]) if isinstance(r["points"], str) else r["points"],
+                "label": r["label"],
+                "colour": r["colour"],
+                "created_at": r["created_at"].isoformat(),
+                "superseded_at": r["superseded_at"].isoformat() if r["superseded_at"] else None,
+                "deleted": r["deleted"],
+            }
+            for r in rows
+        ],
+    }
+
+
+@app.get("/state/evidence/timeline", tags=["evidence"])
+async def evidence_timeline(symbol: str, limit: int = Query(25, le=100)):
+    """One row per paper opportunity, from observation through to outcome.
+
+    This is the Phase 4 exit gate in endpoint form: everything needed to
+    reconstruct a paper trade without screenshots or memory. Each entry carries
+    the evidence that produced it, the configuration digests it was produced
+    under, and what the market subsequently did.
+    """
+    if not state.pool:
+        raise HTTPException(status_code=503, detail="DB Pool not ready")
+    resolved = normalize_symbol(symbol)
+
+    try:
+        async with state.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT o.id, o.symbol, o.dir, o.bias, o.quality, o.snapshot_ts,
+                       o.links, o.confluence,
+                       s.id AS signal_id, s.created_at AS signal_at,
+                       coalesce(
+                         json_agg(
+                           json_build_object(
+                             'horizon_minutes', x.horizon_minutes,
+                             'status', x.status,
+                             'signed_return_pct', x.signed_return_pct,
+                             'forward_return_pct', x.forward_return_pct,
+                             'max_favourable_pct', x.max_favourable_pct,
+                             'max_adverse_pct', x.max_adverse_pct
+                           ) ORDER BY x.horizon_minutes
+                         ) FILTER (WHERE x.id IS NOT NULL), '[]'
+                       ) AS outcomes
+                FROM opportunities o
+                LEFT JOIN signals s ON s.id = o.signal_id
+                LEFT JOIN opportunity_outcomes x ON x.opportunity_id = o.id
+                WHERE o.symbol = $1
+                GROUP BY o.id, s.id
+                ORDER BY o.snapshot_ts DESC
+                LIMIT $2
+                """,
+                resolved,
+                limit,
+            )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    entries = []
+    for r in rows:
+        confluence = r["confluence"]
+        if isinstance(confluence, str):
+            confluence = json.loads(confluence)
+        confluence = confluence or {}
+        links = r["links"]
+        if isinstance(links, str):
+            links = json.loads(links)
+        evidence = confluence.get("evidence") or {}
+        outcomes = r["outcomes"]
+        if isinstance(outcomes, str):
+            outcomes = json.loads(outcomes)
+
+        entries.append({
+            "opportunity_id": str(r["id"]),
+            "signal_id": str(r["signal_id"]) if r["signal_id"] else None,
+            "symbol": r["symbol"],
+            "direction": r["dir"],
+            "directional_score": r["bias"],
+            "coverage_pct": r["quality"],
+            "opened_at": r["snapshot_ts"].isoformat(),
+            "signal_at": r["signal_at"].isoformat() if r["signal_at"] else None,
+            # The configuration this decision was taken under, so a replay can
+            # reproduce it exactly rather than approximately.
+            "catalog_version": evidence.get("catalog_version"),
+            "catalog_digest": evidence.get("catalog_digest"),
+            "rulebook_version": evidence.get("rulebook_version"),
+            "rulebook_digest": evidence.get("rulebook_digest"),
+            "evidence_digest": (links or {}).get("evidence_digest"),
+            "contributing_features": confluence.get("contributing_features") or [],
+            "missing_blocks": evidence.get("missing_blocks") or [],
+            "paper_risk_multiplier": confluence.get("paper_risk_multiplier"),
+            "outcomes": outcomes or [],
+        })
+
+    return {
+        "schema_version": "evidence_timeline_v1",
+        "symbol": resolved,
+        "entries": entries,
+        "note": (
+            "Each entry reconstructs one paper opportunity from the evidence "
+            "that produced it to what the market did next. No order was placed "
+            "and no position existed."
+        ),
+    }
+
+
+@app.get("/state/outcomes/summary", tags=["outcomes"])
+async def get_outcome_summary(symbol: Optional[str] = None):
+    """Measured track record of recorded paper opportunities.
+
+    Describes what the market did after each call. It is a record of this
+    sample, not a probability that the next call wins, and no order was ever
+    placed.
+    """
+    if not state.pool:
+        raise HTTPException(status_code=503, detail="DB Pool not ready")
+    if symbol:
+        symbol = normalize_symbol(symbol)
+
+    try:
+        async with state.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT horizon_minutes,
+                       count(*) FILTER (WHERE status = 'measured') AS measured,
+                       count(*) FILTER (WHERE status = 'pending') AS pending,
+                       count(*) FILTER (WHERE status = 'insufficient_candles') AS unmeasurable,
+                       avg(signed_return_pct) FILTER (WHERE status = 'measured') AS mean_signed,
+                       avg(max_favourable_pct) FILTER (WHERE status = 'measured') AS mean_favourable,
+                       avg(max_adverse_pct) FILTER (WHERE status = 'measured') AS mean_adverse,
+                       count(*) FILTER (WHERE status = 'measured' AND signed_return_pct > 0) AS wins,
+                       -- The market's own behaviour over exactly these windows.
+                       count(*) FILTER (WHERE status = 'measured' AND forward_return_pct > 0) AS market_up,
+                       count(*) FILTER (WHERE status = 'measured' AND direction = 'LONG') AS longs,
+                       avg(forward_return_pct) FILTER (WHERE status = 'measured') AS mean_market_move
+                FROM opportunity_outcomes
+                WHERE ($1::text IS NULL OR symbol = $1)
+                GROUP BY horizon_minutes
+                ORDER BY horizon_minutes
+                """,
+                symbol,
+            )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    horizons = []
+    for r in rows:
+        measured = r["measured"] or 0
+        hit_rate = r["wins"] / measured if measured else None
+        up_rate = r["market_up"] / measured if measured else None
+        long_share = r["longs"] / measured if measured else None
+        # What this direction mix scores by luck alone, given how the market
+        # actually moved. Without it, a one-regime sample reports the trend as
+        # if it were ability.
+        baseline = (
+            long_share * up_rate + (1 - long_share) * (1 - up_rate)
+            if measured
+            else None
+        )
+        horizons.append({
+            "horizon_minutes": r["horizon_minutes"],
+            "measured": measured,
+            "pending": r["pending"] or 0,
+            "unmeasurable": r["unmeasurable"] or 0,
+            # None rather than 0 when nothing is measured: an empty sample has
+            # no hit rate, and 0% would read as "always wrong".
+            "hit_rate": round(hit_rate, 4) if measured else None,
+            "market_up_rate": round(up_rate, 4) if measured else None,
+            "long_share": round(long_share, 4) if measured else None,
+            "expected_hit_rate": round(baseline, 4) if measured else None,
+            "skill_vs_baseline": round(hit_rate - baseline, 4) if measured else None,
+            "mean_signed_return_pct": round(r["mean_signed"], 6) if r["mean_signed"] is not None else None,
+            "mean_market_move_pct": round(r["mean_market_move"], 6) if r["mean_market_move"] is not None else None,
+            "mean_favourable_pct": round(r["mean_favourable"], 6) if r["mean_favourable"] is not None else None,
+            "mean_adverse_pct": round(r["mean_adverse"], 6) if r["mean_adverse"] is not None else None,
+        })
+
+    return {
+        "schema_version": "opportunity_outcome_v1",
+        "symbol": symbol,
+        "horizons": horizons,
+        "note": (
+            "hit_rate is not interpretable alone: compare it with "
+            "expected_hit_rate, what this direction mix scores by luck given "
+            "how the market moved. A single-regime sample cannot demonstrate "
+            "skill. No order was placed."
+        ),
+    }
+
+
+@app.get("/state/market/candles")
+async def get_market_candles(
+    venue: str = "hyperliquid",
+    symbol: str = "BTC-PERP",
+    interval: str = "15m",
+    limit: int = Query(300, le=1000),
+):
+    """Proxy venue OHLCV candles for the Market Canvas.
+
+    Display only. Candles are not catalog features and carry no scoring
+    authority; the upstream response states that explicitly.
+    """
+    path = (
+        f"/candles/{venue}/{symbol}"
+        f"?interval={interval}&limit={limit}"
+    )
+    try:
+        resp = await asyncio.to_thread(_market_data_get, path)
+    except Exception as e:
+        logger.error(f"Error fetching candles: {e}", extra={"trace_id": "market"})
+        raise HTTPException(status_code=503, detail="Market data service unavailable")
+
+    if resp.status_code == 400:
+        raise HTTPException(status_code=400, detail=resp.json().get("detail", "invalid request"))
+    if resp.status_code == 404:
+        # Hyperliquid is the only venue this system carries. Asking for another
+        # is a client error and says so; it is not a fault in market-data.
+        raise HTTPException(
+            status_code=404,
+            detail=resp.json().get("error", "unsupported venue or symbol"),
+        )
+    if resp.status_code >= 500 or resp.status_code == 503:
+        raise HTTPException(status_code=503, detail="Market data service unavailable")
+    resp.raise_for_status()
+    return resp.json()
+
+
+@app.get("/state/signals/refusal-history")
+async def get_refusal_history(
+    days: int = Query(30, ge=1, le=365),
+    symbol: Optional[str] = None,
+):
+    """Daily refusal counts by reason, from the permanent aggregate.
+
+    Full refusal rows are kept for a recent window only — roughly 4,300 a day of
+    evidence JSON is not a store worth growing forever, and nobody reconstructs
+    an individual refusal from three weeks ago. What does keep mattering is the
+    denominator: "the coverage floor blocked 61% of ETH verdicts last Tuesday"
+    is only answerable if the refusals are counted somewhere after the rows are
+    gone.
+
+    ``reason`` is the primary code — the first gate the evidence failed — so the
+    counts sum to the exact number of refusals. ``reason_codes`` additionally
+    tallies every code seen, including secondary ones, and those may sum higher.
+    """
+    if state.pool is None:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+
+    clauses = ["day >= (current_date - $1::int)"]
+    args: list = [days]
+    if symbol:
+        args.append(normalize_symbol(symbol))
+        clauses.append(f"symbol = ${len(args)}")
+
+    async with state.pool.acquire() as conn:
+        rows = await conn.fetch(
+            f"""
+            SELECT day, symbol, reason, refusals, reason_codes,
+                   scored_rows, covered_rows,
+                   mean_score, mean_coverage, min_coverage, max_coverage,
+                   first_rolled_at, last_rolled_at
+            FROM signal_refusal_daily
+            WHERE {' AND '.join(clauses)}
+            ORDER BY day DESC, symbol, refusals DESC
+            """,
+            *args,
+        )
+
+    entries = []
+    for row in rows:
+        entry = dict(row)
+        entry["day"] = entry["day"].isoformat()
+        codes = entry.get("reason_codes")
+        entry["reason_codes"] = json.loads(codes) if isinstance(codes, str) else codes
+        entry["first_rolled_at"] = entry["first_rolled_at"].isoformat()
+        entry["last_rolled_at"] = entry["last_rolled_at"].isoformat()
+        entries.append(entry)
+
+    return {
+        "days": days,
+        "symbol": symbol,
+        "entries": entries,
+        "total_refusals": sum(int(e["refusals"]) for e in entries),
+        "note": (
+            "Summarised from full refusal rows before they were removed. "
+            "Recent days may still have their full rows in /state/signals."
+        ),
+    }
+
+
+def _as_json(value):
+    """asyncpg returns jsonb as str on some paths and as a value on others."""
+    if isinstance(value, (str, bytes)):
+        try:
+            return json.loads(value)
+        except (ValueError, TypeError):
+            return value
+    return value
+
+
+class HarnessAsk(BaseModel):
+    intent: str
+    prompt: str
+    context: Optional[Dict[str, Any]] = None
+
+
+async def _record_harness_refusal(request: "HarnessAsk", exc: HarnessError) -> None:
+    """File a refused harness answer as a quarantine refusal row.
+
+    The offending content is stored as an opaque string in the payload, which is
+    what quarantine is for: untrusted material kept for review. Nothing reads it
+    back as structure, and the row is marked not accepted.
+
+    Best effort. A failure to record must not mask the refusal itself — the
+    operator still needs the 422.
+    """
+    if not state.pool:
+        return
+    try:
+        payload = {
+            "refused": True,
+            "reason_code": exc.code,
+            "reason": str(exc),
+            "intent": request.intent,
+            "prompt": request.prompt,
+        }
+        async with state.pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO quarantine_intake
+                    (source, accepted, content_digest, payload, reasons, observed_at)
+                VALUES ('agent_harness', false, $1, $2::jsonb, $3::jsonb, now())
+                ON CONFLICT (source, content_digest) DO NOTHING
+                """,
+                content_digest(payload),
+                json.dumps(payload),
+                json.dumps([{"code": exc.code, "detail": str(exc)}]),
+            )
+    except Exception as record_exc:
+        logger.error(
+            f"Could not record harness refusal: {record_exc}",
+            extra={"trace_id": "agents"},
+        )
+
+
+@app.get("/state/agents/harness/status", tags=["agents"])
+async def get_harness_status():
+    """Whether an advisory harness runtime is reachable.
+
+    "not_configured" and "offline" are ordinary states, not errors. Harnesses
+    are optional and TradeSync is required to work without them — and reporting
+    a stopped runtime as broken would repeat the healthcheck mistake this
+    project already made once.
+    """
+    result = await agent_connector.probe()
+    return {
+        **result,
+        "boundary": {
+            "may_explain": True,
+            "may_compare": True,
+            "may_draft_proposals": True,
+            "may_score": False,
+            "may_approve": False,
+            "may_execute": False,
+        },
+        "note": (
+            "Enforced in code, not documented: a response carrying a score, "
+            "direction, approval or order field is refused by name, and every "
+            "accepted answer is routed to quarantine rather than to evidence."
+        ),
+    }
+
+
+@app.post("/state/agents/harness/ask", tags=["agents"])
+async def ask_harness(request: HarnessAsk):
+    """Ask an advisory question and file the answer in quarantine.
+
+    The answer is **never** returned as evidence. It is checked against the
+    advisory-only contract, stored as an untrusted quarantine row, and the row's
+    digest is returned as a receipt. Promotion to anything the system scores on
+    remains an operator act through the normal quarantine review path.
+
+    A model that claims scoring or approval authority produces HTTP 422 naming
+    the field. That is a finding, not a transport failure: it usually means the
+    prompt, or something the model read, tried to escalate.
+    """
+    if not agent_connector.configured():
+        raise HTTPException(
+            status_code=503,
+            detail="AGENT_HARNESS_URL is unset; the harness connector is offline",
+        )
+    if not state.pool:
+        raise HTTPException(status_code=503, detail="DB Pool not ready")
+
+    try:
+        result = await agent_connector.ask(
+            request.intent, request.prompt, request.context
+        )
+    except HarnessError as exc:
+        # A model reaching for authority is a finding, and this system already
+        # holds that refusals are stored: "what did that connector try to send"
+        # is exactly the question an operator needs answered later. Discarding
+        # it would leave no trace of an escalation attempt.
+        if exc.code == "authority_claimed":
+            await _record_harness_refusal(request, exc)
+        # 422 for a contract breach, 502 for a runtime that did not answer.
+        status = 502 if exc.code in {"not_configured"} else 422
+        raise HTTPException(status_code=status, detail=f"{exc.code}: {exc}")
+    except httpx.HTTPError as exc:
+        # The type matters. httpx.ReadTimeout stringifies to an empty string,
+        # so "unreachable: " with nothing after it is what an operator would
+        # have seen — the same trap that made an earlier read-path regression
+        # in this system report a blank reason.
+        raise HTTPException(
+            status_code=504 if isinstance(exc, httpx.TimeoutException) else 502,
+            detail=(
+                f"harness runtime {type(exc).__name__}"
+                + (f": {exc}" if str(exc) else " (no detail from the client)")
+                + f" after {agent_connector.AGENT_HARNESS_TIMEOUT_S:.0f}s"
+            ),
+        )
+
+    submission = agent_connector.quarantine_submission(result)
+    received_ms = int(time.time() * 1000)
+
+    async with state.pool.acquire() as conn:
+        seen = await conn.fetch(
+            "SELECT content_digest FROM quarantine_intake WHERE source = $1",
+            submission["source"],
+        )
+        verdict = evaluate_submission(
+            submission["source"],
+            submission["payload"],
+            received_ms,
+            seen_digests=[r["content_digest"] for r in seen],
+        )
+        await conn.execute(
+            """
+            INSERT INTO quarantine_intake
+                (source, accepted, content_digest, payload, reasons, observed_at)
+            VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, now())
+            ON CONFLICT (source, content_digest) DO NOTHING
+            """,
+            submission["source"],
+            verdict.accepted,
+            verdict.content_digest,
+            json.dumps(submission["payload"]),
+            json.dumps(verdict.reasons),
+        )
+
+    return {
+        "intent": result["task"]["intent"],
+        "task_digest": result["task"]["task_digest"],
+        "content": result["accepted"]["content"],
+        "model": result["accepted"]["model"],
+        "elapsed_ms": result["accepted"]["elapsed_ms"],
+        # The evidence writeback receipt: what was filed, and where.
+        "receipt": {
+            "quarantined": verdict.accepted,
+            "content_digest": verdict.content_digest,
+            "source": submission["source"],
+            "reasons": verdict.reasons,
+        },
+        "authority": "advisory_only",
+        "note": (
+            "Filed in quarantine as untrusted material. It is not evidence and "
+            "cannot reach the scoring path without an operator promotion."
+        ),
+    }
+
+
+@app.get("/state/knowledge/graph/status")
+async def get_graph_status():
+    """Whether the ChaseOS graph projection is configured, and what is in force.
+
+    An unset connector is a normal state, not a fault: TradeSync must remain
+    fully usable with every optional connector disabled. The answer says
+    "not_configured" rather than reporting an error the operator cannot act on.
+    """
+    directory = snapshot_directory()
+    files = available_snapshots()
+
+    projected = None
+    if state.pool is not None:
+        async with state.pool.acquire() as conn:
+            projected = await current_snapshot(conn)
+    if projected:
+        projected = {
+            **projected,
+            "created_at": projected["created_at"].isoformat(),
+            "ingested_at": projected["ingested_at"].isoformat(),
+            "extraction_scope": _as_json(projected.get("extraction_scope")),
+            "build_info": _as_json(projected.get("build_info")),
+        }
+
+    return {
+        "configured": directory is not None,
+        "snapshot_dir": str(directory) if directory else None,
+        "available_snapshots": [p.name for p in files],
+        "projected": projected,
+        "status": (
+            "not_configured"
+            if directory is None
+            else "projected"
+            if projected
+            else "configured_but_never_ingested"
+        ),
+        # Restated on every response. A projection of canonical knowledge is
+        # still not canonical, and it grants nothing.
+        "authority": "read_only_projection",
+        "note": (
+            "ChaseOS is canonical. This is a local projection of a snapshot "
+            "artifact, rebuildable from it, and it confers no scoring, "
+            "approval or execution authority."
+        ),
+    }
+
+
+@app.post("/state/knowledge/graph/ingest")
+async def ingest_graph_snapshot(filename: Optional[str] = None):
+    """Project a snapshot from the configured directory into local adjacency.
+
+    Reads the named file, or the newest when none is named. The vault is opened
+    read-only; nothing is written back to ChaseOS, which is the exit-gate
+    requirement for this phase.
+
+    A snapshot that claims scoring, approval or execution authority is refused
+    by name rather than cleaned up and accepted.
+    """
+    if state.pool is None:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+
+    directory = snapshot_directory()
+    if directory is None:
+        raise HTTPException(
+            status_code=503,
+            detail="CHASEOS_GRAPH_DIR is unset; the knowledge connector is offline",
+        )
+
+    files = available_snapshots()
+    if not files:
+        raise HTTPException(
+            status_code=404,
+            detail=f"no snapshot files in {directory}",
+        )
+
+    if filename:
+        chosen = next((p for p in files if p.name == filename), None)
+        if chosen is None:
+            raise HTTPException(status_code=404, detail=f"no snapshot named {filename}")
+    else:
+        chosen = files[0]
+
+    try:
+        snapshot = read_snapshot(chosen)
+    except SnapshotRejected as exc:
+        # 422, not 500: the file was read fine and is not acceptable. The
+        # reason is returned so the operator can take it back to ChaseOS.
+        raise HTTPException(status_code=422, detail=str(exc))
+    except (OSError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=f"unreadable snapshot: {exc}")
+
+    async with state.pool.acquire() as conn:
+        result = await project_snapshot(conn, snapshot)
+
+    logger.info(
+        f"Projected ChaseOS snapshot {result['snapshot_id']} "
+        f"({result['nodes']} nodes, {result['edges']} edges)",
+        extra={"trace_id": "knowledge"},
+    )
+    return {"source_file": chosen.name, **result}
+
+
+@app.get("/state/knowledge/graph/nodes")
+async def get_graph_nodes(
+    q: Optional[str] = None,
+    node_type: Optional[str] = None,
+    limit: int = Query(50, ge=1, le=500),
+):
+    """Search the projected nodes by label substring and type."""
+    if state.pool is None:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+
+    async with state.pool.acquire() as conn:
+        projected = await current_snapshot(conn)
+        if not projected:
+            return {"snapshot_id": None, "nodes": [], "status": "no_projection"}
+
+        clauses = ["snapshot_id = $1"]
+        args: list = [projected["snapshot_id"]]
+        if q:
+            args.append(f"%{q.lower()}%")
+            clauses.append(f"lower(label) LIKE ${len(args)}")
+        if node_type:
+            args.append(node_type)
+            clauses.append(f"node_type = ${len(args)}")
+        args.append(limit)
+
+        rows = await conn.fetch(
+            f"""
+            SELECT node_id, label, node_type, source_file, source_line,
+                   domain, project, confidence, provenance, community_id
+            FROM graph_nodes
+            WHERE {' AND '.join(clauses)}
+            ORDER BY label
+            LIMIT ${len(args)}
+            """,
+            *args,
+        )
+
+    return {
+        "snapshot_id": projected["snapshot_id"],
+        "nodes": [dict(row) for row in rows],
+        "authority": "read_only_projection",
+    }
+
+
+@app.get("/state/knowledge/graph/neighbours/{node_id}")
+async def get_graph_neighbours(
+    node_id: str,
+    depth: int = Query(2, ge=1, le=4),
+    limit: int = Query(100, ge=1, le=500),
+):
+    """Nodes within ``depth`` hops of ``node_id``, in either direction.
+
+    Undirected, because lineage and evidence-path questions do not care which
+    way the extractor oriented an edge. Depth is capped: an unbounded walk over
+    a 27k-note graph is not a query, it is a table scan with extra steps.
+    """
+    if state.pool is None:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+
+    async with state.pool.acquire() as conn:
+        projected = await current_snapshot(conn)
+        if not projected:
+            raise HTTPException(status_code=404, detail="no graph projection in force")
+        found = await conn.fetchval(
+            "SELECT 1 FROM graph_nodes WHERE snapshot_id = $1 AND node_id = $2",
+            projected["snapshot_id"],
+            node_id,
+        )
+        if not found:
+            raise HTTPException(
+                status_code=404,
+                detail=f"node {node_id} is not in snapshot {projected['snapshot_id']}",
+            )
+        found_nodes = await neighbours(
+            conn, projected["snapshot_id"], node_id, depth, limit
+        )
+
+    # Which hops are actually represented, not just which were asked for.
+    # Results are ordered nearest-first, so a hub node with 1,500 immediate
+    # neighbours fills the whole limit at one hop and a depth=3 request returns
+    # nothing from hops 2 or 3. "truncated" says something was cut; this says
+    # what you are actually looking at.
+    hops_returned = sorted({int(n["hops"]) for n in found_nodes})
+    truncated = len(found_nodes) >= limit
+
+    return {
+        "snapshot_id": projected["snapshot_id"],
+        "node_id": node_id,
+        "depth": depth,
+        "neighbours": found_nodes,
+        "truncated": truncated,
+        "hops_returned": hops_returned,
+        "reached_requested_depth": (not truncated) or (depth in hops_returned),
+        "authority": "read_only_projection",
+    }
+
+
+@app.get("/state/market/context")
+async def get_market_context(
+    venue: str = "hyperliquid",
+    symbol: str = "BTC-PERP",
+    interval: str = "15m",
+    limit: int = Query(300, le=1000),
+):
+    """Funding and open interest bucketed onto the canvas candle boundaries.
+
+    The two series have different reaches and the response keeps them apart
+    rather than blending them: funding is the venue's own hourly record and
+    covers the whole chart, open interest is our rolling 24-hour recording
+    because Hyperliquid publishes only the current value. Each carries a
+    coverage block so the pane can state where its data actually stops.
+
+    Display only, like candles. Neither series gains scoring authority here.
+    """
+    path = f"/context/{venue}/{symbol}?interval={interval}&limit={limit}"
+    try:
+        resp = await asyncio.to_thread(_market_data_get, path)
+    except Exception as e:
+        logger.error(f"Error fetching canvas context: {e}", extra={"trace_id": "market"})
+        raise HTTPException(status_code=503, detail="Market data service unavailable")
+
+    if resp.status_code == 400:
+        raise HTTPException(
+            status_code=400, detail=resp.json().get("detail", "invalid request")
+        )
+    if resp.status_code == 404:
+        # Hyperliquid is the only venue this system carries. Asking for another
+        # is a client error and says so; it is not a fault in market-data.
+        raise HTTPException(
+            status_code=404,
+            detail=resp.json().get("error", "unsupported venue or symbol"),
+        )
+    if resp.status_code >= 500 or resp.status_code == 503:
+        raise HTTPException(status_code=503, detail="Market data service unavailable")
+    resp.raise_for_status()
+    return resp.json()
+
+
+@app.get("/state/market/depth")
+async def get_market_depth(
+    venue: str = "hyperliquid",
+    symbol: str = "BTC-PERP",
+):
+    """The current L2 book as a cumulative ladder.
+
+    A single poll rather than a series: the book is replaced wholesale each
+    time, so there is nothing to draw across past candles. A book the venue did
+    not return is a 503, never an empty ladder that would render as a market
+    with no resting size.
+    """
+    path = f"/depth/{venue}/{symbol}"
+    try:
+        resp = await asyncio.to_thread(_market_data_get, path)
+    except Exception as e:
+        logger.error(f"Error fetching depth: {e}", extra={"trace_id": "market"})
+        raise HTTPException(status_code=503, detail="Market data service unavailable")
+
+    if resp.status_code == 404:
+        raise HTTPException(
+            status_code=404,
+            detail=resp.json().get("error", "unsupported venue or symbol"),
+        )
+    if resp.status_code >= 500 or resp.status_code == 503:
+        raise HTTPException(status_code=503, detail="Order book unavailable")
+    resp.raise_for_status()
+    return resp.json()
+
+
 @app.get("/state/market/timeseries")
 async def get_market_timeseries(
     venue: str,
@@ -1306,16 +2980,121 @@ async def get_market_data_status():
             }
 
 
+async def _record_and_annotate_states(status: dict) -> dict:
+    """Persist state changes and attach how long each stage has held its state.
+
+    Failures here are logged and swallowed: state ageing is operator context,
+    and losing it must never take down the pipeline view itself.
+    """
+    nodes = status.get("nodes") or []
+    if not state.pool or not nodes:
+        return status
+
+    now_s = int(time.time())
+    observed = {node["id"]: node["status"] for node in nodes}
+
+    try:
+        async with state.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT DISTINCT ON (node_id) node_id, new_state, entered_at
+                FROM node_state_history
+                ORDER BY node_id, entered_at DESC
+                """
+            )
+            last_known = {r["node_id"]: r["new_state"] for r in rows}
+            entered = {
+                r["node_id"]: int(r["entered_at"].timestamp()) for r in rows
+            }
+
+            transitions = detect_transitions(observed, last_known, now_s)
+            for transition in transitions:
+                await conn.execute(
+                    """
+                    INSERT INTO node_state_history (node_id, previous_state, new_state)
+                    VALUES ($1, $2, $3)
+                    """,
+                    transition.node_id,
+                    transition.previous_state,
+                    transition.new_state,
+                )
+                entered[transition.node_id] = transition.at_epoch_s
+
+            # Recent changes per node, for flap detection.
+            recent = await conn.fetch(
+                """
+                SELECT node_id, entered_at FROM node_state_history
+                WHERE entered_at > now() - interval '15 minutes'
+                """
+            )
+    except Exception as exc:
+        logger.warning(f"state history unavailable: {exc}", extra={"trace_id": "pipeline"})
+        return status
+
+    by_node: dict[str, list] = {}
+    for row in recent:
+        by_node.setdefault(row["node_id"], []).append(
+            {"at_epoch_s": int(row["entered_at"].timestamp())}
+        )
+
+    status["nodes"] = [
+        annotate_node(
+            node,
+            entered.get(node["id"]),
+            now_s,
+            by_node.get(node["id"], []),
+        )
+        for node in nodes
+    ]
+    return status
+
+
 @app.get("/state/integration-pipeline", tags=["pipeline"])
 async def get_integration_pipeline():
     """Return live Tier A probes and honest optional-connector boundaries."""
 
-    return await collect_integration_pipeline(
+    status = await collect_integration_pipeline(
         pool=state.pool,
         redis_client=await get_redis(),
         market_data_url=MARKET_DATA_URL,
         catalog_feature_count=len(regime_lab_engine.catalog.features),
     )
+    return await _record_and_annotate_states(status)
+
+
+@app.get("/state/integration-pipeline/history", tags=["pipeline"])
+async def get_pipeline_state_history(node_id: Optional[str] = None, limit: int = Query(50, le=200)):
+    """Recent state transitions, newest first."""
+    if not state.pool:
+        raise HTTPException(status_code=503, detail="DB Pool not ready")
+    try:
+        async with state.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT node_id, previous_state, new_state, entered_at
+                FROM node_state_history
+                WHERE ($1::text IS NULL OR node_id = $1)
+                ORDER BY entered_at DESC
+                LIMIT $2
+                """,
+                node_id,
+                limit,
+            )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return {
+        "schema_version": "node_state_history_v1",
+        "transitions": [
+            {
+                "node_id": r["node_id"],
+                "previous_state": r["previous_state"],
+                "new_state": r["new_state"],
+                "entered_at": r["entered_at"].isoformat(),
+            }
+            for r in rows
+        ],
+    }
 
 # --- Private paper-only Regime Lab ---
 

@@ -77,12 +77,46 @@ services:
     mem_reservation: 256m
     cpus: 0.75
     environment:
-      # The bounded profile does not start these services. Empty endpoints keep
-      # the read-only inspector fast and explicit; set a URL when a service is
-      # intentionally admitted to this runtime.
+      # core-scorer and fusion-engine are required for Tier A, so the inspector
+      # probes them by default: when they are not running the honest report is
+      # "offline", not "not configured". ingest-gateway serves the legacy
+      # events path, is not required for Tier A, and stays unset until it is
+      # intentionally admitted. Any of these can be overridden or blanked.
       INGEST_GATEWAY_URL: ${PIPELINE_INGEST_GATEWAY_URL:-}
-      CORE_SCORER_URL: ${PIPELINE_CORE_SCORER_URL:-}
-      FUSION_ENGINE_URL: ${PIPELINE_FUSION_ENGINE_URL:-}
+      # TradingView (and Strike Zone Pine) webhook. Empty by default: an
+      # unauthenticated public endpoint into a trading system is not an
+      # acceptable default, and TradingView cannot send auth headers so
+      # the secret must travel in the alert body.
+      TRADINGVIEW_WEBHOOK_SECRET: ${TRADINGVIEW_WEBHOOK_SECRET:-}
+      CORE_SCORER_URL: ${PIPELINE_CORE_SCORER_URL:-http://core-scorer:8000}
+      FUSION_ENGINE_URL: ${PIPELINE_FUSION_ENGINE_URL:-http://fusion-engine:8002}
+      # state-api reports dry_run on paths where nothing reached a venue. Same
+      # variable and same value as exec-hl-svc, so the two cannot disagree about
+      # which mode the system is in.
+      DRY_RUN: "true"
+      # Advisory agent harness (Hermes / OpenClaw / a local Ollama). Unset by
+      # default: a harness is optional and TradeSync must work without one.
+      # The boundary is enforced in code — a response carrying a score,
+      # direction, approval or order field is refused by name, and every
+      # accepted answer is filed in quarantine, never in evidence.
+      # host.docker.internal reaches a runtime on the operator's machine.
+      AGENT_HARNESS_URL: ${AGENT_HARNESS_URL:-}
+      AGENT_HARNESS_MODEL: ${AGENT_HARNESS_MODEL:-llama3.1:8b}
+      # ChaseOS knowledge-graph snapshots. Unset by default: a knowledge
+      # connector that switches itself on because a path happens to exist is a
+      # connector the operator did not choose to run. Set
+      # CHASEOS_GRAPH_HOST_DIR to the vault's .chaseos/graph directory to
+      # enable it; the mount below is :ro, so nothing here can write canonical
+      # knowledge even if the code tried to.
+      CHASEOS_GRAPH_DIR: ${CHASEOS_GRAPH_DIR:-}
+    volumes:
+      # Bound to a harmless default so the compose file is valid whether or not
+      # the connector is configured. Read-only in every case.
+      - ${CHASEOS_GRAPH_HOST_DIR:-./sql}:/knowledge/chaseos-graph:ro
+    extra_hosts:
+      # Docker Desktop resolves this already; declaring it keeps the same
+      # compose file working against a Linux engine, where it does not.
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz', timeout=3)"]
       interval: 10s
