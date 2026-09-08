@@ -1,5 +1,6 @@
 import os
 import json
+import time
 import uuid
 import asyncio
 import asyncpg
@@ -9,6 +10,18 @@ from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel, Field
 from tradesync_core.core_score import calculate_score as _core_calculate_score, Event as CoreEvent
+from tradesync_core.paper_signal import AdmissionPolicy, decide_paper_signal
+from tradesync_core.symbols import normalize_symbol
+from .paper_producer import (
+    direction_hold_max_age_seconds,
+    has_active_opportunity,
+    last_admitted_direction,
+    persist_decision,
+    publish_decision,
+)
+from .outcome_job import OUTCOME_INTERVAL_SECONDS, run_outcome_pass
+from .regime_source import fetch_regime_evidence
+from .retention_job import RETENTION_INTERVAL_SECONDS, run_retention_pass
 
 app = FastAPI(title="TradeSync Core Scorer", version="0.1.0")
 
@@ -17,6 +30,25 @@ PG_DSN = os.getenv("PG_DSN", "postgresql://tradesync:CHANGE_ME@localhost:5432/tr
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 SCORING_INTERVAL = int(os.getenv("SCORING_INTERVAL", "60"))
 SYMBOLS = os.getenv("SYMBOLS", "BTC,ETH,SOL").split(",")
+
+# The regime path is the native Hyperliquid paper pipeline. The legacy
+# events-table path below remains importable for replay of historical rows,
+# but it is no longer what the running loop produces.
+REGIME_PAPER_ENABLED = os.getenv("REGIME_PAPER_ENABLED", "true").lower() == "true"
+# The fastest catalog feature samples every 60s, so a shorter cycle would
+# re-read the same evidence and fan out history requests for nothing.
+REGIME_CYCLE_INTERVAL = int(os.getenv("REGIME_CYCLE_INTERVAL", "60"))
+MINIMUM_COVERAGE_TO_EMIT = float(os.getenv("MINIMUM_COVERAGE_TO_EMIT", "0.30"))
+DIRECTION_DEADBAND = float(os.getenv("DIRECTION_DEADBAND", "0.05"))
+MAXIMUM_EVIDENCE_AGE_MS = int(os.getenv("MAXIMUM_EVIDENCE_AGE_MS", "120000"))
+
+
+def admission_policy() -> AdmissionPolicy:
+    return AdmissionPolicy(
+        minimum_coverage_to_emit=MINIMUM_COVERAGE_TO_EMIT,
+        direction_deadband=DIRECTION_DEADBAND,
+        maximum_evidence_age_ms=MAXIMUM_EVIDENCE_AGE_MS,
+    )
 
 # Redis Config
 redis_client = None
@@ -157,16 +189,137 @@ async def run_scoring_cycle():
     except Exception as e:
         print(f"Error in scoring cycle: {e}")
 
+async def run_regime_paper_cycle():
+    """Ask the regime engine for evidence, then record one verdict per symbol."""
+    for configured in SYMBOLS:
+        symbol = normalize_symbol(configured.strip())
+        if not symbol:
+            continue
+        try:
+            await record_symbol_verdict(symbol)
+        except Exception as exc:
+            print(f"[RegimePaper] {symbol} failed: {exc}")
+
+
+async def record_symbol_verdict(symbol: str):
+    """Record exactly one verdict for ``symbol``, admitted or refused."""
+    evidence = await fetch_regime_evidence(symbol)
+    if not evidence.available:
+        print(f"[RegimePaper] {symbol}: no admissible evidence: {evidence.reason}")
+        return
+
+    evaluated_at_ms = int(time.time() * 1000)
+
+    conn = await asyncpg.connect(PG_DSN)
+    try:
+        # A side counts as held only while it is still current. Passing the
+        # bound explicitly keeps the cadence and the stickiness in one place.
+        previous_direction = await last_admitted_direction(
+            conn, symbol, direction_hold_max_age_seconds(SCORING_INTERVAL)
+        )
+        decision = decide_paper_signal(
+            symbol=symbol,
+            evaluation=evidence.evaluation,
+            feature_results=evidence.feature_results,
+            catalog_summary=evidence.catalog,
+            evaluated_at_ms=evaluated_at_ms,
+            policy=admission_policy(),
+            directional=evidence.directional or None,
+            previous_direction=previous_direction,
+        )
+        signal_id, created_at = await persist_decision(conn, decision)
+        duplicate = decision.admitted and await has_active_opportunity(
+            conn, symbol, decision.direction
+        )
+    finally:
+        await conn.close()
+
+    if decision.admitted and duplicate:
+        # The side has not changed and the previous opportunity is still live.
+        # The verdict is recorded, but republishing would create a duplicate.
+        print(
+            f"[RegimePaper] {symbol} still {decision.direction}; "
+            "active opportunity retained, not duplicated."
+        )
+    elif decision.admitted:
+        r = await get_redis()
+        await publish_decision(r, decision, signal_id, created_at)
+        print(
+            f"[RegimePaper] Admitted {decision.direction} {symbol} "
+            f"directional={decision.directional_score} coverage={decision.data_coverage}"
+        )
+    else:
+        codes = ", ".join(reason["code"] for reason in decision.rejection_reasons)
+        print(f"[RegimePaper] No opportunity for {symbol}. Reasons: {codes}")
+
+
 async def score_loop():
     while True:
-        await run_scoring_cycle()
-        await asyncio.sleep(SCORING_INTERVAL)
+        if REGIME_PAPER_ENABLED:
+            try:
+                await run_regime_paper_cycle()
+            except Exception as exc:
+                print(f"[RegimePaper] Cycle error: {exc}")
+            await asyncio.sleep(REGIME_CYCLE_INTERVAL)
+        else:
+            await run_scoring_cycle()
+            await asyncio.sleep(SCORING_INTERVAL)
 
 # --- Lifecycle ---
+
+async def outcome_loop():
+    """Measure past opportunities on its own cadence.
+
+    Kept separate from the producer so a slow measurement can never delay or
+    influence a live verdict.
+    """
+    while True:
+        try:
+            conn = await asyncpg.connect(PG_DSN)
+            try:
+                stats = await run_outcome_pass(conn)
+            finally:
+                await conn.close()
+            if stats["opportunities"]:
+                print(
+                    f"[Outcomes] reviewed {stats['opportunities']} opportunities, "
+                    f"{stats['measured']} horizons measured"
+                )
+        except Exception as exc:
+            print(f"[Outcomes] pass failed: {exc}")
+        await asyncio.sleep(OUTCOME_INTERVAL_SECONDS)
+
+
+async def retention_loop():
+    """Bound the refusal store, on its own slow cadence.
+
+    Separate from scoring and from measurement: housekeeping must never delay a
+    verdict or an outcome. Refusals are summarised into a permanent daily
+    aggregate before they are removed, so the denominator behind every
+    admission rate survives even though the rows do not.
+    """
+    while True:
+        try:
+            conn = await asyncpg.connect(PG_DSN)
+            try:
+                stats = await run_retention_pass(conn)
+            finally:
+                await conn.close()
+            if stats["deleted"]:
+                print(
+                    f"[Retention] rolled {stats['rolled']} aggregate rows, "
+                    f"removed {stats['deleted']} expired refusals"
+                )
+        except Exception as exc:
+            print(f"[Retention] pass failed: {exc}")
+        await asyncio.sleep(RETENTION_INTERVAL_SECONDS)
+
 
 @app.on_event("startup")
 async def startup_event():
     asyncio.create_task(score_loop())
+    asyncio.create_task(outcome_loop())
+    asyncio.create_task(retention_loop())
 
 # --- Endpoints ---
 
