@@ -4,6 +4,8 @@ This folder is the documentation system of record for the Hyperliquid-only Trade
 
 ## Start here
 
+Latest continuation: [Claude handover — 7 September 2026](CLAUDE_CONTINUATION_HANDOVER_2026-09-07.md), including checkout recovery boundaries, current Docker availability, historical verification, and the next paper-pipeline slice.
+
 1. [Repository README](../README.md) — current product boundary and operator start/stop.
 2. [Roadmap](../roadmap.md) — delivery sequence, three-week mobile-alert sprint, gates, and future phases.
 3. [Standalone and federated architecture](architecture/STANDALONE_FEDERATED_ARCHITECTURE.md) — capability tiers and outage behavior.
@@ -15,6 +17,36 @@ This folder is the documentation system of record for the Hyperliquid-only Trade
 9. [Regime Lab API](contracts/REGIME_LAB_API.md) — private learning controls, same-evidence comparison, persistence, and fail-closed boundaries.
 10. [Regime Lab live-runtime verification](changes/2026-09-02_regime-lab-live-runtime.md) — Docker repair, live feature evidence, restart behavior, tests, and remaining gaps.
 11. [Integration Pipeline status v1](contracts/INTEGRATION_PIPELINE_STATUS_V1.md) — live probes, declared connectors, missing links, and recovery semantics.
+12. [Regime-backed paper signal path](changes/2026-09-07_regime-backed-paper-signal.md) — one-hour return admission, catalog 1.1.0, the 0.55 coverage ceiling, admission gates, and replay idempotency.
+13. [Outcome measurement and directional CVD](changes/2026-09-08_outcomes-and-directional-cvd.md) — forward-return measurement, the first track record, and a second admitted directional feature.
+14. [Dashboard truthfulness and 24h change](changes/2026-09-08_dashboard-truthfulness-and-24h-change.md) — venue-published previous-day derivation, the structurally capped Tier A counter, and honest probe defaults.
+
+## Current state
+
+- [Roadmap state and plan — 8 September 2026](ROADMAP_STATE_2026-09-08.md) — decisions taken, the first measured track record, and outstanding work in priority order.
+
+## Planning
+
+- [Implementation sequence](IMPLEMENTATION_SEQUENCE.md) — every outstanding item with its slot, precondition, and the reason it sits there. Includes health-state ageing, Strike Zone, agent harnesses, ChaseOS Gate and Pine Script.
+
+## Recent change records
+
+- [Market Canvas drawings](changes/2026-09-08_canvas_drawings.md) — versioned operator levels that supersede rather than overwrite.
+- [Coinbase spot premium](changes/2026-09-08_spot_premium_context.md) — a third directional candidate, deliberately context-only until you admit it.
+- [Regime-split skill gate](changes/2026-09-08_regime-split-skill-gate.md) — the pooled figure was a Simpson's-paradox artefact; no skill demonstrated in either regime.
+
+- [Fixed-window replay](changes/2026-09-08_fixed-window-replay.md) — champion/challenger on frozen evidence, and why weight tuning cannot fix the signal.
+- [State ageing and quarantine](changes/2026-09-08_state-ageing-and-quarantine.md) — how long each stage has held its state, and the Tier B admission boundary.
+
+## Architecture diagrams
+
+Visual walkthrough of the whole system, verified against the running stack.
+
+- [System map](architecture/SYSTEM_MAP.md) — start here. Service topology, ports, capability tiers, Cockpit routes, runtime profiles.
+- [Paper signal dataflow](architecture/PAPER_SIGNAL_DATAFLOW.md) — observation to opportunity, the producer cycle, admission gates, replay safety.
+- [Feature and regime mathematics](architecture/FEATURE_AND_REGIME_MATH.md) — feature lifecycle, the five blocks, the 0.55 coverage ceiling, a worked score.
+- [Failure modes](architecture/FAILURE_MODES.md) — how this system actually broke, drawn out, with a checklist.
+- [Webhook ingress security](architecture/WEBHOOK_INGRESS_SECURITY.md) — the risk analysis for exposing an endpoint to TradingView.
 
 ## Brand
 

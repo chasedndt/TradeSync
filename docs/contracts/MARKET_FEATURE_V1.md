@@ -21,7 +21,11 @@ The canonical paper-shadow catalog is `config/features/market-feature-catalog-v1
 
 ## Current source truth
 
-The catalog contains 17 feature definitions. “Implemented” means the underlying field or transparent derivation exists in the current Hyperliquid adapter/snapshot path. It does not mean the feature has become an active trading signal. On 2026-09-02 the local Docker runtime verified current observations in Redis, migration application in PostgreSQL, and paper-only Regime Lab evaluation; active-scorer integration remains planned.
+The catalog contains 17 feature definitions. “Implemented” means the underlying field or transparent derivation exists in the current Hyperliquid adapter/snapshot path. It does not mean the feature has become an active trading signal. On 2026-09-02 the local Docker runtime verified current observations in Redis, migration application in PostgreSQL, and paper-only Regime Lab evaluation.
+
+Catalog version `1.1.0` (2026-09-07) promoted `hl_return_1h_pct` to `implemented` once durable mark-price history existed to align its comparator against. See [the change record](../changes/2026-09-07_regime-backed-paper-signal.md).
+
+Only features whose `score_mode` is `direct` or `inverse` can contribute to a generic block score. Because `positioning`, `spot_premium` and `macro_flows` currently declare none, the highest attainable `data_coverage` is **0.55**, below the rulebook’s 0.70 threshold for normal paper risk. The `low_data_coverage` cap therefore applies to every evaluation until one of those blocks gains an admitted direct or inverse feature.
 
 | Feature group | Current truth | Scoring authority |
 |---|---|---|
@@ -29,7 +33,7 @@ The catalog contains 17 feature definitions. “Implemented” means the underly
 | spread, depth, impact, imbalance | transparently derived from Hyperliquid L2 | eligible with derived provenance |
 | funding APR | display derivation | not separately scored, preventing double-counting |
 | Hyperliquid mark/oracle premium | derived from the current Hyperliquid mark and oracle fields | playbook-specific after its cadence-governed history gate |
-| 1h return | durable aligned price history still planned | not active |
+| 1h return | derived from stored mark-price history, anchored at or before t minus 1 hour | direct, the only generically-admitted price/volatility input |
 | OI-based liquidation estimate | proxy | never scoring eligible |
 | direct liquidation flow and direct CVD | unavailable in current adapter | unavailable, never substituted |
 | Coinbase premium and ETF net flow | no admitted source | unavailable/context-only |
