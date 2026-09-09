@@ -1,5 +1,8 @@
 # TradeSync — full state handover, 2026-09-09
 
+<!-- venue-guard-exempt: discusses the removed venue by name
+     records that the guard had been red at HEAD, which needs the token quoted -->
+
 Written for whoever picks this up next, including another agent asked to produce
 a plan. Read this before proposing anything.
 
