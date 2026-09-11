@@ -515,6 +515,7 @@ Tracked so they are not rediscovered:
 | `test_main.py` preview/execute — 3 failures | **resolved 2026-09-08** | — |
 | Outcome job fetched only the last 8h of candles and re-reviewed the same 40 rows forever; 240m unmeasured since 09-08 | **resolved 2026-09-12** — `changes/2026-09-11_outcome-job-fetches-the-windows-it-measures.md` | — |
 | Hyperliquid serves 1m candles for ~3 days only; older 60m/240m windows measured at 5m and labelled, 15m left unmeasured | structural, disclosed per row | — |
+| `/state/outcomes/by-regime` mixes 5m- and 1m-measured rows without saying so | open — read the row `reason` in the aggregate | with measurement part 2 |
 | Refusal rows unbounded — ~4,300/day | **resolved 2026-09-08** | — |
 | Suitability blocks cannot exceed 0.55 coverage | **stale 2026-09-08** — see below | — |
 | No hysteresis on direction band | **resolved 2026-09-08** | — |

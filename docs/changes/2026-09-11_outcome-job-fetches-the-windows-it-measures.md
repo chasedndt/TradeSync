@@ -74,6 +74,23 @@ empty — an empty answer, never a failed request. Two rules apply:
   rows the venue has no 1m history for reset again after the fallback deploy.
   Re-measurement results are recorded below once the passes complete.
 
+## Re-measurement results (2026-09-12, after both deploys)
+
+Two passes on the per-window build, 120 rows each: 240 then 322 horizons measured.
+
+| Window age | 15m | 60m | 240m |
+|---|---|---|---|
+| Older than ~3 days (278 windows) | `insufficient_candles` — "5m is too coarse for a 15m horizon" | measured at 5m, labelled | measured at 5m, labelled |
+| Newer (164 windows) | measured at 1m | measured at 1m | measured at 1m |
+
+Totals moved from 74 → **516 measured at 240m** with 664 still draining; 60m
+from 882 → 1,121. Nothing was written off for a window that was not requested.
+
+**Follow-up needed:** `/state/outcomes/by-regime` does not yet distinguish rows
+measured at 5m from those at 1m. Until it does, treat 60m/240m cells that
+include pre-09-09 windows as mixed-resolution. The row-level `reason` carries
+the fact; the aggregate should read it.
+
 ## What this means for the gate
 
 The 240m horizon's evidence since 8 September was never lost — it was never
