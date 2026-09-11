@@ -41,8 +41,17 @@ def resolve_window(
     interval: str,
     limit: int,
     now_ms: int | None = None,
+    start_ms: int | None = None,
+    end_ms: int | None = None,
 ) -> tuple[str, int, int, int]:
-    """Return (interval, limit, start_ms, end_ms) for a candle request."""
+    """Return (interval, limit, start_ms, end_ms) for a candle request.
+
+    Without ``start_ms``/``end_ms`` the window is the most recent ``limit``
+    candles. With them it is that explicit range, so a measurement that needs
+    candles from two days ago can ask for exactly those. The outcome job used
+    to have no way to say that: it could only ask for "the last N", and any
+    window older than N candles was reported as having no candles at all.
+    """
 
     if interval not in SUPPORTED_INTERVALS:
         raise CandleRequestError(
@@ -51,11 +60,24 @@ def resolve_window(
         )
     if limit <= 0:
         raise CandleRequestError("limit must be positive")
+    if (start_ms is None) != (end_ms is None):
+        raise CandleRequestError("start_ms and end_ms must be given together")
+
+    step_ms = SUPPORTED_INTERVALS[interval]
+    if start_ms is not None and end_ms is not None:
+        if end_ms <= start_ms:
+            raise CandleRequestError("end_ms must be after start_ms")
+        span = (end_ms - start_ms + step_ms - 1) // step_ms
+        if span > MAX_LIMIT:
+            raise CandleRequestError(
+                f"range covers {span} {interval} candles; at most {MAX_LIMIT} "
+                "per request, so split the range"
+            )
+        return interval, span, start_ms, end_ms
 
     bounded = min(limit, MAX_LIMIT)
-    end_ms = now_ms if now_ms is not None else int(time.time() * 1000)
-    start_ms = end_ms - SUPPORTED_INTERVALS[interval] * bounded
-    return interval, bounded, start_ms, end_ms
+    end = now_ms if now_ms is not None else int(time.time() * 1000)
+    return interval, bounded, end - step_ms * bounded, end
 
 
 def _number(value: Any) -> float | None:

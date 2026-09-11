@@ -576,11 +576,17 @@ async def get_candles(
     symbol: str,
     interval: str = DEFAULT_INTERVAL,
     limit: int = DEFAULT_LIMIT,
+    start_ms: int | None = None,
+    end_ms: int | None = None,
 ):
-    """Return venue OHLCV candles for the Market Canvas.
+    """Return venue OHLCV candles for the Market Canvas and outcome measurement.
 
     Display and annotation only. These never enter the feature catalog, so a
     chart cannot become a source of scoring authority.
+
+    ``start_ms``/``end_ms`` select an explicit range instead of the latest
+    ``limit`` candles, for measurements that need a window older than the
+    most recent history.
     """
     if venue != "hyperliquid":
         return JSONResponse(
@@ -590,7 +596,7 @@ async def get_candles(
 
     try:
         resolved_interval, resolved_limit, start_ms, end_ms = resolve_window(
-            interval, limit
+            interval, limit, start_ms=start_ms, end_ms=end_ms
         )
     except CandleRequestError as exc:
         return JSONResponse(
