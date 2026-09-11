@@ -513,6 +513,8 @@ Tracked so they are not rediscovered:
 | `tests/test_core_scorer.py` cannot collect — root `main.py` shadows it | **resolved 2026-09-08** | — |
 | Every service package named `app` — see below | **resolved 2026-09-08** | — |
 | `test_main.py` preview/execute — 3 failures | **resolved 2026-09-08** | — |
+| Outcome job fetched only the last 8h of candles and re-reviewed the same 40 rows forever; 240m unmeasured since 09-08 | **resolved 2026-09-12** — `changes/2026-09-11_outcome-job-fetches-the-windows-it-measures.md` | — |
+| Hyperliquid serves 1m candles for ~3 days only; older 60m/240m windows measured at 5m and labelled, 15m left unmeasured | structural, disclosed per row | — |
 | Refusal rows unbounded — ~4,300/day | **resolved 2026-09-08** | — |
 | Suitability blocks cannot exceed 0.55 coverage | **stale 2026-09-08** — see below | — |
 | No hysteresis on direction band | **resolved 2026-09-08** | — |
