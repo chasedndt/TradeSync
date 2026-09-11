@@ -13,8 +13,12 @@ from tradesync_core.outcomes import HorizonOutcome  # noqa: E402
 _job = load_service_module("core_scorer_app", "core-scorer", "outcome_job")
 
 
-def measured(horizon: int) -> HorizonOutcome:
-    return HorizonOutcome(horizon, "measured", entry_price=1.0, exit_price=1.01, candles_used=12)
+def measured(horizon: int, entry: float = 1.0) -> HorizonOutcome:
+    return HorizonOutcome(horizon, "measured", entry_price=entry, exit_price=entry * 1.01, candles_used=12)
+
+
+def empty(horizon: int) -> HorizonOutcome:
+    return HorizonOutcome(horizon, "insufficient_candles", reason=_job.EMPTY_AT_FINE)
 
 
 def test_fine_interval_leaves_every_horizon_untouched() -> None:
@@ -46,4 +50,36 @@ def test_a_coarse_gap_is_still_a_gap() -> None:
     gap = HorizonOutcome(240, "insufficient_candles", reason="candles span 3000s of a 14400s horizon")
     out = _job.guard_coarse([gap], "5m")
     assert out[0].status == "insufficient_candles"
+    assert out[0].reason == gap.reason
+
+
+def test_fallback_is_per_window_not_per_batch() -> None:
+    """A row that measured at 1m keeps it; only the empty horizons take the 5m result.
+
+    The first version switched the whole batch to 5m only when *nothing* came
+    back at 1m. A batch straddling the retention boundary had some 1m data, so
+    its older windows were written off instead of falling back.
+    """
+    fine = [measured(15, entry=100.0), empty(60), empty(240)]
+    coarse = [measured(15, entry=105.0), measured(60, entry=105.0), measured(240, entry=105.0)]
+    out = _job.fall_back_per_window(fine, coarse)
+    assert out[0].entry_price == 100.0 and out[0].reason == ""  # kept the 1m result
+    assert out[1].status == "measured" and "measured at 5m" in out[1].reason
+    assert out[2].status == "measured" and "measured at 5m" in out[2].reason
+
+
+def test_an_empty_15m_window_is_refused_at_5m_rather_than_measured_late() -> None:
+    out = _job.fall_back_per_window([empty(15)], [measured(15, entry=105.0)])
+    assert out[0].status == "insufficient_candles"
+    assert "too coarse" in out[0].reason
+
+
+def test_without_a_coarse_series_the_fine_verdict_stands() -> None:
+    fine = [empty(60)]
+    assert _job.fall_back_per_window(fine, None) == fine
+
+
+def test_a_coarse_gap_does_not_upgrade_an_empty_fine_window() -> None:
+    gap = HorizonOutcome(240, "insufficient_candles", reason="candles span 3000s of a 14400s horizon")
+    out = _job.fall_back_per_window([empty(240)], [gap])
     assert out[0].reason == gap.reason

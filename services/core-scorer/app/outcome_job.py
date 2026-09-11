@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import os
 import time
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from typing import Any
 
 import httpx
@@ -28,6 +28,7 @@ from tradesync_core.outcomes import (
     measure_opportunity,
 )
 
+from .outcome_store import pending_opportunities, store_outcome
 from .outcome_windows import (
     FetchRange,
     chunk_ranges,
@@ -94,94 +95,39 @@ async def _fetch_interval(
     return merge_candles(batches), received
 
 
-async def fetch_candles_for(
-    symbol: str, opened_at_s: list[int], client: httpx.AsyncClient
-) -> tuple[list[dict[str, Any]], list[FetchRange], str]:
-    """Candles for the batch's windows, at 1m where the venue still has it.
+# Below this age the venue has been seen to still serve 1m candles (probed
+# 2026-09-12: present at 72h, gone at 96h). Older spans also fetch the coarse
+# series so a window the fine series no longer covers can fall back per window.
+FINE_RETENTION_S = int(os.getenv("OUTCOME_FINE_RETENTION_S", str(60 * 3600)))
 
-    Returns the merged candles, the ranges actually received, and the interval
-    they came at. The coarse interval is used only when the fine one came back
-    empty for a span that was successfully requested — an empty answer, not a
-    failed request.
+
+@dataclass
+class SymbolCandles:
+    fine: list[dict[str, Any]]
+    fine_ranges: list[FetchRange]
+    coarse: list[dict[str, Any]]
+    coarse_ranges: list[FetchRange]
+
+
+async def fetch_candles_for(
+    symbol: str, opened_at_s: list[int], client: httpx.AsyncClient, now_s: int
+) -> SymbolCandles:
+    """Candles for the batch's windows: 1m always, plus 5m when the span is old.
+
+    The coarse series is fetched alongside rather than instead, so a batch that
+    straddles the venue's 1m retention boundary can measure its newer windows
+    at 1m and its older ones at 5m, window by window, instead of writing the
+    older ones off because the batch as a whole had some 1m data.
     """
     span = required_span_s(opened_at_s, LONGEST_HORIZON, CANDLE_SECONDS)
     if span is None:
-        return [], [], OUTCOME_CANDLE_INTERVAL
-    candles, received = await _fetch_interval(symbol, span, OUTCOME_CANDLE_INTERVAL, client)
-    if candles or not received:
-        return candles, received, OUTCOME_CANDLE_INTERVAL
-    coarse, coarse_received = await _fetch_interval(symbol, span, COARSE_CANDLE_INTERVAL, client)
-    return coarse, coarse_received, COARSE_CANDLE_INTERVAL
-
-
-async def pending_opportunities(conn, batch: int) -> list[dict[str, Any]]:
-    """Opportunities with a horizon still open or never written.
-
-    ``measured`` and ``insufficient_candles`` are both final. Counting only
-    ``measured`` as final, as this once did, kept every window with a gap in
-    the queue forever and the newest forty of them crowded out everything
-    else. Oldest first, so a backlog drains instead of ageing.
-    """
-    rows = await conn.fetch(
-        """
-        SELECT o.id, o.symbol, o.dir, o.snapshot_ts
-        FROM opportunities o
-        WHERE o.dir IN ('LONG', 'SHORT')
-          AND (
-            SELECT count(*) FROM opportunity_outcomes x
-            WHERE x.opportunity_id = o.id
-              AND x.status IN ('measured', 'insufficient_candles')
-          ) < $1
-        ORDER BY o.snapshot_ts ASC
-        LIMIT $2
-        """,
-        len(DEFAULT_HORIZONS_MINUTES),
-        batch,
-    )
-    return [dict(r) for r in rows]
-
-
-async def store_outcome(conn, outcome, symbol: str, direction: str) -> None:
-    """Write every horizon, replacing any earlier verdict for the same one."""
-    for horizon in outcome.horizons:
-        await conn.execute(
-            """
-            INSERT INTO opportunity_outcomes (
-                opportunity_id, symbol, direction, horizon_minutes, status,
-                entry_price, exit_price, forward_return_pct, signed_return_pct,
-                max_favourable_pct, max_adverse_pct, candles_used, reason,
-                opened_at, measured_at
-            ) VALUES (
-                $1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
-                to_timestamp($14), now()
-            )
-            ON CONFLICT (opportunity_id, horizon_minutes) DO UPDATE SET
-                status = EXCLUDED.status,
-                entry_price = EXCLUDED.entry_price,
-                exit_price = EXCLUDED.exit_price,
-                forward_return_pct = EXCLUDED.forward_return_pct,
-                signed_return_pct = EXCLUDED.signed_return_pct,
-                max_favourable_pct = EXCLUDED.max_favourable_pct,
-                max_adverse_pct = EXCLUDED.max_adverse_pct,
-                candles_used = EXCLUDED.candles_used,
-                reason = EXCLUDED.reason,
-                measured_at = now()
-            """,
-            str(outcome.opportunity_id),
-            symbol,
-            direction,
-            horizon.horizon_minutes,
-            horizon.status,
-            horizon.entry_price,
-            horizon.exit_price,
-            horizon.forward_return_pct,
-            horizon.signed_return_pct,
-            horizon.max_favourable_pct,
-            horizon.max_adverse_pct,
-            horizon.candles_used,
-            horizon.reason,
-            outcome.opened_at_s,
-        )
+        return SymbolCandles([], [], [], [])
+    fine, fine_ranges = await _fetch_interval(symbol, span, OUTCOME_CANDLE_INTERVAL, client)
+    coarse: list[dict[str, Any]] = []
+    coarse_ranges: list[FetchRange] = []
+    if span[0] < now_s - FINE_RETENTION_S:
+        coarse, coarse_ranges = await _fetch_interval(symbol, span, COARSE_CANDLE_INTERVAL, client)
+    return SymbolCandles(fine, fine_ranges, coarse, coarse_ranges)
 
 
 def guard_unrequested(
@@ -228,6 +174,28 @@ def guard_coarse(horizons: list[HorizonOutcome], interval: str) -> list[HorizonO
     return out
 
 
+EMPTY_AT_FINE = "no candles cover this window"
+
+
+def fall_back_per_window(
+    fine: list[HorizonOutcome], coarse: list[HorizonOutcome] | None
+) -> list[HorizonOutcome]:
+    """Use the coarse result only for horizons the fine series could not cover.
+
+    A horizon that measured at 1m keeps its 1m result. One that found no 1m
+    candles takes the 5m result if there is one — after ``guard_coarse`` has
+    labelled it or refused it. With no coarse series the fine verdict stands.
+    """
+    if coarse is None:
+        return fine
+    by_horizon = {h.horizon_minutes: h for h in guard_coarse(coarse, COARSE_CANDLE_INTERVAL)}
+    out = []
+    for horizon in fine:
+        empty = horizon.status == "insufficient_candles" and horizon.reason == EMPTY_AT_FINE
+        out.append(by_horizon.get(horizon.horizon_minutes, horizon) if empty else horizon)
+    return out
+
+
 async def run_outcome_pass(conn) -> dict[str, int]:
     """Measure one batch. Returns counts for logging."""
     pending = await pending_opportunities(conn, OUTCOME_BATCH)
@@ -239,33 +207,38 @@ async def run_outcome_pass(conn) -> dict[str, int]:
     for row in pending:
         by_symbol.setdefault(row["symbol"], []).append(int(row["snapshot_ts"].timestamp()))
 
-    candles: dict[str, list[dict[str, Any]]] = {}
-    fetched: dict[str, list[FetchRange]] = {}
-    interval: dict[str, str] = {}
+    series: dict[str, SymbolCandles] = {}
     async with httpx.AsyncClient() as client:
         for symbol, opened in by_symbol.items():
-            candles[symbol], fetched[symbol], interval[symbol] = await fetch_candles_for(
-                symbol, opened, client
-            )
+            series[symbol] = await fetch_candles_for(symbol, opened, client, now_s)
 
     measured = 0
     for row in pending:
         opened_at_s = int(row["snapshot_ts"].timestamp())
-        try:
-            outcome = measure_opportunity(
+        sc = series.get(row["symbol"]) or SymbolCandles([], [], [], [])
+
+        def measure(candles: list[dict[str, Any]]):
+            return measure_opportunity(
                 opportunity_id=str(row["id"]),
                 symbol=row["symbol"],
                 direction=row["dir"],
                 opened_at_s=opened_at_s,
-                candles=candles.get(row["symbol"], []),
+                candles=candles,
                 now_s=now_s,
             )
+
+        try:
+            outcome = measure(sc.fine)
+            fine = guard_unrequested(outcome.horizons, sc.fine_ranges, opened_at_s)
+            coarse = None
+            if sc.coarse_ranges and any(
+                h.status == "insufficient_candles" and h.reason == EMPTY_AT_FINE for h in fine
+            ):
+                coarse = guard_unrequested(measure(sc.coarse).horizons, sc.coarse_ranges, opened_at_s)
         except OutcomeError as exc:
             print(f"[Outcomes] skipping {row['id']}: {exc}")
             continue
-        horizons = guard_unrequested(outcome.horizons, fetched.get(row["symbol"], []), opened_at_s)
-        horizons = guard_coarse(horizons, interval.get(row["symbol"], OUTCOME_CANDLE_INTERVAL))
-        outcome = replace(outcome, horizons=horizons)
+        outcome = replace(outcome, horizons=fall_back_per_window(fine, coarse))
         await store_outcome(conn, outcome, row["symbol"], row["dir"])
         measured += sum(1 for h in outcome.horizons if h.status == "measured")
 
