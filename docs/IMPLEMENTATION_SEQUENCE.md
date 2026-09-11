@@ -55,6 +55,15 @@ It closed an unfinished **Phase 2** roadmap deliverable:
 
 ### 1.2 Skill across two regimes ✅ resolved 2026-09-08 — **gate returns NEGATIVE**
 
+> **Method correction, 2026-09-11.** The regime labels below were assigned from
+> each hour's own forward returns — a hindsight label — and the standard errors
+> estimated independence rather than measuring it. The verdict "no demonstrated
+> edge" stands; the table is descriptive, not a prospective test. The corrected
+> method (entry-time regimes, counted independent windows, block bootstrap,
+> Holm-adjusted positive skill, costed economic edge) is built and tested in
+> `tradesync_core`; wiring it into the endpoint is pending. See
+> [the change record](changes/2026-09-11_measurement-hardening-core.md).
+
 Both regimes are now present in the stored window. Result:
 
 | Horizon | Regime | n | Skill | Significance |
