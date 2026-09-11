@@ -28,7 +28,7 @@ Tier A must continue when any Tier B connector is unavailable. Tier C always fai
 - PostgreSQL 16 and Redis 7 are active dependencies; Qdrant is an optional evidence profile.
 - CoinGecko and DefiLlama are free, context-only feeds. FRED is an optional free-key macro feed.
 - The responsive Mission Control dashboard and read-only execution readiness surface are implemented locally.
-- The canonical ChaseOS private instance is `C:\Users\chaseos\Documents\chaseos_obsidian`. Its live knowledge connector is not currently available, so the interface in this repository is a proposed versioned contract, not a verified live integration.
+- The canonical ChaseOS private instance is `C:\Users\chaseos\Documents\chaseos_chaseintech`. Its live knowledge connector is not currently available, so the interface in this repository is a proposed versioned contract, not a verified live integration.
 - The first Rust component is a shared contract crate. The Rust alert router and Hyperliquid real-time edge are roadmap work, not complete services.
 - Quant Foundations Book 1 and a versioned paper-only regime-weight engine are implemented locally. They do not yet replace the legacy live dashboard classifier or scorer.
 - A source-governed 17-feature catalog, cadence-governed market extractor, ordinary/robust normalizer, backend block aggregation, and private Regime Lab are implemented locally.

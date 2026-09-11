@@ -71,7 +71,7 @@ Verified after rebuilding State API:
 - No restart action is executable from the UI; commands are explanatory text.
 - The canonical ChaseOS vault at
   `C:\Users\chaseos\Documents\chaseos_obsidian` was not read, moved, or
-  modified.
+  modified. _(Corrected 2026-09-11: the canonical instance is `chaseos_chaseintech`; `chaseos_obsidian` is a stub and must not be used.)_
 - PostgreSQL and Redis volumes were retained. No `down -v` operation ran.
 - Ingest-gateway, scorer, fusion, Strike Zone, agent harness, ChaseOS, and
   execution services were not started or represented as connected.

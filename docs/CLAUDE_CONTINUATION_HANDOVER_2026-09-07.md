@@ -25,6 +25,9 @@ Hyperliquid is the ONLY trading venue. Start with free public data and free infr
 
 ChaseOS means exactly `C:\Users\chaseos\Documents\chaseos_obsidian`, not Chaser West. That vault is canonical and must not be moved, copied, or broadly rewritten. The connector is not proof of permission to write its knowledge graph.
 
+> **Corrected 2026-09-08, reconfirmed 2026-09-11:** the canonical instance is
+> `C:\Users\chaseos\Documents\chaseos_chaseintech`. `chaseos_obsidian` is a stub and must not be used.
+
 Three capability tiers:
 
 | Tier | Intended capability | Dependency rule |

@@ -213,7 +213,7 @@ Solid lines describe the intended paper system. Dotted lines describe the future
 
 Canonical local instance:
 
-`C:\Users\chaseos\Documents\chaseos_obsidian`
+`C:\Users\chaseos\Documents\chaseos_chaseintech`
 
 Responsibilities:
 
@@ -1042,7 +1042,7 @@ Use the full handover above as context, then append this request:
 
 ### ChaseOS
 
-- `C:\Users\chaseos\Documents\chaseos_obsidian`
+- `C:\Users\chaseos\Documents\chaseos_chaseintech`
 - `00_HOME/Now.md`
 - `06_AGENTS/Agent-Control-Plane.md`
 - `06_AGENTS/Permission-Matrix.md`

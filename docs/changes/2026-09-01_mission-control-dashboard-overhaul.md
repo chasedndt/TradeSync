@@ -26,7 +26,7 @@ After this change, the main screen is a responsive, evidence-led Mission Control
 - Hyperliquid remains the sole venue.
 - `EXECUTION_ENABLED=false`; no wallet, signer, secret, live order, deployment, publication, or spend was authorized or used.
 - Context feeds have `execution_authority=false` and do not enter the scoring or order path.
-- The canonical ChaseOS vault at `C:\Users\chaseos\Documents\chaseos_obsidian` was not modified.
+- The canonical ChaseOS vault at `C:\Users\chaseos\Documents\chaseos_obsidian` was not modified. _(Corrected 2026-09-11: the canonical instance is `chaseos_chaseintech`; `chaseos_obsidian` is a stub and must not be used.)_
 
 ## Verification evidence
 

@@ -7,7 +7,7 @@ Status: FOUNDATION IMPLEMENTED; paper-only contract, not runtime wiring.
 This step defines the first explicit handoff contract among:
 
 - Strike Zone Crypto: creates the review-only market candidate.
-- ChaseOS (`C:\Users\chaseos\Documents\chaseos_obsidian`): records the authenticated, single-use operator decision.
+- ChaseOS (`C:\Users\chaseos\Documents\chaseos_chaseintech`): records the authenticated, single-use operator decision.
 - TradeSync: validates the immutable packet before one paper-ledger evaluation.
 - Hyperliquid: venue vocabulary only in this step; no private API request occurs.
 

@@ -111,7 +111,7 @@ zero or a broken dashboard:
 - The execution node remains `locked` until the isolated signer, risk policy,
   single-use approval, replay protection, and reconciliation gates exist.
 - ChaseOS means the canonical instance at
-  `C:\Users\chaseos\Documents\chaseos_obsidian`; this endpoint does not read,
+  `C:\Users\chaseos\Documents\chaseos_chaseintech`; this endpoint does not read,
   move, or modify that vault.
 
 ## Minimal response shape

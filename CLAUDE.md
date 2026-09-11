@@ -9,6 +9,7 @@ TradeSync is a standalone-first, Hyperliquid-only workstation with optional Chas
 - ChaseOS means the canonical private instance at `C:\Users\chaseos\Documents\chaseos_chaseintech`
   (00_HOME .. 99_ARCHIVE, 27k+ notes). Corrected by the operator on 2026-09-08;
   `chaseos_obsidian` is a stub holding only `07_LOGS` and is NOT the knowledge graph.
+  It must not be used for any canonical purpose (reconfirmed 2026-09-11).
 - ChaseOS governs canonical knowledge promotion and approval authority; TradeSync must remain usable when the connector is offline.
 - Optional context providers and AI models never grant risk, approval, wallet, or execution authority.
 - No key, signer, wallet, deployment, spend, or live execution without explicit operator approval and passing roadmap gates.
