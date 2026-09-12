@@ -1,0 +1,16 @@
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; padding: 0 16px 14px; }
+.card { border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px; background: rgba(255, 255, 255, 0.015); display: flex; flex-direction: column; gap: 8px; }
+.earned { border-color: var(--green); box-shadow: inset 0 0 0 1px rgba(60, 200, 120, 0.25); }
+.head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.id { font: 600 12px/1.3 var(--font-mono); word-break: break-all; }
+.standing { font: 600 9px/16px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; padding: 0 6px; border-radius: 3px; white-space: nowrap; }
+.scoring { background: rgba(80, 160, 255, 0.18); color: #9cc8ff; }
+.context { background: rgba(120, 135, 150, 0.18); color: var(--muted); }
+.verdict { font: 600 11px/1.3 var(--font-mono); }
+.coverage { color: var(--muted); font-size: 10px; }
+.cells { width: 100%; border-collapse: collapse; font: 11px/1.4 var(--font-mono); }
+.cells th { color: var(--muted); font-weight: 500; text-align: left; padding: 2px 4px; border-bottom: 1px solid var(--border); }
+.cells td { padding: 2px 4px; white-space: nowrap; }
+.role { color: var(--dim); font-size: 10px; line-height: 1.45; margin: 0; }
+.next { font-size: 11px; margin: 0; }
+.foot { color: var(--dim); font-size: 10px; padding: 0 16px 14px; margin: 0; }

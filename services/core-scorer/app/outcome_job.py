@@ -28,6 +28,7 @@ from tradesync_core.outcomes import (
     measure_opportunity,
 )
 
+from .outcome_features import record_entry_features
 from .outcome_regime import (
     lookback_margin_s,
     missing_regime_opportunities,
@@ -208,7 +209,8 @@ async def run_outcome_pass(conn) -> dict[str, int]:
     """Measure one batch. Returns counts for logging."""
     pending = await pending_opportunities(conn, OUTCOME_BATCH)
     if not pending:
-        return {"opportunities": 0, "measured": 0}
+        features = await record_entry_features(conn, OUTCOME_BATCH, int(time.time()))
+        return {"opportunities": 0, "measured": 0, "entry_features_present": features["present"]}
 
     now_s = int(time.time())
     by_symbol: dict[str, list[int]] = {}
@@ -252,7 +254,14 @@ async def run_outcome_pass(conn) -> dict[str, int]:
         await _record_regime(conn, row, opened_at_s, sc)
 
     labelled = await _backfill_regimes(conn, {str(r["id"]) for r in pending}, now_s)
-    return {"opportunities": len(pending), "measured": measured, "regimes_backfilled": labelled}
+    features = await record_entry_features(conn, OUTCOME_BATCH, now_s)
+    return {
+        "opportunities": len(pending),
+        "measured": measured,
+        "regimes_backfilled": labelled,
+        "entry_features_present": features["present"],
+        "entry_features_absent": features["absent"],
+    }
 
 
 async def _record_regime(conn, row, opened_at_s: int, sc: SymbolCandles) -> None:

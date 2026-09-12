@@ -3675,3 +3675,8 @@ register_rehearsal(app, state)
 from app.skill_gate import register as register_skill_gate  # noqa: E402
 
 register_skill_gate(app, state)
+
+# Evidence cards: what each candidate feature has earned; see app/evidence_cards.py.
+from app.evidence_cards import register as register_evidence_cards  # noqa: E402
+
+register_evidence_cards(app, state)

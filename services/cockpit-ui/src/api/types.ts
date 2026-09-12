@@ -836,6 +836,48 @@ export interface SkillGateResponse {
   note: string
 }
 
+// === Evidence cards (slice 5: earned weights) ===
+
+export type EvidencePolarity = 'as_read' | 'inverted'
+
+/** One horizon x polarity cell of a feature card; same fields as a skill-gate cell. */
+export interface EvidenceCardCell extends Omit<SkillGateCell, 'regime'> {
+  polarity: EvidencePolarity
+  /** positive skill that also held on the chronological hold-out */
+  earned: boolean
+}
+
+export interface EvidenceCard {
+  feature_id: string
+  standing: 'scoring' | 'context_only'
+  block: string | null
+  unit: string | null
+  provenance: string | null
+  source_authority: string | null
+  decision_role: string | null
+  cells: EvidenceCardCell[]
+  earned: boolean
+  earned_by: string[]
+  abstained: number
+  entries_with_reading: number
+  entries_without_reading: number
+  next_step: string
+  meaning: string
+}
+
+export interface EvidenceCardsResponse {
+  schema_version: 'evidence_cards_v1'
+  symbol: string | null
+  catalog_version: string
+  horizons: number[]
+  polarities: EvidencePolarity[]
+  cards: EvidenceCard[]
+  cells_assessed_together: number
+  entries_pending: number
+  costs: SkillGateResponse['costs']
+  note: string
+}
+
 // === Paper rehearsal ===
 
 export interface RehearseRequest {

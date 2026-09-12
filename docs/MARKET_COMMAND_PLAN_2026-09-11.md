@@ -269,6 +269,17 @@ This follows Codex's review order; slice 1 is accepted today.
   counted independence, three verdicts, stated costs) runs on real data at
   `/state/outcomes/skill-gate` and on the Regime Lab. Gate CLOSED; every cell
   negative after costs. `changes/2026-09-12_skill-gate-wired-in.md`.
+- **Slice 4 (Hermes) paused** by the operator on 2026-09-12: no compute until
+  limits reset. Everything else proceeds around it.
+- **Slice 5 delivered**: every candidate feature's reading at entry is recorded
+  once against each opportunity; each feature is scored as a guesser in both
+  polarities with the skill gate's costs and one Holm adjustment; "earned" is
+  positive skill that held out of sample, reported at
+  `/state/outcomes/evidence-cards` and on the Regime Lab, never self-granted.
+  `changes/2026-09-12_evidence-cards-earned-weights.md`. **Strike Zone / Pine
+  signals will enter through exactly this mechanism; what blocks them is the
+  public route (Cloudflare Tunnel or a Discord reader), an operator decision
+  flagged in that record.** Slice 6 (Thesis page) is next.
 
 ## 7. Where things stand at the end of 2026-09-11
 
