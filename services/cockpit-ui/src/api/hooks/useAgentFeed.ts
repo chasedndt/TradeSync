@@ -1,6 +1,21 @@
 import { useQueries, useQuery } from '@tanstack/react-query'
 import { apiGet } from '../client'
-import type { AgentPostPayload, HarnessStatus, QuarantineItem, QuarantineList } from '../types'
+import type { AgentPostPayload, HarnessStatus, QuarantineItem, QuarantineList, SourceCardsResponse } from '../types'
+
+/**
+ * What each external source has earned: claims extracted from held material,
+ * measured like paper opportunities, Holm-adjusted together with the skill
+ * gate's costs. A slow read; refreshes on a long interval.
+ */
+export function useSourceCards(symbol?: string) {
+  return useQuery({
+    queryKey: ['source-cards', symbol ?? 'all'],
+    queryFn: () => apiGet<SourceCardsResponse>(`/state/outcomes/source-cards${symbol ? `?symbol=${encodeURIComponent(symbol)}` : ''}`),
+    refetchInterval: 300_000,
+    staleTime: 120_000,
+    retry: 1,
+  })
+}
 
 export type AgentPost = QuarantineItem & { payload: AgentPostPayload }
 

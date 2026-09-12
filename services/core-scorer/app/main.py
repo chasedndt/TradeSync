@@ -4,6 +4,7 @@ import time
 import uuid
 import asyncio
 import asyncpg
+import httpx
 import redis.asyncio as redis
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
@@ -322,11 +323,41 @@ async def retention_loop():
         await asyncio.sleep(RETENTION_INTERVAL_SECONDS)
 
 
+async def claims_loop():
+    """Extract claims from quarantined material and measure them, on their own cadence.
+
+    Separate from scoring and from the opportunity outcomes: a source's track
+    record is bookkeeping about Tier B material and must never delay a
+    verdict. See app/claims_job.py.
+    """
+    from .claims_job import CLAIMS_INTERVAL_SECONDS, run_claims_pass
+
+    await asyncio.sleep(60)  # let the schema and market-data settle first
+    while True:
+        try:
+            conn = await asyncpg.connect(PG_DSN)
+            try:
+                async with httpx.AsyncClient() as client:
+                    stats = await run_claims_pass(conn, client)
+            finally:
+                await conn.close()
+            if stats.get("extract_rows") or stats.get("measure_claims"):
+                print(
+                    f"[Claims] extracted {stats.get('extract_claims', 0)} claims from "
+                    f"{stats.get('extract_rows', 0)} rows ({stats.get('extract_no_claim', 0)} no-claim); "
+                    f"measured {stats.get('measure_measured', 0)} horizons over {stats.get('measure_claims', 0)} claims"
+                )
+        except Exception as exc:
+            print(f"[Claims] pass failed: {exc}")
+        await asyncio.sleep(CLAIMS_INTERVAL_SECONDS)
+
+
 @app.on_event("startup")
 async def startup_event():
     asyncio.create_task(score_loop())
     asyncio.create_task(outcome_loop())
     asyncio.create_task(retention_loop())
+    asyncio.create_task(claims_loop())
 
 # --- Endpoints ---
 

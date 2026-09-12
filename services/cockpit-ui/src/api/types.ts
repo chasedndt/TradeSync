@@ -992,6 +992,36 @@ export interface HermesJobOutputPayload {
 
 export type AgentPostPayload = DiscordMessagePayload | HermesJobOutputPayload
 
+/** One horizon × polarity cell of a source card; same fields as a skill-gate cell. */
+export interface SourceCardCell extends Omit<SkillGateCell, 'regime'> {
+  polarity: 'as_stated' | 'inverted'
+  earned: boolean
+}
+
+export interface SourceCard {
+  source: 'tradingview' | 'discord' | 'chaseos' | string
+  source_id: string
+  claims: number
+  claims_measured: number
+  latest_claim_at: string | null
+  cells: SourceCardCell[]
+  earned: boolean
+  earned_by: string[]
+  next_step: string
+}
+
+export interface SourceCardsResponse {
+  schema_version: 'source_cards_v1'
+  symbol: string | null
+  horizons: number[]
+  polarities: ['as_stated', 'inverted']
+  cards: SourceCard[]
+  cells_assessed_together: number
+  extraction: { rows_with_claims: number; rows_without_claims: number; rows_pending: number }
+  costs: SkillGateResponse['costs']
+  note: string
+}
+
 // === Paper rehearsal ===
 
 export interface RehearseRequest {

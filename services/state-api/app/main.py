@@ -3681,6 +3681,11 @@ from app.evidence_cards import register as register_evidence_cards  # noqa: E402
 
 register_evidence_cards(app, state)
 
+# Source cards: what each external source has earned; see app/source_cards.py.
+from app.source_cards import register as register_source_cards  # noqa: E402
+
+register_source_cards(app, state)
+
 # The Thesis page's read model: the SOP's minimum valid thesis from evidence.
 from app.thesis import register as register_thesis  # noqa: E402
 
