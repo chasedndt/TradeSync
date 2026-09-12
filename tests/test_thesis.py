@@ -94,11 +94,26 @@ def test_thesis_has_every_sop_part_and_is_private() -> None:
 
 def test_every_line_names_its_source_and_the_text_is_the_lines_joined() -> None:
     t = _thesis()
-    assert len(t["lines"]) == 9
+    assert len(t["lines"]) == 10
     assert all(line["source"] for line in t["lines"])
     assert t["text"] == "\n".join(line["text"] for line in t["lines"])
     assert t["lines"][1]["age_ms"] == 30_000
     assert t["lines"][3]["text"].startswith("Derivatives and context: ") and t["derivatives"]
+    assert t["lines"][5]["text"].startswith("External sources: none of 0 measured")
+
+
+def test_earned_sources_join_the_stack_and_clear_the_no_earned_inputs_condition() -> None:
+    sources = [
+        {"source_id": "StrikeZone FVG Engine", "source": "tradingview", "earned": True, "earned_by": ["60m as_stated"], "claims_measured": 40},
+        {"source_id": "sz-market-thesis-desk", "source": "discord", "earned": False, "earned_by": [], "claims_measured": 12},
+        {"source_id": "quiet", "source": "discord", "earned": False, "earned_by": [], "claims_measured": 0},
+    ]
+    t = _thesis(sources=sources)
+    assert t["sources"] == {"earned": [{"source_id": "StrikeZone FVG Engine", "source": "tradingview", "earned_by": ["60m as_stated"]}],
+                            "measured": 2, "recording": 3}
+    assert "StrikeZone FVG Engine earned 60m as_stated (2 of 3 sources measured)" in t["text"]
+    by = {c["code"]: c["active"] for c in t["no_trade_conditions"]}
+    assert by["no_earned_inputs"] is False
     assert "Verdict: NO TRADE" in t["text"] and "not for publication" in t["text"]
 
 

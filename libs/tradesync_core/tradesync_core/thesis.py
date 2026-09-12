@@ -168,9 +168,18 @@ def build_thesis(
     events: Sequence[Mapping[str, Any]],
     execution_enabled: bool,
     feature_results: Sequence[Mapping[str, Any]] = (),
+    sources: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
-    """The minimum valid thesis, as data plus rendered lines."""
+    """The minimum valid thesis, as data plus rendered lines.
+
+    ``sources`` are the source cards: every external source (indicator, agent
+    channel, job) with a measured track record. Earned ones join the
+    confirmation stack; the rest are counted so the reader can see how much
+    of the fleet has been measured at all.
+    """
     derivatives = derivatives_read(feature_results, now_ms)
+    earned_sources = [s for s in sources if s.get("earned")]
+    measured_sources = sum(1 for s in sources if (s.get("claims_measured") or 0) > 0)
     newest_context = max((d["observed_at_ms"] for d in derivatives if d["observed_at_ms"]), default=None)
     direction = str((signal or {}).get("direction") or "NONE")
     coverage = _float((signal or {}).get("data_coverage"))
@@ -180,7 +189,7 @@ def build_thesis(
     anchors = anchor_levels(candles, bucket_s)
     cards_by = {str(c.get("feature_id")): c for c in cards}
     stack = confirmation_stack(contributors, cards_by)
-    earned = sum(1 for s in stack if s["earned"])
+    earned = sum(1 for s in stack if s["earned"]) + len(earned_sources)
     gate_state = (gate or {}).get("gate")
     source_live = source_status.get("status") == "live"
     conditions = no_trade_conditions(
@@ -228,6 +237,14 @@ def build_thesis(
             "regime evaluation contributors + evidence cards", _int(signal_at_ms), _age(now_ms, signal_at_ms),
         ),
         Line(
+            ("External sources: " + "; ".join(
+                f"{s['source_id']} earned {', '.join(s.get('earned_by', []))}" for s in earned_sources
+            ) + f" ({measured_sources} of {len(sources)} sources measured).")
+            if earned_sources else
+            f"External sources: none of {measured_sources} measured source(s) has earned a weight; {len(sources)} sources recording.",
+            "source cards (claims extracted from Pine alerts, agent posts and job outputs)", now_ms, 0,
+        ),
+        Line(
             (f"Invalidation: {inval['rule']} at {inval['level']:,.2f}." if inval.get("level") is not None else f"Invalidation: {inval['rule']}."),
             "anchor levels", None, None,
         ),
@@ -266,6 +283,11 @@ def build_thesis(
         "anchors": anchors,
         "derivatives": derivatives,
         "confirmation_stack": stack,
+        "sources": {
+            "earned": [{"source_id": s.get("source_id"), "source": s.get("source"), "earned_by": list(s.get("earned_by", []))} for s in earned_sources],
+            "measured": measured_sources,
+            "recording": len(sources),
+        },
         "invalidation": inval,
         "no_trade_conditions": [c.to_dict() for c in conditions],
         "confidence": {

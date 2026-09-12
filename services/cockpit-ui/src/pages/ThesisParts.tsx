@@ -103,6 +103,24 @@ export function Stack({ thesis }: { thesis: ThesisResponse }) {
           </li>
         ))}
       </ul>
+      <div className={styles.row} style={{ marginTop: 6 }}>
+        <span>External sources</span>
+        <span className={styles.mono}>{thesis.sources.measured} measured / {thesis.sources.recording} recording</span>
+      </div>
+      {thesis.sources.earned.length > 0 ? (
+        <ul className={styles.stack}>
+          {thesis.sources.earned.map((s) => (
+            <li className={styles.stackItem} key={`${s.source}:${s.source_id}`}>
+              <span className={styles.mono}>{s.source_id}</span>
+              <span className={`${styles.pill} ${styles.pillContext}`}>{s.source}</span>
+              <span className={`${styles.pill} ${styles.pillEarned}`} title={s.earned_by.join(', ')}>earned</span>
+              <span />
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className={styles.detail} style={{ margin: 0 }}>No external source has earned a weight yet.</p>
+      )}
     </Part>
   )
 }

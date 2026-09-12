@@ -25,6 +25,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.evidence_cards import compute_evidence_cards
 from app.skill_gate import compute_skill_gate
+from app.source_cards import compute_source_cards
 from tradesync_core.thesis import build_thesis
 
 router = APIRouter(tags=["thesis"])
@@ -137,13 +138,14 @@ async def gather_inputs(
     async with pool.acquire() as conn:
         signal, regime = await _latest_signal(conn, symbol), await _latest_regime(conn, symbol)
     async with httpx.AsyncClient(trust_env=False) as client:
-        candles, snapshots, gate, cards, context, live = await asyncio.gather(
+        candles, snapshots, gate, cards, context, live, source_cards = await asyncio.gather(
             _market(client, market_data_url, f"/candles/hyperliquid/{symbol}?interval={CANDLE_INTERVAL}&limit={CANDLE_LIMIT}"),
             _market(client, market_data_url, "/snapshots"),
             compute_skill_gate(pool, symbol),
             compute_evidence_cards(pool, symbol),
             calendar(),
             evidence("hyperliquid", symbol),
+            compute_source_cards(pool, None),
         )
     feature_results = list(live[0]) if live else []
     snapshot = next((s for s in (snapshots or {}).get("snapshots", []) if s.get("symbol") == symbol), None)
@@ -164,6 +166,7 @@ async def gather_inputs(
         "events": events,
         "contributors": (signal or {}).get("contributors") or [],
         "feature_results": feature_results,
+        "sources": (source_cards or {}).get("cards") or [],
     }
 
 
@@ -195,6 +198,7 @@ def register(
             events=inputs["events"],
             execution_enabled=execution_enabled(),
             feature_results=inputs["feature_results"],
+            sources=inputs["sources"],
         )
 
     app.include_router(router)

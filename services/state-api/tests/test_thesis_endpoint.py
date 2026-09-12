@@ -50,6 +50,9 @@ def test_endpoint_assembles_a_private_thesis_from_the_gathered_inputs() -> None:
     async def fake_cards(pool, symbol):
         return {"cards": [{"feature_id": "hl_return_1h_pct", "standing": "scoring", "earned": False, "earned_by": []}]}
 
+    async def fake_sources(pool, symbol):
+        return {"cards": [{"source_id": "StrikeZone FVG Engine", "source": "tradingview", "earned": False, "earned_by": [], "claims_measured": 1}]}
+
     async def fake_calendar():
         return {"providers": {"calendar": {"data": {"events": [{"impact": "High", "title": "CPI", "minutes_until": 45}]}}}}
 
@@ -67,6 +70,7 @@ def test_endpoint_assembles_a_private_thesis_from_the_gathered_inputs() -> None:
         patch.object(module, "_market", side_effect=fake_market),
         patch.object(module, "compute_skill_gate", side_effect=fake_gate),
         patch.object(module, "compute_evidence_cards", side_effect=fake_cards),
+        patch.object(module, "compute_source_cards", side_effect=fake_sources),
         patch.object(module, "execution_enabled", return_value=False),
         patch.object(module, "gather_inputs", side_effect=gather_with_fake_calendar),
     ):
@@ -98,7 +102,8 @@ def test_a_refused_signal_yields_no_direction() -> None:
     with patch.object(state, "pool", _pool(row, None)), \
          patch.object(module, "_market", side_effect=none), \
          patch.object(module, "compute_skill_gate", side_effect=empty), \
-         patch.object(module, "compute_evidence_cards", side_effect=empty):
+         patch.object(module, "compute_evidence_cards", side_effect=empty), \
+         patch.object(module, "compute_source_cards", side_effect=empty):
         import asyncio
         inputs = asyncio.run(module.gather_inputs(state.pool, "BTC-PERP", "http://x", cal))
     assert inputs["signal"]["direction"] == "NONE" and inputs["regime"] is None

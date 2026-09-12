@@ -937,6 +937,7 @@ export interface ThesisResponse {
     scoring_allowed: boolean
   }[]
   confirmation_stack: ThesisStackItem[]
+  sources: { earned: { source_id: string; source: string; earned_by: string[] }[]; measured: number; recording: number }
   invalidation: { level: number | null; rule: string; source?: string }
   no_trade_conditions: { code: string; active: boolean; detail: string }[]
   confidence: { evidence_coverage: number | null; meaning: string }

@@ -33,6 +33,16 @@ from tradesync_core.agent_harness import (
 
 AGENT_HARNESS_URL = os.getenv("AGENT_HARNESS_URL", "").strip()
 AGENT_HARNESS_MODEL = os.getenv("AGENT_HARNESS_MODEL", "llama3.1:8b").strip()
+# Two dialects. "ollama" is the original local runtime (/api/tags, /api/generate).
+# "openai" is the OpenAI-compatible surface the Hermes gateway's API server
+# exposes (/v1/models, /v1/chat/completions, Bearer API_SERVER_KEY). The key is
+# read once here and sent only in the Authorization header; never logged.
+AGENT_HARNESS_API = os.getenv("AGENT_HARNESS_API", "ollama").strip().lower()
+AGENT_HARNESS_KEY = os.getenv("AGENT_HARNESS_KEY", "").strip()
+
+
+def _headers() -> dict[str, str]:
+    return {"Authorization": f"Bearer {AGENT_HARNESS_KEY}"} if AGENT_HARNESS_KEY else {}
 # Bounded so a hung runtime cannot hold a request open. Generous, because a
 # cold local model loads several gigabytes into memory before it answers the
 # first token, and that is a one-off cost rather than a fault.
@@ -62,7 +72,10 @@ async def probe() -> dict[str, Any]:
 
     try:
         async with httpx.AsyncClient(timeout=AGENT_HARNESS_PROBE_TIMEOUT_S) as client:
-            response = await client.get(f"{AGENT_HARNESS_URL}/api/tags")
+            if AGENT_HARNESS_API == "openai":
+                response = await client.get(f"{AGENT_HARNESS_URL}/v1/models", headers=_headers())
+            else:
+                response = await client.get(f"{AGENT_HARNESS_URL}/api/tags")
             response.raise_for_status()
             payload = response.json()
     except Exception as exc:
@@ -73,7 +86,10 @@ async def probe() -> dict[str, Any]:
             "detail": f"{type(exc).__name__}: {exc}",
         }
 
-    models = [m.get("name") for m in payload.get("models", []) if m.get("name")]
+    if AGENT_HARNESS_API == "openai":
+        models = [m.get("id") for m in payload.get("data", []) if isinstance(m, dict) and m.get("id")]
+    else:
+        models = [m.get("name") for m in payload.get("models", []) if m.get("name")]
     return {
         "status": "live",
         "url": AGENT_HARNESS_URL,
@@ -100,14 +116,21 @@ async def ask(intent: str, prompt: str, context: dict[str, Any] | None = None) -
 
     started = time.monotonic()
     async with httpx.AsyncClient(timeout=AGENT_HARNESS_TIMEOUT_S) as client:
-        response = await client.post(
-            f"{AGENT_HARNESS_URL}/api/generate",
-            json={
-                "model": AGENT_HARNESS_MODEL,
-                "prompt": _render(task),
-                "stream": False,
-            },
-        )
+        if AGENT_HARNESS_API == "openai":
+            response = await client.post(
+                f"{AGENT_HARNESS_URL}/v1/chat/completions",
+                headers=_headers(),
+                json={
+                    "model": AGENT_HARNESS_MODEL,
+                    "messages": [{"role": "user", "content": _render(task)}],
+                    "stream": False,
+                },
+            )
+        else:
+            response = await client.post(
+                f"{AGENT_HARNESS_URL}/api/generate",
+                json={"model": AGENT_HARNESS_MODEL, "prompt": _render(task), "stream": False},
+            )
         response.raise_for_status()
         body = response.json()
     elapsed_ms = int((time.monotonic() - started) * 1000)
@@ -115,12 +138,18 @@ async def ask(intent: str, prompt: str, context: dict[str, Any] | None = None) -
     # The runtime's own reply shape is not our envelope. It is wrapped into one
     # here so that validate_response checks a single known contract rather than
     # every runtime's dialect.
+    if AGENT_HARNESS_API == "openai":
+        choices = body.get("choices") or [{}]
+        content = ((choices[0].get("message") or {}).get("content")) or ""
+        runtime = "hermes-openai"
+    else:
+        content, runtime = body.get("response", ""), "ollama"
     envelope = {
         "schema_version": RESPONSE_SCHEMA_VERSION,
         "task_digest": task["task_digest"],
-        "content": body.get("response", ""),
+        "content": content,
         "model": body.get("model", AGENT_HARNESS_MODEL),
-        "runtime": "ollama",
+        "runtime": runtime,
         "elapsed_ms": elapsed_ms,
     }
     accepted = validate_response(envelope, task)

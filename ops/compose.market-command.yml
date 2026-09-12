@@ -108,6 +108,12 @@ services:
       # host.docker.internal reaches a runtime on the operator's machine.
       AGENT_HARNESS_URL: ${AGENT_HARNESS_URL:-}
       AGENT_HARNESS_MODEL: ${AGENT_HARNESS_MODEL:-llama3.1:8b}
+      # "ollama" (default) or "openai": the Hermes gateway's API server speaks
+      # the OpenAI dialect at http://host.docker.internal:8642 with a Bearer
+      # key (its API_SERVER_KEY, copied file-to-file into runtime.env as
+      # AGENT_HARNESS_KEY; never displayed, never logged).
+      AGENT_HARNESS_API: ${AGENT_HARNESS_API:-ollama}
+      AGENT_HARNESS_KEY: ${AGENT_HARNESS_KEY:-}
       # The isolated signer and the account to preview. The address is public;
       # the key that controls it lives only in signer-svc's own environment and
       # never appears in this service.
