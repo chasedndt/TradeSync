@@ -52,7 +52,7 @@ export function useEvidenceMarkers(
         time,
         direction: (latest.dir === 'SHORT' ? 'SHORT' : 'LONG') as 'LONG' | 'SHORT',
         label:
-          count > 1 ? `${latest.dir} ×${count}` : `${latest.dir} ${Math.round(latest.quality)}%`,
+          count > 1 ? `${latest.dir} · ${count} research calls` : `${latest.dir} · research`,
       }))
       .sort((a, b) => a.time - b.time)
   }, [opportunities, symbol, interval])

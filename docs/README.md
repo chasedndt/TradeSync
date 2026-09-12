@@ -4,6 +4,16 @@ This folder is the documentation system of record for the Hyperliquid-only Trade
 
 ## Start here
 
+Pairing acceptance follow-up: [Build, dependency audit and setup-screen QA](changes/2026-09-09_walletconnect-build-acceptance.md).
+
+Optional pairing: [WalletConnect address-only implementation and setup gates](changes/2026-09-09_walletconnect-address-only.md).
+
+Watch-only onboarding: [Public-address account inspection](changes/2026-09-09_watch-only-wallet.md).
+
+Latest UI slice: [Canvas modes, paper outcomes and adapter readbacks](changes/2026-09-09_canvas-and-adapter-readbacks.md).
+
+Current review: [9 September usability, measurement and wallet progression](REVIEW_20260909_USABILITY_AND_WALLETS.md), with updated architecture diagrams and explicit acceptance gaps.
+
 Latest continuation: [Claude handover — 7 September 2026](CLAUDE_CONTINUATION_HANDOVER_2026-09-07.md), including checkout recovery boundaries, current Docker availability, historical verification, and the next paper-pipeline slice.
 
 1. [Repository README](../README.md) — current product boundary and operator start/stop.

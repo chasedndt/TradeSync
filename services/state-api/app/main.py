@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import math
 import uuid
@@ -1661,7 +1662,7 @@ async def get_execution_reconciliation(hours: int = Query(24, ge=1, le=720)):
 
 
 @app.get("/state/execution/wallet-preview", tags=["execution"])
-async def get_wallet_preview():
+async def get_wallet_preview(address: Optional[str] = None):
     """Account state for the configured address, read-only.
 
     An address is public: it is in every transaction the account has ever made.
@@ -1674,7 +1675,10 @@ async def get_wallet_preview():
     records would tell you what TradeSync believes; this tells you what the
     venue believes, and the difference between those is the interesting part.
     """
-    if not WALLET_ADDRESS:
+    preview_address = address.strip() if address is not None else WALLET_ADDRESS
+    if address is not None and not re.fullmatch(r"0x[0-9a-fA-F]{40}", preview_address):
+        raise HTTPException(status_code=422, detail="Expected a public EVM address: 0x followed by 40 hexadecimal characters. Never enter a private key.")
+    if not preview_address:
         return {
             "configured": False,
             "address": None,
@@ -1687,7 +1691,7 @@ async def get_wallet_preview():
         async with httpx.AsyncClient(timeout=8.0, trust_env=False) as client:
             response = await client.post(
                 HYPERLIQUID_INFO_URL,
-                json={"type": "clearinghouseState", "user": WALLET_ADDRESS},
+                json={"type": "clearinghouseState", "user": preview_address},
             )
             response.raise_for_status()
             state_payload = response.json()
@@ -1700,7 +1704,9 @@ async def get_wallet_preview():
             ),
         )
 
-    margin = state_payload.get("marginSummary") or {}
+    if not isinstance(state_payload, dict) or not isinstance(state_payload.get("marginSummary"), dict) or not isinstance(state_payload.get("assetPositions"), list):
+        raise HTTPException(status_code=503, detail="Venue account response is incomplete; no balance is inferred")
+    margin = state_payload["marginSummary"]
     positions = []
     for entry in state_payload.get("assetPositions") or []:
         position = entry.get("position") or {}
@@ -1720,12 +1726,17 @@ async def get_wallet_preview():
             "liquidation_price": _as_float(position.get("liquidationPx")),
         })
 
-    account_value = _as_float(margin.get("accountValue")) or 0.0
-    total_margin_used = _as_float(margin.get("totalMarginUsed")) or 0.0
+    account_value = _as_float(margin.get("accountValue"))
+    total_margin_used = _as_float(margin.get("totalMarginUsed"))
+    if account_value is None or total_margin_used is None or not math.isfinite(account_value) or not math.isfinite(total_margin_used):
+        raise HTTPException(status_code=503, detail="Venue balance fields are unavailable; no balance is inferred")
 
     return {
         "configured": True,
-        "address": WALLET_ADDRESS,
+        "address": preview_address,
+        "lookup_mode": "session_watch_only" if address is not None else "configured_watch_only",
+        "observed_at": datetime.now(timezone.utc).isoformat(),
+        "network": "testnet" if "testnet" in HYPERLIQUID_INFO_URL else "mainnet",
         "account_value_usd": account_value,
         "withdrawable_usd": _as_float(state_payload.get("withdrawable")),
         "total_margin_used_usd": total_margin_used,

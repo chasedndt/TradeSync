@@ -69,6 +69,7 @@ export function PriceChart({
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const chartRef = useRef<IChartApi | null>(null)
+  const fittedRef = useRef(false)
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
   const volumeRef = useRef<ISeriesApi<'Histogram'> | null>(null)
   const priceLinesRef = useRef<Map<string, IPriceLine>>(new Map())
@@ -88,6 +89,7 @@ export function PriceChart({
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
+    fittedRef.current = false
 
     const chart = createChart(el, {
       height,
@@ -186,7 +188,10 @@ export function PriceChart({
         color: c.close >= c.open ? 'rgba(63,178,127,0.28)' : 'rgba(224,87,74,0.28)',
       })),
     )
-    if (candles.length) chartRef.current?.timeScale().fitContent()
+    if (candles.length && chartRef.current && !fittedRef.current) {
+      chartRef.current.timeScale().fitContent()
+      fittedRef.current = true
+    }
     setRevision((r) => r + 1)
   }, [candles])
 

@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { WatchOnlyWallet } from '../components/WatchOnlyWallet'
 import { useExecutionStatus } from '../api/hooks'
 import { Database, ListChecks, LockKey, Prohibit, ShieldCheck, Wallet } from '../components/icons'
 
@@ -21,7 +22,7 @@ export function Execution() {
           <Prohibit size={42} className="tone-bad" weight="bold" />
           <div><h3>{backendDisabled ? 'LIVE EXECUTION DISABLED' : 'CONFIGURATION CONFLICT'}</h3><strong>TradeSync is operating without wallet authority.</strong></div>
           <ul className="execution-list">
-            <li>No wallet or signer is connected</li>
+            <li>Account viewing does not grant signing or order authority</li>
             <li>No order-placement controls are exposed</li>
             <li>Context providers cannot approve or execute trades</li>
           </ul>
@@ -38,8 +39,8 @@ export function Execution() {
         <section className="panel p-5">
           <Wallet size={28} className="tone-dim mb-4" weight="duotone" />
           <div className="eyebrow">Wallet authority</div>
-          <div className="text-lg font-bold tone-dim">NOT CONFIGURED</div>
-          <p className="text-xs text-slate-400 mt-2">Wallet creation and signer wiring remain a separately approved phase.</p>
+          <div className="text-lg font-bold tone-dim">WATCH ONLY</div>
+          <p className="text-xs text-slate-400 mt-2">Public-address lookup below. Signer provisioning and activation remain separate approval-gated operations.</p>
         </section>
         <section className="panel p-5">
           <Database size={28} className="tone-warn mb-4" weight="duotone" />
@@ -49,8 +50,9 @@ export function Execution() {
         </section>
       </div>
 
+      <WatchOnlyWallet />
       <section className="panel">
-        <div className="panel-heading"><div><h2>Activation gates</h2><p>These are future safety requirements, not controls</p></div></div>
+        <div className="panel-heading"><div><h2>Activation gates</h2><p>These are safety requirements, not controls</p></div></div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-slate-800">
           {[
             ['1', 'Paper evidence', 'End-to-end paper receipts, replay protection, and journal accuracy must pass.'],

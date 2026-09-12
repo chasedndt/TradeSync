@@ -1,5 +1,13 @@
 # TradeSync Roadmap
 
+## Operator usability follow-up — 2026-09-09
+
+WalletConnect address-only QR pairing is implemented in source, pending the operator's public project ID, dependency-security triage and live acceptance. See [scope and gates](docs/changes/2026-09-09_walletconnect-address-only.md). This is not a signing or execution connector.
+
+Watch-only account onboarding is implemented as a session-only public-address lookup; see [verification and scope](docs/changes/2026-09-09_watch-only-wallet.md). It does not enable signing or replace the pending paper-rehearsal and unified-connector work.
+
+Canvas modes, labelled hypothetical outcomes and separate adapter readbacks are implemented in source; see [the change record](docs/changes/2026-09-09_canvas-and-adapter-readbacks.md) for verification limits. Next: rendered chart/drawing acceptance; unified integration freshness/receipt status; Pine source inventory; signal-lifecycle and cost-aware replay; watch-only public-address onboarding and paper rehearsal. These do not enable execution, jobs or external publishing. Earlier completion dates/statuses below remain historical until reconciled.
+
 Last updated: 2026-09-02
 
 Planning horizon: three-week foundation sprint plus gated continuation

@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 import { apiGet } from '../../api/client'
 import type { EvidenceTimeline as Timeline, TimelineEntry } from '../../api/types'
 
@@ -10,6 +11,7 @@ import type { EvidenceTimeline as Timeline, TimelineEntry } from '../../api/type
  * next — without screenshots or memory.
  */
 export function EvidenceTimeline({ symbol }: { symbol: string }) {
+  const [horizon, setHorizon] = useState(60)
   const { data, isLoading, isError } = useQuery({
     queryKey: ['evidence-timeline', symbol],
     queryFn: () =>
@@ -38,22 +40,33 @@ export function EvidenceTimeline({ symbol }: { symbol: string }) {
 
   return (
     <div style={{ display: 'grid', gap: 8 }}>
+      <div role="group" aria-label="Outcome horizon" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {[15, 60, 240].map((minutes) => <button key={minutes} type="button"
+          className={horizon === minutes ? 'chip chip--active' : 'chip'} aria-pressed={horizon === minutes}
+          onClick={() => setHorizon(minutes)}>{minutes}m outcome</button>)}
+      </div>
+      <p className="metric-sub">Latest {data.entries.length} admitted calls for {symbol}. $ impact below assumes $1,000 unleveraged notional per call; these are independent research observations, not a portfolio simulation.</p>
       {data.entries.map((entry) => (
-        <TimelineRow key={entry.opportunity_id} entry={entry} />
+        <TimelineRow key={entry.opportunity_id} entry={entry} horizon={horizon} />
       ))}
     </div>
   )
 }
 
-function TimelineRow({ entry }: { entry: TimelineEntry }) {
+function TimelineRow({ entry, horizon }: { entry: TimelineEntry; horizon: number }) {
   const measured = entry.outcomes.filter((o) => o.status === 'measured')
+  const selected = entry.outcomes.find((o) => o.horizon_minutes === horizon)
+  const value = selected?.status === 'measured' && Number.isFinite(selected.signed_return_pct) ? selected.signed_return_pct : null
   return (
     <details className="panel" style={{ padding: 10 }}>
-      <summary style={{ cursor: 'pointer', display: 'flex', gap: 12, alignItems: 'center' }}>
+      <summary style={{ cursor: 'pointer', display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
         <span className={entry.direction === 'SHORT' ? 'tone-bad' : 'tone-good'}>
           {entry.direction}
         </span>
-        <span className="metric-sub">{new Date(entry.opened_at).toLocaleTimeString()}</span>
+        <span className="metric-sub">{new Date(entry.opened_at).toLocaleString()}</span>
+        <strong className={value == null ? 'tone-dim' : value > 0 ? 'tone-good' : value < 0 ? 'tone-bad' : 'tone-dim'}>
+          {value == null ? `${horizon}m: ${selected?.status ?? 'unavailable'}` : `${horizon}m: ${value >= 0 ? '+' : ''}${value.toFixed(3)}% · ${value >= 0 ? '+' : '-'}$${Math.abs(value * 10).toFixed(2)} gross / $1k`}
+        </strong>
         <span className="metric-sub">score {entry.directional_score.toFixed(4)}</span>
         <span className="metric-sub">coverage {entry.coverage_pct.toFixed(1)}%</span>
         <span style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
