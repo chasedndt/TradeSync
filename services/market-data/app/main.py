@@ -402,37 +402,37 @@ async def poll_context_loop():
 
 
 async def poll_orderbook_loop():
-    """Poll orderbook data from all providers."""
+    """Poll orderbook data from all providers.
+
+    Symbols are read concurrently, not one after another. The snapshot's
+    timestamp is refreshed by this loop, and a sequential pass over ten
+    symbols took about 25 seconds — so the first symbols in the list aged past
+    Mission Control's 15-second freshness rule every cycle, as a staircase of
+    ages (1s, 2s … 20s, 25s) showed on 2026-09-12. The venue rate limiter is
+    still the throttle; concurrency only removes the self-inflicted queue.
+    """
     logger.info(f"Starting orderbook poller for symbols: {SYMBOLS}")
+
+    async def read_one(provider, symbol: str) -> None:
+        try:
+            orderbook = await provider.fetch_orderbook(symbol)
+            if not orderbook:
+                return
+            event = normalizer.normalize_orderbook(provider.venue, orderbook)
+            if event:
+                await redis_client.push_normalized(event.model_dump())
+                snapshot = snapshotter.process_event(event)
+                if snapshot:
+                    await store_snapshot_and_features(snapshot)
+        except Exception as e:
+            logger.error(f"Error polling {provider.venue} orderbook for {symbol}: {e}")
 
     while True:
         try:
             for provider in providers:
                 if not provider.enabled:
                     continue
-
-                for symbol in SYMBOLS:
-                    try:
-                        # Fetch orderbook
-                        orderbook = await provider.fetch_orderbook(symbol)
-
-                        if not orderbook:
-                            continue
-
-                        # Normalize
-                        event = normalizer.normalize_orderbook(provider.venue, orderbook)
-
-                        if event:
-                            # Push to Redis
-                            await redis_client.push_normalized(event.model_dump())
-
-                            # Update snapshot
-                            snapshot = snapshotter.process_event(event)
-                            if snapshot:
-                                await store_snapshot_and_features(snapshot)
-
-                    except Exception as e:
-                        logger.error(f"Error polling {provider.venue} orderbook for {symbol}: {e}")
+                await asyncio.gather(*(read_one(provider, s) for s in SYMBOLS))
 
             await asyncio.sleep(POLL_INTERVAL_ORDERBOOK / 1000)
 

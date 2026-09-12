@@ -213,10 +213,12 @@ services:
       MARKET_SYMBOLS: *market_symbols
       ENABLE_HYPERLIQUID: "true"
       POLL_INTERVAL_CONTEXT: "5000"
-      # One request per symbol per cycle against a 60/min venue limiter: ten
-      # symbols at 3s would ask for 200/min and the book would silently age.
-      # 10s keeps it at 60/min. Raise this again if the list grows.
-      POLL_INTERVAL_ORDERBOOK: "10000"
+      # One request per symbol per cycle, all symbols concurrently, against a
+      # 120/min venue limiter shared with funding history and candle fetches.
+      # Ten symbols at 8s is 75/min; the snapshot timestamp is refreshed by
+      # this loop, so this interval bounds how old Mission Control sees a
+      # symbol. Raise it if the list grows past about fifteen.
+      POLL_INTERVAL_ORDERBOOK: "8000"
       PYTHONUNBUFFERED: 1
     dns:
       - 8.8.8.8
