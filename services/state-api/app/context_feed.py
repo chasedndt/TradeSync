@@ -17,6 +17,8 @@ from typing import Any, Awaitable, Callable, Dict, Optional
 
 import httpx
 
+from . import context_shapes, economic_calendar
+
 logger = logging.getLogger(__name__)
 
 
@@ -47,12 +49,18 @@ class ContextFeedService:
             if item.strip()
         ]
         self.timeout_seconds = float(os.getenv("CONTEXT_FEED_TIMEOUT_SECONDS", "6"))
+        self.calendar_enabled = _env_bool("CALENDAR_CONTEXT_ENABLED", True)
         self.ttls = {
             "coingecko": int(os.getenv("COINGECKO_CONTEXT_TTL_SECONDS", "300")),
             "defillama": int(os.getenv("DEFILLAMA_CONTEXT_TTL_SECONDS", "900")),
             "fred": int(os.getenv("FRED_CONTEXT_TTL_SECONDS", "3600")),
+            # The ForexFactory feed is a courtesy feed with unpublished terms:
+            # once an hour is the most it is asked, and the answer is cached.
+            "calendar": int(os.getenv("CALENDAR_CONTEXT_TTL_SECONDS", "3600")),
         }
         self._cache: Dict[str, CacheEntry] = {}
+        self._failed_at: Dict[str, float] = {}
+        self.failure_hold_seconds = int(os.getenv("CONTEXT_FEED_FAILURE_HOLD_SECONDS", "900"))
         self._locks = {name: asyncio.Lock() for name in self.ttls}
         self._client: Optional[httpx.AsyncClient] = None
 
@@ -71,14 +79,17 @@ class ContextFeedService:
             self._client = None
 
     def _disabled(self, provider: str, reason: str = "disabled_by_configuration") -> Dict[str, Any]:
-        return {
-            "provider": provider,
-            "status": "disabled",
-            "source_type": "context_only",
-            "execution_authority": False,
-            "reason": reason,
-            "data": {},
-        }
+        return context_shapes.disabled(provider, reason)
+
+    def _unavailable(self, provider: str, error: str, failed_at: float) -> Dict[str, Any]:
+        return context_shapes.unavailable(
+            provider, error, failed_at, self.failure_hold_seconds, self.ttls[provider]
+        )
+
+    def _format(self, provider: str, entry: CacheEntry, cached: bool) -> Dict[str, Any]:
+        return context_shapes.formatted(
+            provider, entry.payload, entry.fetched_at, cached, self.ttls[provider]
+        )
 
     async def _cached_fetch(
         self,
@@ -97,45 +108,32 @@ class ContextFeedService:
             if cached and not force_refresh and now - cached.fetched_at < self.ttls[provider]:
                 return self._format(provider, cached, cached=True)
 
-            try:
-                payload = await fetcher()
-                entry = CacheEntry(payload=payload, fetched_at=time.time())
-                self._cache[provider] = entry
-                return self._format(provider, entry, cached=False)
-            except Exception as exc:
-                logger.warning("Context provider %s failed: %s", provider, type(exc).__name__)
+            # A recent failure is remembered too. Without this, a provider that
+            # is rate-limiting us gets asked again on every overview poll — once
+            # a minute from the Cockpit — which is exactly how a short 429
+            # becomes a long one.
+            held = self._failed_at.get(provider)
+            if held and not force_refresh and now - held < self.failure_hold_seconds:
                 if cached:
                     result = self._format(provider, cached, cached=True)
                     result.update(status="degraded", error="provider_refresh_failed")
                     return result
-                return {
-                    "provider": provider,
-                    "status": "unavailable",
-                    "source_type": "context_only",
-                    "execution_authority": False,
-                    "cached": False,
-                    "stale": True,
-                    "age_seconds": None,
-                    "fetched_at": None,
-                    "ttl_seconds": self.ttls[provider],
-                    "error": "provider_fetch_failed",
-                    "data": {},
-                }
+                return self._unavailable(provider, "provider_fetch_failed_recently", held)
 
-    def _format(self, provider: str, entry: CacheEntry, cached: bool) -> Dict[str, Any]:
-        age = max(0.0, time.time() - entry.fetched_at)
-        return {
-            "provider": provider,
-            "status": "healthy" if age <= self.ttls[provider] else "stale",
-            "source_type": "context_only",
-            "execution_authority": False,
-            "cached": cached,
-            "stale": age > self.ttls[provider],
-            "age_seconds": round(age, 3),
-            "fetched_at": datetime.fromtimestamp(entry.fetched_at, timezone.utc).isoformat(),
-            "ttl_seconds": self.ttls[provider],
-            "data": entry.payload,
-        }
+            try:
+                payload = await fetcher()
+                entry = CacheEntry(payload=payload, fetched_at=time.time())
+                self._cache[provider] = entry
+                self._failed_at.pop(provider, None)
+                return self._format(provider, entry, cached=False)
+            except Exception as exc:
+                logger.warning("Context provider %s failed: %s", provider, type(exc).__name__)
+                self._failed_at[provider] = time.time()
+                if cached:
+                    result = self._format(provider, cached, cached=True)
+                    result.update(status="degraded", error="provider_refresh_failed")
+                    return result
+                return self._unavailable(provider, "provider_fetch_failed", self._failed_at[provider])
 
     async def _fetch_coingecko(self) -> Dict[str, Any]:
         client = await self._get_client()
@@ -198,9 +196,49 @@ class ContextFeedService:
                 values[series_id] = {"value": latest.get("value"), "date": latest.get("date")}
         return {"metric_family": "macro_reference", "series": values}
 
+    async def _fetch_calendar(self) -> Dict[str, Any]:
+        """ForexFactory's weekly feed, plus FRED release dates when a key exists.
+
+        Each feed is validated event by event; a malformed event is dropped
+        and counted rather than shown at a guessed time. FRED failing does not
+        lose the ForexFactory half, and vice versa — the payload says which
+        sources answered.
+        """
+        client = await self._get_client()
+        now = datetime.now(timezone.utc)
+        response = await client.get(
+            economic_calendar.FF_FEED_URL,
+            headers={"User-Agent": "TradeSync private research workstation"},
+        )
+        response.raise_for_status()
+        parts = [economic_calendar.normalise_forexfactory(response.json(), now)]
+        if self.fred_api_key:
+            try:
+                fred = await client.get(
+                    "https://api.stlouisfed.org/fred/releases/dates",
+                    params={
+                        "api_key": self.fred_api_key,
+                        "file_type": "json",
+                        "include_release_dates_with_no_data": "true",
+                        "realtime_start": now.strftime("%Y-%m-%d"),
+                        "sort_order": "asc",
+                        "limit": "200",
+                    },
+                )
+                fred.raise_for_status()
+                parts.append(economic_calendar.normalise_fred_release_dates(fred.json(), now))
+            except Exception as exc:  # the other half still stands
+                logger.warning("FRED release dates failed: %s", type(exc).__name__)
+        payload = economic_calendar.merge(*parts)
+        payload["fred_configured"] = bool(self.fred_api_key)
+        return payload
+
     async def fetch_overview(self, force_refresh: bool = False) -> Dict[str, Any]:
         tasks = []
         names = []
+        if self.calendar_enabled:
+            names.append("calendar")
+            tasks.append(self._cached_fetch("calendar", self._fetch_calendar, force_refresh))
 
         if self.coingecko_enabled:
             names.append("coingecko")
@@ -222,6 +260,8 @@ class ContextFeedService:
             providers["fred"] = self._disabled("fred")
         elif not self.fred_api_key:
             providers["fred"] = self._disabled("fred", "free_api_key_not_configured")
+        if not self.calendar_enabled:
+            providers["calendar"] = self._disabled("calendar")
 
         return {
             "role": "context_only",
@@ -244,6 +284,11 @@ class ContextFeedService:
                     "configured": bool(self.fred_api_key),
                     "ttl_seconds": self.ttls["fred"],
                     "series": self.fred_series,
+                },
+                "calendar": {
+                    "enabled": self.calendar_enabled,
+                    "ttl_seconds": self.ttls["calendar"],
+                    "sources": ["forexfactory"] + (["fred"] if self.fred_api_key else []),
                 },
             },
         }

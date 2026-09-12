@@ -414,12 +414,39 @@ export interface ContextProvider {
   }
 }
 
+/** One scheduled economic event, already validated and converted to UTC. */
+export interface CalendarEvent {
+  title: string
+  country: string
+  impact: 'High' | 'Medium' | 'Low' | 'Holiday'
+  /** ISO 8601, UTC. FRED rows are date-only: midnight UTC of that date. */
+  scheduled_at: string
+  minutes_until: number
+  source: 'forexfactory' | 'fred'
+  forecast: string
+  previous: string
+  /** By title (FOMC, CPI, NFP…), not by the feed's own impact rating. */
+  market_moving: boolean
+}
+
+export interface CalendarProviderData {
+  metric_family?: 'economic_calendar'
+  events?: CalendarEvent[]
+  next_market_moving?: CalendarEvent | null
+  counts?: { total: number; high: number; market_moving: number; rejected: number }
+  rejections?: string[]
+  sources?: string[]
+  fred_configured?: boolean
+}
+
 export interface ContextOverviewResponse {
   role: 'context_only'
   authoritative_market_source: 'hyperliquid'
   execution_venue: 'hyperliquid'
   execution_authority: false
-  providers: Record<'coingecko' | 'defillama' | 'fred', ContextProvider>
+  providers: Record<'coingecko' | 'defillama' | 'fred', ContextProvider> & {
+    calendar?: Omit<ContextProvider, 'data'> & { data: CalendarProviderData }
+  }
   generated_at: string
 }
 

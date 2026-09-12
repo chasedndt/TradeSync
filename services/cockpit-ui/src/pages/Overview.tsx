@@ -1,6 +1,7 @@
 import { Fragment } from 'react'
 import { NavLink } from 'react-router-dom'
 import { MarketChartPanel } from '../components/canvas/MarketChartPanel'
+import { EventsStrip } from '../components/EventsStrip'
 import {
   Bank,
   BracketsCurly,
@@ -222,6 +223,8 @@ export function Overview() {
         <ReadinessItem to="/pipeline" icon={<Heartbeat size={35} weight="duotone" />} label="Intelligence Pipeline" value={hasSignals ? 'ACTIVE' : 'PARTIAL'} detail={hasSignals ? 'Scoring output detected' : 'No current scoring output'} tone={hasSignals ? 'good' : 'warn'} />
         <ReadinessItem to="/pipeline" icon={<Prohibit size={35} weight="bold" />} label="Execution" value="DISABLED" detail="Paper-only · No wallet connected" tone="bad" />
       </section>
+
+      <EventsStrip context={context} />
 
       <div className="primary-grid">
         <MarketPulse snapshots={snapshots} />
