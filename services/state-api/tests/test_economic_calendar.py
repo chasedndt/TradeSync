@@ -104,7 +104,16 @@ def test_fred_release_dates_become_date_only_cards() -> None:
     assert [e.title for e in out.events] == ["Consumer Price Index"]
     assert out.events[0].scheduled_at == "2026-09-15T00:00:00+00:00"
     assert out.events[0].source == "fred" and out.events[0].market_moving
+    assert out.events[0].impact == "Medium"
     assert out.rejected == 2
+
+
+def test_fred_daily_fillers_are_low_impact_so_the_strip_skips_them() -> None:
+    raw = {"release_dates": [{"release_name": "Coinbase Cryptocurrencies", "date": "2026-09-13"},
+                             {"release_name": "CBOE Market Statistics", "date": "2026-09-13"}]}
+    out = normalise_fred_release_dates(raw, NOW)
+    assert [e.impact for e in out.events] == ["Low", "Low"]
+    assert not any(e.market_moving for e in out.events)
 
 
 def test_merge_orders_by_time_and_names_the_next_market_mover() -> None:

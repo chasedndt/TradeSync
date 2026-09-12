@@ -201,15 +201,20 @@ def normalise_fred_release_dates(
         days = (when - now).total_seconds() / 86400
         if days < -1 or days > horizon_days:
             continue
+        moving = _is_market_moving(name)
         out.events.append(
             EventCard(
                 title=name.strip()[:120],
                 country="USD",
-                impact="Medium",
+                # FRED lists every release, daily fillers included ("Coinbase
+                # Cryptocurrencies", "CBOE Market Statistics"). Only the ones
+                # that match a market-moving title rank as Medium; the rest are
+                # Low, which the strip does not surface.
+                impact="Medium" if moving else "Low",
                 scheduled_at=when.isoformat(),
                 minutes_until=int((when - now).total_seconds() // 60),
                 source="fred",
-                market_moving=_is_market_moving(name),
+                market_moving=moving,
             )
         )
     out.events.sort(key=lambda e: e.scheduled_at)
