@@ -795,6 +795,47 @@ export interface DepthResponse {
   authority: string
 }
 
+// === Skill gate (corrected measurement) ===
+
+export interface SkillGateCell {
+  label: string
+  horizon_minutes: number
+  regime: 'rising' | 'falling' | 'flat' | 'unknown'
+  measured: number
+  independent_per_symbol: number
+  independent_pooled: number
+  hit_rate: number | null
+  expected_hit_rate: number | null
+  skill: number | null
+  standard_error: number | null
+  z: number | null
+  /** |z| >= 2 in either direction: the sample can tell this apart from zero. */
+  detectable: boolean
+  /** skill > 0, Holm-adjusted across every cell assessed together, and z >= 2. */
+  positive_skill: boolean
+  /** null when costs were not supplied; never false by default. */
+  economic_edge: boolean | null
+  mean_signed_return_pct: number | null
+  mean_net_return_pct: number | null
+  in_sample_skill: number | null
+  holdout_skill: number | null
+  holdout_measured: number
+  notes: string[]
+  readiness: string
+}
+
+export interface SkillGateResponse {
+  schema_version: 'skill_gate_v2'
+  symbol: string | null
+  horizons: number[]
+  cells: SkillGateCell[]
+  cells_assessed_together: number
+  verdict: { any_detectable: boolean; any_positive_skill: boolean; any_economic_edge: boolean; gate: 'OPEN' | 'CLOSED' }
+  costs: { round_trip_fee_pct: number; spread_pct: number; slippage_pct: number; total_pct: number; source: string }
+  entry_regimes_pending: number
+  note: string
+}
+
 // === Paper rehearsal ===
 
 export interface RehearseRequest {

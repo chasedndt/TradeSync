@@ -3670,3 +3670,8 @@ async def get_execution_status_alias(response: Response):
 from app.rehearsal import register as register_rehearsal  # noqa: E402
 
 register_rehearsal(app, state)
+
+# The skill gate measured the corrected way; see app/skill_gate.py.
+from app.skill_gate import register as register_skill_gate  # noqa: E402
+
+register_skill_gate(app, state)

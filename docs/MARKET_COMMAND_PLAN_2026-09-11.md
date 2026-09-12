@@ -265,6 +265,10 @@ This follows Codex's review order; slice 1 is accepted today.
   A key leak into the state-api log was found and closed the same hour.
 - **Mission Control liveness** now judged on observation age, not metric age;
   order books polled concurrently. All ten symbols LIVE.
+- **Slice 3 delivered**: the corrected measurement (entry-time regimes,
+  counted independence, three verdicts, stated costs) runs on real data at
+  `/state/outcomes/skill-gate` and on the Regime Lab. Gate CLOSED; every cell
+  negative after costs. `changes/2026-09-12_skill-gate-wired-in.md`.
 
 ## 7. Where things stand at the end of 2026-09-11
 

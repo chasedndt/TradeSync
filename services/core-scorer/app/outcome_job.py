@@ -28,6 +28,11 @@ from tradesync_core.outcomes import (
     measure_opportunity,
 )
 
+from .outcome_regime import (
+    lookback_margin_s,
+    missing_regime_opportunities,
+    store_entry_regime,
+)
 from .outcome_store import pending_opportunities, store_outcome
 from .outcome_windows import (
     FetchRange,
@@ -122,6 +127,9 @@ async def fetch_candles_for(
     span = required_span_s(opened_at_s, LONGEST_HORIZON, CANDLE_SECONDS)
     if span is None:
         return SymbolCandles([], [], [], [])
+    # Start an hour earlier: the entry regime is read from the candles that
+    # closed before each opportunity fired, out of the same fetch.
+    span = (span[0] - lookback_margin_s(CANDLE_SECONDS), span[1])
     fine, fine_ranges = await _fetch_interval(symbol, span, OUTCOME_CANDLE_INTERVAL, client)
     coarse: list[dict[str, Any]] = []
     coarse_ranges: list[FetchRange] = []
@@ -241,5 +249,49 @@ async def run_outcome_pass(conn) -> dict[str, int]:
         outcome = replace(outcome, horizons=fall_back_per_window(fine, coarse))
         await store_outcome(conn, outcome, row["symbol"], row["dir"])
         measured += sum(1 for h in outcome.horizons if h.status == "measured")
+        await _record_regime(conn, row, opened_at_s, sc)
 
-    return {"opportunities": len(pending), "measured": measured}
+    labelled = await _backfill_regimes(conn, {str(r["id"]) for r in pending}, now_s)
+    return {"opportunities": len(pending), "measured": measured, "regimes_backfilled": labelled}
+
+
+async def _record_regime(conn, row, opened_at_s: int, sc: SymbolCandles) -> None:
+    """Label the entry regime from whichever series covers the hour before entry."""
+    if any(c["time"] < opened_at_s for c in sc.fine):
+        await store_entry_regime(conn, str(row["id"]), row["symbol"], opened_at_s, sc.fine,
+                                 CANDLE_SECONDS, OUTCOME_CANDLE_INTERVAL)
+    elif sc.coarse:
+        await store_entry_regime(conn, str(row["id"]), row["symbol"], opened_at_s, sc.coarse,
+                                 COARSE_SECONDS, COARSE_CANDLE_INTERVAL)
+    # No candles before entry at either interval: no row, and it is retried
+    # by the backfill on a later pass rather than labelled "unknown" now.
+
+
+async def _backfill_regimes(conn, skip: set[str], now_s: int) -> int:
+    """Label opportunities that already have outcomes but no entry regime.
+
+    Their outcomes are not re-measured — only the regime is added — so a fetch
+    at a coarser interval today cannot change a result recorded at 1m earlier.
+    """
+    rows = [r for r in await missing_regime_opportunities(conn, OUTCOME_BATCH) if str(r["id"]) not in skip]
+    if not rows:
+        return 0
+    by_symbol: dict[str, list[int]] = {}
+    for row in rows:
+        by_symbol.setdefault(row["symbol"], []).append(int(row["snapshot_ts"].timestamp()))
+    series: dict[str, SymbolCandles] = {}
+    async with httpx.AsyncClient() as client:
+        for symbol, opened in by_symbol.items():
+            series[symbol] = await fetch_candles_for(symbol, opened, client, now_s)
+    labelled = 0
+    for row in rows:
+        sc = series.get(row["symbol"]) or SymbolCandles([], [], [], [])
+        before = await conn.fetchval(
+            "SELECT count(*) FROM opportunity_entry_regimes WHERE opportunity_id = $1::uuid", str(row["id"])
+        )
+        await _record_regime(conn, row, int(row["snapshot_ts"].timestamp()), sc)
+        after = await conn.fetchval(
+            "SELECT count(*) FROM opportunity_entry_regimes WHERE opportunity_id = $1::uuid", str(row["id"])
+        )
+        labelled += int(after) - int(before)
+    return labelled

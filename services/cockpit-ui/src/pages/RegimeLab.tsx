@@ -7,6 +7,7 @@ import {
 } from '../api/hooks'
 import type { RegimeLabExperimentRequest } from '../api/types'
 import { useTrackedSymbols } from '../api/hooks/useTrackedSymbols'
+import { SkillGatePanel } from '../components/SkillGatePanel'
 
 const BLOCK_LABELS: Record<string, string> = {
   price_volatility: 'Price & volatility',
@@ -135,6 +136,8 @@ export function RegimeLab() {
           </span>
         </div>
       </section>
+
+      <SkillGatePanel symbol={symbol} />
 
       <section className="regime-stat-grid" aria-label="Regime Lab status">
         <article className="regime-stat">
