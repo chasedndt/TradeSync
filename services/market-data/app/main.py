@@ -40,6 +40,7 @@ from .cross_venue import (
     parse_premium_index,
 )
 from .news_tone import (
+    BACKOFF_AFTER_429_S,
     GDELT_DOC_URL,
     MIN_REQUEST_SPACING_S,
     attach_news_tone,
@@ -227,8 +228,8 @@ async def poll_news_tone_loop():
                         if response.status_code == 429:
                             # GDELT's limit is per-IP and bursty; one refusal
                             # means back off well past the nominal spacing.
-                            logger.warning(f"GDELT rate-limited on {symbol}; backing off 60s")
-                            await asyncio.sleep(60)
+                            logger.warning(f"GDELT rate-limited on {symbol}; backing off {BACKOFF_AFTER_429_S:.0f}s")
+                            await asyncio.sleep(BACKOFF_AFTER_429_S)
                             continue
                         response.raise_for_status()
                         reading = parse_timelinetone(response.json(), int(time.time() * 1000))

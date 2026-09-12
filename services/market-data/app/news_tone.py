@@ -24,7 +24,12 @@ from datetime import datetime, timezone
 from typing import Any, Mapping
 
 GDELT_DOC_URL = "https://api.gdeltproject.org/api/v2/doc/doc"
-MIN_REQUEST_SPACING_S = 6.0  # GDELT asks for 5; a margin costs nothing
+# GDELT asks for one request per five seconds, but in practice refused four of
+# ten requests spaced six seconds apart on 2026-09-12. Fifteen seconds, with a
+# two-minute back-off on any refusal, gets a clean cycle; ten coins take about
+# three minutes, well inside the fifteen-minute cadence.
+MIN_REQUEST_SPACING_S = 15.0
+BACKOFF_AFTER_429_S = 120.0
 BUCKET_S = 900  # GDELT tone timelines are 15-minute buckets
 
 # What to ask GDELT for each coin. Ticker symbols alone are too ambiguous
