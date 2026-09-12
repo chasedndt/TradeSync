@@ -106,6 +106,17 @@ def extract_feature_observations(snapshot: Mapping[str, Any]) -> list[dict[str, 
         # Observed taker flow from the venue trade stream. Absent, not zero,
         # until trades have actually been seen.
         "hl_direct_cvd": _path(snapshot, "derived", "cvd_window_usd", "value"),
+        # Context only: GDELT news tone for the coin, recorded so its skill can
+        # be measured; it cannot score until it earns a weight.
+        "gdelt_news_tone": _path(snapshot, "derived", "gdelt_news_tone", "value"),
+        # Context only: Binance perpetual funding and OI, and the funding
+        # spread between the two venues. External reference venue, not a
+        # trading venue; none of the three can score until it earns a weight.
+        "binance_funding_rate_8h": _path(snapshot, "derived", "binance_funding_rate_8h", "value"),
+        "binance_open_interest_usd": _path(snapshot, "derived", "binance_open_interest_usd", "value"),
+        "funding_spread_vs_binance_bps": _path(
+            snapshot, "derived", "funding_spread_vs_binance_bps", "value"
+        ),
         "hl_liquidation_total_proxy_usd": _path(
             snapshot, "liquidations", "horizons", "1h", "total_usd"
         ),

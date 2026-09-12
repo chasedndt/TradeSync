@@ -1,7 +1,7 @@
 {
   "schema_version": "market_feature_catalog_v1",
   "catalog_id": "tradesync-hyperliquid-market-features",
-  "version": "1.5.0",
+  "version": "1.7.0",
   "status": "paper_shadow",
   "venue": "hyperliquid",
   "purpose": "Define source, unit, comparator, history, normalization, provenance, and scoring authority before a market feature can reach the regime rulebook.",
@@ -374,6 +374,105 @@
       "decision_role": "May create a risk cap; cannot assign bullish or bearish direction.",
       "missing_data": "No external-risk flag is inferred.",
       "caveats": ["Event severity and market impact are distinct variables."]
+    },
+    "gdelt_news_tone": {
+      "signal_kind": "directional",
+      "block": "macro_flows",
+      "availability": "implemented",
+      "provenance": "context_only",
+      "source_authority": "context_only",
+      "source": "GDELT DOC 2.0 timelinetone: average tone of world news mentioning the coin, 15-minute buckets, newest closed bucket",
+      "unit": "tone_score",
+      "comparator": "GDELT article tone from -100 to +100 averaged per 15-minute bucket; the bucket still filling is skipped",
+      "normalization": "none",
+      "score_mode": "context_only",
+      "scoring_eligible": false,
+      "lookback_points": 96,
+      "minimum_history_points": 8,
+      "sampling_interval_ms": 900000,
+      "fresh_after_ms": 1800000,
+      "stale_after_ms": 3600000,
+      "decision_role": "Recorded against outcomes so news tone can be tested as a directional input. Contributes nothing to any score until it earns a weight through measured skill (edge_evidence.positive_skill), which is an operator decision.",
+      "missing_data": "Absent when GDELT has not answered for the coin within the last hour, or when no closed bucket exists.",
+      "caveats": [
+        "Context only: this is somebody else's reading of the news, not something TradeSync measured on the venue.",
+        "GDELT limits requests to one every five seconds; the poller asks for one coin at a time on a fifteen-minute cycle.",
+        "Queries name the project, not the ticker, because NEAR, LINK and UNI are ordinary words.",
+        "A zero tone is a claim that the news was neutral; a missing reading is absent, never zero.",
+        "Attribution required by GDELT's terms: The GDELT Project, https://www.gdeltproject.org/"
+      ]
+    },
+    "binance_funding_rate_8h": {
+      "availability": "implemented",
+      "provenance": "context_only",
+      "source_authority": "external_reference_venue",
+      "normalization": "none",
+      "score_mode": "context_only",
+      "scoring_eligible": false,
+      "lookback_points": 240,
+      "minimum_history_points": 20,
+      "sampling_interval_ms": 60000,
+      "fresh_after_ms": 120000,
+      "stale_after_ms": 600000,
+      "signal_kind": "directional",
+      "block": "positioning",
+      "source": "Binance USDT-M perpetual premiumIndex lastFundingRate for the same coin",
+      "unit": "rate_per_8h",
+      "comparator": "The venue's last funding rate per 8-hour interval, as published",
+      "decision_role": "Recorded so cross-venue positioning can be tested. Contributes nothing to any score until it earns a weight; Binance is a price and positioning reference, never a trading venue.",
+      "missing_data": "Absent when Binance has not answered within ten minutes.",
+      "caveats": [
+        "Binance is an external reference venue, not the trading venue. Hyperliquid remains the only venue TradeSync trades on.",
+        "Binance funding is per 8 hours; Hyperliquid's is hourly. Compare only after converting, which funding_spread_vs_binance_bps does."
+      ]
+    },
+    "binance_open_interest_usd": {
+      "availability": "implemented",
+      "provenance": "context_only",
+      "source_authority": "external_reference_venue",
+      "normalization": "none",
+      "score_mode": "context_only",
+      "scoring_eligible": false,
+      "lookback_points": 240,
+      "minimum_history_points": 20,
+      "sampling_interval_ms": 60000,
+      "fresh_after_ms": 120000,
+      "stale_after_ms": 600000,
+      "signal_kind": "none",
+      "block": "positioning",
+      "source": "Binance USDT-M perpetual openInterest in contracts, converted at the venue's own mark",
+      "unit": "usd",
+      "comparator": "Open interest in USD at the Binance mark at the time of the read",
+      "decision_role": "Context for how much of the wider market's positioning sits on the largest venue. Never scores on its own.",
+      "missing_data": "Absent when Binance has not answered within ten minutes.",
+      "caveats": [
+        "USD open interest moves with both contract quantity and mark price.",
+        "Not comparable to Hyperliquid OI without stating which mark each was valued at."
+      ]
+    },
+    "funding_spread_vs_binance_bps": {
+      "availability": "implemented",
+      "provenance": "context_only",
+      "source_authority": "external_reference_venue",
+      "normalization": "none",
+      "score_mode": "context_only",
+      "scoring_eligible": false,
+      "lookback_points": 240,
+      "minimum_history_points": 20,
+      "sampling_interval_ms": 60000,
+      "fresh_after_ms": 120000,
+      "stale_after_ms": 600000,
+      "signal_kind": "directional",
+      "block": "positioning",
+      "source": "Hyperliquid hourly funding times eight, minus Binance 8-hour funding, in basis points",
+      "unit": "basis_points",
+      "comparator": "Both venues per 8 hours; rejected when the two readings were more than 5 minutes apart",
+      "decision_role": "Positive means Hyperliquid longs are paying more than Binance longs: the Hyperliquid crowd is more one-sidedly long than the wider market's. A directional candidate, recorded first; it can score only after measured skill and an operator decision.",
+      "missing_data": "Absent when either venue's funding is missing or the readings were not aligned.",
+      "caveats": [
+        "A spread is not a prediction; funding can stay skewed for days.",
+        "Sampling skew is bounded at 5 minutes so a slow poll cannot present as market structure."
+      ]
     }
   }
 }

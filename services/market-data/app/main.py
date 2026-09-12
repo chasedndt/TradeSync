@@ -31,6 +31,21 @@ from .spot_premium import (
 )
 from .context_series import bucket_series, describe_coverage
 from .depth import summarise_book
+from .cross_venue import (
+    BINANCE_OPEN_INTEREST_URL,
+    BINANCE_PREMIUM_INDEX_URL,
+    attach_cross_venue,
+    binance_symbol_for,
+    parse_open_interest,
+    parse_premium_index,
+)
+from .news_tone import (
+    GDELT_DOC_URL,
+    MIN_REQUEST_SPACING_S,
+    attach_news_tone,
+    parse_timelinetone,
+    query_for,
+)
 from .trade_flow import CVD_WINDOW_MS, TradeFlowTracker
 from .trade_stream import run_trade_stream
 from .candles import (
@@ -126,6 +141,110 @@ async def poll_spot_reference_loop():
         await asyncio.sleep(SPOT_POLL_INTERVAL_MS / 1000)
 
 
+# Latest Binance funding and open interest per symbol. External reference
+# venue, context only; see cross_venue.py.
+cross_venue_reference: dict = {}
+CROSS_VENUE_POLL_INTERVAL_S = int(os.getenv("CROSS_VENUE_POLL_INTERVAL_S", "60"))
+CROSS_VENUE_STALE_AFTER_MS = int(os.getenv("CROSS_VENUE_STALE_AFTER_MS", "600000"))
+
+
+async def poll_cross_venue_loop():
+    """Read Binance funding and OI for every symbol, concurrently, once a minute.
+
+    Two public requests per coin per minute. A coin Binance does not list
+    simply never gets a reading. Failures are logged and skipped: an external
+    reference venue must never disturb Hyperliquid observation.
+    """
+    logger.info("Starting Binance cross-venue poller")
+    while True:
+        try:
+            async def read_one(client, symbol: str) -> None:
+                venue_symbol = binance_symbol_for(symbol)
+                try:
+                    premium_raw = await client.get(
+                        BINANCE_PREMIUM_INDEX_URL, params={"symbol": venue_symbol}, timeout=8.0
+                    )
+                    premium_raw.raise_for_status()
+                    premium = parse_premium_index(premium_raw.json())
+                    if premium is None:
+                        return
+                    entry = cross_venue_reference.setdefault(symbol, {})
+                    entry["premium"] = premium
+                    oi_raw = await client.get(
+                        BINANCE_OPEN_INTEREST_URL, params={"symbol": venue_symbol}, timeout=8.0
+                    )
+                    oi_raw.raise_for_status()
+                    oi = parse_open_interest(oi_raw.json(), premium["mark_price_usd"])
+                    if oi is not None:
+                        entry["open_interest"] = oi
+                except Exception as exc:
+                    logger.warning(f"Binance unavailable for {venue_symbol}: {exc}")
+
+            async with httpx.AsyncClient(headers={"User-Agent": "tradesync/1.0"}) as client:
+                await asyncio.gather(*(read_one(client, s) for s in SYMBOLS))
+        except Exception as exc:
+            logger.warning(f"Cross-venue poll failed: {exc}")
+        await asyncio.sleep(CROSS_VENUE_POLL_INTERVAL_S)
+
+
+# Latest GDELT news tone per symbol. Context only; see news_tone.py.
+news_tone_reference: dict = {}
+NEWS_TONE_POLL_INTERVAL_S = int(os.getenv("NEWS_TONE_POLL_INTERVAL_S", "900"))
+NEWS_TONE_STALE_AFTER_MS = int(os.getenv("NEWS_TONE_STALE_AFTER_MS", "3600000"))
+
+
+async def poll_news_tone_loop():
+    """Ask GDELT for each coin's tone, one request at a time, spaced apart.
+
+    GDELT's limit is one request every five seconds. Coins are polled
+    sequentially with a gap, not concurrently, and a coin without a safe query
+    is skipped. Failures are logged and skipped: Tier B context must never
+    disturb Hyperliquid observation.
+    """
+    logger.info("Starting GDELT news tone poller")
+    while True:
+        try:
+            async with httpx.AsyncClient() as client:
+                for symbol in SYMBOLS:
+                    query = query_for(symbol)
+                    if not query:
+                        continue
+                    try:
+                        response = await client.get(
+                            GDELT_DOC_URL,
+                            params={
+                                "query": query,
+                                "mode": "timelinetone",
+                                # A day, not six hours: for smaller coins GDELT
+                                # answers a six-hour window with an empty object.
+                                # Freshness still governs what gets attached.
+                                "timespan": "24h",
+                                "format": "json",
+                            },
+                            headers={"User-Agent": "tradesync/1.0 (private research)"},
+                            timeout=20.0,
+                        )
+                        if response.status_code == 429:
+                            # GDELT's limit is per-IP and bursty; one refusal
+                            # means back off well past the nominal spacing.
+                            logger.warning(f"GDELT rate-limited on {symbol}; backing off 60s")
+                            await asyncio.sleep(60)
+                            continue
+                        response.raise_for_status()
+                        reading = parse_timelinetone(response.json(), int(time.time() * 1000))
+                        if reading is not None:
+                            news_tone_reference[symbol] = reading
+                        else:
+                            body = response.text[:160].replace("\n", " ")
+                            logger.warning(f"GDELT tone for {symbol}: no closed bucket in response ({body!r})")
+                    except Exception as exc:
+                        logger.warning(f"GDELT tone unavailable for {symbol}: {exc}")
+                    await asyncio.sleep(MIN_REQUEST_SPACING_S)
+        except Exception as exc:
+            logger.warning(f"News tone poll failed: {exc}")
+        await asyncio.sleep(NEWS_TONE_POLL_INTERVAL_S)
+
+
 def attach_spot_premium(payload: dict) -> dict:
     """Attach the spot-versus-perp premium when both sides are aligned.
 
@@ -183,9 +302,14 @@ async def resolve_derived_features(payload) -> dict:
     except Exception as exc:  # pragma: no cover - transport failure path
         logger.warning(f"mark-price history unavailable for {symbol}: {exc}")
         return payload
-    return attach_spot_premium(
-        attach_trade_flow(attach_derived_features(payload, mark_history))
+    enriched = attach_news_tone(
+        attach_spot_premium(
+            attach_trade_flow(attach_derived_features(payload, mark_history))
+        ),
+        news_tone_reference,
+        NEWS_TONE_STALE_AFTER_MS,
     )
+    return attach_cross_venue(enriched, cross_venue_reference, CROSS_VENUE_STALE_AFTER_MS)
 
 
 async def store_snapshot_and_features(snapshot):
@@ -388,6 +512,8 @@ async def lifespan(app: FastAPI):
     background_tasks.append(asyncio.create_task(poll_orderbook_loop()))
     background_tasks.append(asyncio.create_task(poll_funding_history_loop()))
     background_tasks.append(asyncio.create_task(poll_spot_reference_loop()))
+    background_tasks.append(asyncio.create_task(poll_news_tone_loop()))
+    background_tasks.append(asyncio.create_task(poll_cross_venue_loop()))
     background_tasks.append(
         asyncio.create_task(
             run_trade_stream(trade_flow, [s.replace('-PERP', '') for s in SYMBOLS])
