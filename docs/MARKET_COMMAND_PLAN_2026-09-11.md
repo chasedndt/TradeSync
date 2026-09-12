@@ -240,7 +240,24 @@ This follows Codex's review order; slice 1 is accepted today.
 
 ---
 
-## 7. Where things stand at the end of today
+## 7a. Progress since — 2026-09-12
+
+- **Symbol universe widened to ten** by a stated rule (24h notional ≥ $30M and
+  leverage ≥ 10×), configured once in compose; the Cockpit reads the list from
+  the API. See `changes/2026-09-12_ten-symbol-universe-one-source-of-truth.md`.
+- **Open data sources researched and verified** against GitHub and vendor
+  terms: `research/2026-09-12_open-data-sources-for-market-command.md`.
+- **The first three sources are in**, each context-only until it earns a weight:
+  the economic-events strip on Mission Control (ForexFactory + FRED release
+  dates; feed currently rate-limiting this host, held 15 min between attempts),
+  `gdelt_news_tone`, and Binance funding / OI / funding spread. Catalog is at
+  **1.7.0**, 21 features. Change records dated 2026-09-12.
+- **Outcome job defect fixed** (it fetched only eight hours of candles and
+  wrote older windows off); 240m outcomes are accruing for the first time
+  since 8 September, with a 5m fallback where the venue has dropped 1m history.
+- **Slice 1 accepted and committed**, including Codex's watch-only wallet.
+
+## 7. Where things stand at the end of 2026-09-11
 
 - **Docker**: recovered from a stale-socket crash; all nine containers healthy;
   collection live again after a 27-hour gap.
