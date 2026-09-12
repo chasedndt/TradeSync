@@ -88,6 +88,12 @@ services:
       # acceptable default, and TradingView cannot send auth headers so
       # the secret must travel in the alert body.
       TRADINGVIEW_WEBHOOK_SECRET: ${TRADINGVIEW_WEBHOOK_SECRET:-}
+      # FRED (free key from https://fredaccount.stlouisfed.org/apikeys). Set both
+      # in runtime.env; the key is read here only, never printed. Enables the
+      # macro-reference provider and adds official release dates to the
+      # Mission Control events strip.
+      FRED_API_KEY: ${FRED_API_KEY:-}
+      FRED_CONTEXT_ENABLED: ${FRED_CONTEXT_ENABLED:-false}
       CORE_SCORER_URL: ${PIPELINE_CORE_SCORER_URL:-http://core-scorer:8000}
       FUSION_ENGINE_URL: ${PIPELINE_FUSION_ENGINE_URL:-http://fusion-engine:8002}
       # state-api reports dry_run on paths where nothing reached a venue. Same
