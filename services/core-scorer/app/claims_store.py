@@ -61,6 +61,62 @@ async def record_extraction(conn, quarantine_id: str, extractor: str, claims: li
             )
 
 
+RULE_ABSTAINED = "no tracked symbol with a clear direction nearby"
+
+
+async def harness_candidates(conn, batch: int) -> list[dict[str, Any]]:
+    """Rows the rule extractor could not read and the harness has not yet been asked about.
+
+    Only the "could not read" reason qualifies. Empty posts, ledgers and
+    alerts without a direction are settled; asking a model about them would
+    only invite invention.
+    """
+    rows = await conn.fetch(
+        """
+        SELECT q.id, q.source, q.payload, q.observed_at, q.received_at
+        FROM quarantine_intake q
+        JOIN quarantine_extractions x ON x.quarantine_id = q.id
+        LEFT JOIN quarantine_harness_extractions h ON h.quarantine_id = q.id
+        WHERE x.claims = 0 AND x.reason = $1 AND h.quarantine_id IS NULL
+          AND q.source IN ('discord', 'chaseos')
+        ORDER BY q.received_at DESC
+        LIMIT $2
+        """,
+        RULE_ABSTAINED,
+        batch,
+    )
+    out = []
+    for r in rows:
+        d = dict(r)
+        d["payload"] = json.loads(d["payload"]) if isinstance(d["payload"], str) else d["payload"]
+        out.append(d)
+    return out
+
+
+async def record_harness_extraction(
+    conn, quarantine_id: str, extractor: str, claims: list[Claim], reason: str, receipt_digest: str | None
+) -> None:
+    async with conn.transaction():
+        await conn.execute(
+            """
+            INSERT INTO quarantine_harness_extractions (quarantine_id, extractor, claims, reason, receipt_digest)
+            VALUES ($1::uuid, $2, $3, $4, $5) ON CONFLICT (quarantine_id) DO NOTHING
+            """,
+            quarantine_id, extractor, len(claims), reason, receipt_digest,
+        )
+        for c in claims:
+            await conn.execute(
+                """
+                INSERT INTO evidence_claims
+                    (quarantine_id, source, source_id, symbol, direction, horizon_minutes, claimed_at, extractor, excerpt)
+                VALUES ($1::uuid, $2, $3, $4, $5, $6, to_timestamp($7::double precision / 1000.0), $8, $9)
+                ON CONFLICT (quarantine_id, symbol) DO NOTHING
+                """,
+                quarantine_id, c.source, c.source_id, c.symbol, c.direction, c.horizon_minutes,
+                c.claimed_at_ms, c.extractor, c.excerpt,
+            )
+
+
 async def pending_claims(conn, batch: int) -> list[dict[str, Any]]:
     """Claims with a horizon still open or never written, oldest first."""
     rows = await conn.fetch(

@@ -99,6 +99,13 @@ async def run_measurement_pass(conn, client) -> dict[str, int]:
 
 
 async def run_claims_pass(conn, client) -> dict[str, int]:
+    from .claims_harness import run_harness_pass
+
     extracted = await run_extraction_pass(conn)
+    proposed = await run_harness_pass(conn, client)
     measured = await run_measurement_pass(conn, client)
-    return {**{f"extract_{k}": v for k, v in extracted.items()}, **{f"measure_{k}": v for k, v in measured.items()}}
+    return {
+        **{f"extract_{k}": v for k, v in extracted.items()},
+        **{f"harness_{k}": v for k, v in proposed.items()},
+        **{f"measure_{k}": v for k, v in measured.items()},
+    }
