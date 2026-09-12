@@ -65,15 +65,24 @@ weight, sits on top of this record.
 
 ## Live, on deploy
 
-Reader: cursors established on the StrikeZone Hyperliquid channels
-(thesis feed, evidence health, assumptions, forward test, paper outcomes,
-scorecards, regime lab, upgrade approvals, model quality, cron health, ops
-review, indicators). **The Pine alert channels returned HTTP 403**: the
-Hermes bot is not a member of the StrikeZone Crypto guild, or lacks View
-Channel / Read Message History there. That is one operator action in
-Discord (invite the ChaseOS // Hermes bot to that server with those two
-permissions); the reader re-checks every 30 minutes and needs no restart.
-Bridge: 19 runs held after the first pass.
+Correction, same evening: the first channel map was taken from a stale id
+map in the strikezone project folder, and the first 403s were misread as
+"the bot is not in that server". It is. The ChaseOS // Hermes bot
+(id 1495832324619632660) is a member of all three guilds and posts the
+market thesis into `#market-thesis-desk` itself. The registry was rebuilt
+from the bot's own guild channel listing: 65 channels, including the whole
+Daily Market Intel category (thesis desk, BTC/ETH/SOL daily, key levels,
+derivatives, alt watchlist, weekly recap), macro, cross-market, the
+operator desk, every Pine alert category, the quant lab and the review
+channels. The reader's poll interval is 60 s at that size.
+
+Reader, first full pass: 53 channels readable and cursors established.
+**Twelve return HTTP 403 "Missing Access" (code 50001)**: bias-flip 1m/5m/
+15m/30m, ema-cross 30m/1h, fvg 15m, structure 15m/1h/4h, unikill 5m/15m.
+The bot sees them in the guild listing but its role lacks View Channel on
+those categories' overrides. That is one permission edit on the existing
+bot's role in Discord, no new bot; the reader re-checks every 30 minutes
+without a restart. Bridge: 4 real runs held, 18 silent stubs skipped.
 
 The advisory harness connector (`AGENT_HARNESS_URL`) is still unset: no
 model runtime answered on the host. The operator should say where the

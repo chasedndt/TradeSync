@@ -1,35 +1,526 @@
 {
   "schema_version": "discord_channel_registry_v1",
-  "note": "Channel ids are not secrets. Labels are the stable agent/stream names Market Command uses; kinds are agent | alerts | operator. Surveyed 2026-09-12 from the Hermes channel directory and cron/jobs.json. Guilds: control 1492701642313826324, community 1512589037637210172, strikezone 927927060251410503.",
+  "note": "Channel ids are not secrets. Labels are the stable agent/stream names Market Command uses; kinds are agent | alerts | operator. Listed by the ChaseOS // Hermes bot itself (bot id 1495832324619632660) on 2026-09-12; guilds: strikezone 927927060251410503, control 1492701642313826324, community 1512589037637210172.",
   "channels": [
-    {"id": "1518330703878557808", "label": "sz-thesis-feed", "kind": "agent", "guild": "strikezone", "name": "strikezone-thesis-feed", "posts": "thesis availability + retry watchdog (15m)"},
-    {"id": "1520762323734888449", "label": "sz-evidence-health", "kind": "agent", "guild": "strikezone", "name": "evidence-health", "posts": "quant integrity watchdog (30m); evidence-readiness changes (15m)"},
-    {"id": "1529610926100316230", "label": "sz-hl-assumptions", "kind": "agent", "guild": "strikezone", "name": "hyperliquid-assumptions", "posts": "paper-assumptions snapshot (06:05)"},
-    {"id": "1529610931687002334", "label": "sz-hl-forward-test", "kind": "agent", "guild": "strikezone", "name": "signal-ledger-forward-test", "posts": "closed-candle forward test (*/15)"},
-    {"id": "1529610939534409869", "label": "sz-hl-paper-outcomes", "kind": "agent", "guild": "strikezone", "name": "paper-outcomes", "posts": "paper-outcome resolver (:07/:22/:37/:52)"},
-    {"id": "1529610946866053210", "label": "sz-hl-scorecards", "kind": "agent", "guild": "strikezone", "name": "strategy-scorecards", "posts": "daily scorecards (07:15); weekly P&L review (Mon 08:45)"},
-    {"id": "1529610953396719666", "label": "sz-hl-regime-lab", "kind": "agent", "guild": "strikezone", "name": "timeframe-regime-lab", "posts": "weekly timeframe-regime lab (Mon 08:30)"},
-    {"id": "1530695654689476629", "label": "sz-upgrade-approvals", "kind": "agent", "guild": "strikezone", "name": "strategy-upgrade-approvals", "posts": "governed strategy upgrade review (Mon 09:05)"},
-    {"id": "1518330711898329229", "label": "sz-model-quality", "kind": "agent", "guild": "strikezone", "name": "model-quality", "posts": "operator feedback logger (1m)"},
-    {"id": "1518330716255944816", "label": "sz-cron-health", "kind": "operator", "guild": "strikezone", "name": "strikezone-cron-health", "posts": "fleet-health alerts"},
-    {"id": "1508901758955552808", "label": "sz-ops-review", "kind": "operator", "guild": "strikezone", "name": "strikezone-ops-review", "posts": "publish previews routed to ops review"},
-    {"id": "1520761813149421730", "label": "sz-hl-tradfi-alerts", "kind": "alerts", "guild": "strikezone", "name": "hyperliquid-tradfi-alerts", "posts": "TradingView webhook alerts"},
-    {"id": "1394091843393814538", "label": "sz-indicators", "kind": "alerts", "guild": "strikezone", "name": "strikezone-indicators", "posts": "TradingView webhook alerts"},
-    {"id": "1478705802066919604", "label": "pine-bias-flip-1m-btc", "kind": "alerts", "guild": "strikezone", "name": "bias-flip-1m-btc", "posts": "Pine Bias Flip alerts"},
-    {"id": "1476780988397916211", "label": "pine-bias-flip-5m-btc-eth", "kind": "alerts", "guild": "strikezone", "name": "bias-flip-5m-btc-eth", "posts": "Pine Bias Flip alerts"},
-    {"id": "1391262482563338333", "label": "pine-bias-flip-15m", "kind": "alerts", "guild": "strikezone", "name": "bias-flip-15m", "posts": "Pine Bias Flip alerts"},
-    {"id": "1476747126846525651", "label": "pine-bias-flip-30m", "kind": "alerts", "guild": "strikezone", "name": "bias-flip-30m", "posts": "Pine Bias Flip alerts"},
-    {"id": "1389014779888144515", "label": "pine-unikill-5m", "kind": "alerts", "guild": "strikezone", "name": "unikill-5m", "posts": "Pine Unikill alerts"},
-    {"id": "1389014820640260146", "label": "pine-unikill-15m", "kind": "alerts", "guild": "strikezone", "name": "unikill-15m", "posts": "Pine Unikill alerts"},
-    {"id": "1442730460668100798", "label": "pine-unikill-30m", "kind": "alerts", "guild": "strikezone", "name": "unikill-30m-rework", "posts": "Pine Unikill alerts"},
-    {"id": "1389014862738227210", "label": "pine-unikill-1h", "kind": "alerts", "guild": "strikezone", "name": "unikill-1h", "posts": "Pine Unikill alerts"},
-    {"id": "1477005299712917617", "label": "pine-eqh-eql-5m-btc", "kind": "alerts", "guild": "strikezone", "name": "btc-eqh-eql-5m-rework", "posts": "Pine EQH/EQL sweep alerts"},
-    {"id": "1477005570681606245", "label": "pine-eqh-eql-5m-eth", "kind": "alerts", "guild": "strikezone", "name": "eth-eqh-eql-5m", "posts": "Pine EQH/EQL sweep alerts"},
-    {"id": "1493337587157565511", "label": "chaseos-control-plane-brief", "kind": "operator", "guild": "control", "name": "control-plane-brief", "posts": "daily control-plane brief (08:00)"},
-    {"id": "1493336866760429738", "label": "chaseos-alerts-workflows", "kind": "operator", "guild": "control", "name": "alerts-workflows", "posts": "kanban triage (5m); vault maintenance"},
-    {"id": "1493336831666819243", "label": "chaseos-alerts-hermes", "kind": "operator", "guild": "control", "name": "alerts-hermes", "posts": "hermes control-plane drift guard (30m)"},
-    {"id": "1518389637868159058", "label": "chaseos-auto-research", "kind": "agent", "guild": "control", "name": "agent-harness-auto-research", "posts": "research intake and paper scout"},
-    {"id": "1517345062709629030", "label": "chaseos-agent-skills-review", "kind": "operator", "guild": "control", "name": "agent-skills-review", "posts": "agent-skills sentinel; approval bridge; GitHub radar"},
-    {"id": "1516852056051159242", "label": "chaseos-community-moderation", "kind": "operator", "guild": "community", "name": "moderation", "posts": "community safety watchdog"}
+    {
+      "id": "1508961074542547104",
+      "label": "sz-market-thesis-desk",
+      "kind": "agent",
+      "guild": "strikezone",
+      "name": "market-thesis-desk",
+      "posts": "main StrikeZone market thesis, revalidations"
+    },
+    {
+      "id": "1271887026811179051",
+      "label": "sz-btc-daily-update",
+      "kind": "agent",
+      "guild": "strikezone",
+      "name": "btc-daily-update",
+      "posts": "BTC daily"
+    },
+    {
+      "id": "1382444686932971572",
+      "label": "sz-eth-daily-update",
+      "kind": "agent",
+      "guild": "strikezone",
+      "name": "eth-daily-update",
+      "posts": "ETH daily"
+    },
+    {
+      "id": "1508960599445471262",
+      "label": "sz-sol-daily-update",
+      "kind": "agent",
+      "guild": "strikezone",
+      "name": "sol-daily-update",
+      "posts": "SOL daily"
+    },
+    {
+      "id": "1508960716525404232",
+      "label": "sz-key-levels",
+      "kind": "agent",
+      "guild": "strikezone",
+      "name": "key-levels-invalidations",
+      "posts": "levels and invalidations"
+    },
+    {
+      "id": "1508960683759374437",
+      "label": "sz-derivatives-liquidity",
+      "kind": "agent",
+      "guild": "strikezone",
+      "name": "derivatives-liquidity",
+      "posts": "funding, OI, liquidity"
+    },
+    {
+      "id": "1508960744732102837",
+      "label": "sz-alt-watchlist",
+      "kind": "agent",
+      "guild": "strikezone",
+      "name": "alt-watchlist",
+      "posts": "alt watchlist"
+    },
+    {
+      "id": "1382443965185527850",
+      "label": "sz-weekly-recap",
+      "kind": "agent",
+      "guild": "strikezone",
+      "name": "weekly-recap",
+      "posts": "weekly recap"
+    },
+    {
+      "id": "1386931024864477295",
+      "label": "sz-macro-dashboard",
+      "kind": "agent",
+      "guild": "strikezone",
+      "name": "macro-dashboard",
+      "posts": "macro dashboard"
+    },
+    {
+      "id": "1527454560111825128",
+      "label": "sz-economic-calendar",
+      "kind": "agent",
+      "guild": "strikezone",
+      "name": "economic-calendar",
+      "posts": "calendar posts"
+    },
+    {
+      "id": "1527454567061782690",
+      "label": "sz-release-impact",
+      "kind": "agent",
+      "guild": "strikezone",
+      "name": "economic-release-impact",
+      "posts": "release impact"
+    },
+    {
+      "id": "1527454571314548867",
+      "label": "sz-central-bank-watch",
+      "kind": "agent",
+      "guild": "strikezone",
+      "name": "central-bank-watch",
+      "posts": "central banks"
+    },
+    {
+      "id": "1527454575257190531",
+      "label": "sz-cross-asset-impact",
+      "kind": "agent",
+      "guild": "strikezone",
+      "name": "cross-asset-impact",
+      "posts": "cross-asset"
+    },
+    {
+      "id": "1527454580080906350",
+      "label": "sz-crypto-fundamentals",
+      "kind": "agent",
+      "guild": "strikezone",
+      "name": "crypto-fundamentals",
+      "posts": "fundamentals"
+    },
+    {
+      "id": "1520761540091969547",
+      "label": "sz-hl-market-watch",
+      "kind": "agent",
+      "guild": "strikezone",
+      "name": "hyperliquid-market-watch",
+      "posts": "Hyperliquid watch"
+    },
+    {
+      "id": "1520761544101593109",
+      "label": "sz-tradfi-perps-watch",
+      "kind": "agent",
+      "guild": "strikezone",
+      "name": "tradfi-perps-watch",
+      "posts": "TradFi perps"
+    },
+    {
+      "id": "1520761565144547399",
+      "label": "sz-watchlist-priorities",
+      "kind": "agent",
+      "guild": "strikezone",
+      "name": "watchlist-priorities",
+      "posts": "watchlist priorities"
+    },
+    {
+      "id": "1476979254892695635",
+      "label": "pine-session-opens",
+      "kind": "alerts",
+      "guild": "strikezone",
+      "name": "session-opens",
+      "posts": "Pine sessions"
+    },
+    {
+      "id": "1386931061770162247",
+      "label": "pine-btc-daily-close",
+      "kind": "alerts",
+      "guild": "strikezone",
+      "name": "btc-daily-close",
+      "posts": "Pine daily close"
+    },
+    {
+      "id": "1476737031227838504",
+      "label": "pine-structure-30m",
+      "kind": "alerts",
+      "guild": "strikezone",
+      "name": "structure-analysis-30m-rework",
+      "posts": "Pine MSA"
+    },
+    {
+      "id": "1390875292507045969",
+      "label": "pine-structure-15m",
+      "kind": "alerts",
+      "guild": "strikezone",
+      "name": "structure-analysis-15m",
+      "posts": "Pine MSA"
+    },
+    {
+      "id": "1391129778119114903",
+      "label": "pine-structure-1h",
+      "kind": "alerts",
+      "guild": "strikezone",
+      "name": "structure-analysis-1h-rework",
+      "posts": "Pine MSA"
+    },
+    {
+      "id": "1391129818422050947",
+      "label": "pine-structure-4h",
+      "kind": "alerts",
+      "guild": "strikezone",
+      "name": "structure-analysis-4h",
+      "posts": "Pine MSA"
+    },
+    {
+      "id": "1389007705657577633",
+      "label": "pine-ema-cross-30m",
+      "kind": "alerts",
+      "guild": "strikezone",
+      "name": "ema-21-x-55-cross-30m",
+      "posts": "Pine EMA cross"
+    },
+    {
+      "id": "1389007784598704220",
+      "label": "pine-ema-cross-1h",
+      "kind": "alerts",
+      "guild": "strikezone",
+      "name": "ema-21-x-55-cross-1h",
+      "posts": "Pine EMA cross"
+    },
+    {
+      "id": "1462236771763880155",
+      "label": "pine-ema-cross-4h",
+      "kind": "alerts",
+      "guild": "strikezone",
+      "name": "ema-cross-4h",
+      "posts": "Pine EMA cross"
+    },
+    {
+      "id": "1478705802066919604",
+      "label": "pine-bias-flip-1m-btc",
+      "kind": "alerts",
+      "guild": "strikezone",
+      "name": "bias-flip-1m-btc",
+      "posts": "Pine Bias Flip"
+    },
+    {
+      "id": "1476780988397916211",
+      "label": "pine-bias-flip-5m-btc-eth",
+      "kind": "alerts",
+      "guild": "strikezone",
+      "name": "bias-flip-5m-btc-eth",
+      "posts": "Pine Bias Flip"
+    },
+    {
+      "id": "1391262482563338333",
+      "label": "pine-bias-flip-15m",
+      "kind": "alerts",
+      "guild": "strikezone",
+      "name": "bias-flip-15m",
+      "posts": "Pine Bias Flip"
+    },
+    {
+      "id": "1476747126846525651",
+      "label": "pine-bias-flip-30m",
+      "kind": "alerts",
+      "guild": "strikezone",
+      "name": "bias-flip-30m",
+      "posts": "Pine Bias Flip"
+    },
+    {
+      "id": "1389014779888144515",
+      "label": "pine-unikill-5m",
+      "kind": "alerts",
+      "guild": "strikezone",
+      "name": "unikill-5m",
+      "posts": "Pine Unikill"
+    },
+    {
+      "id": "1389014820640260146",
+      "label": "pine-unikill-15m",
+      "kind": "alerts",
+      "guild": "strikezone",
+      "name": "unikill-15m",
+      "posts": "Pine Unikill"
+    },
+    {
+      "id": "1442730460668100798",
+      "label": "pine-unikill-30m",
+      "kind": "alerts",
+      "guild": "strikezone",
+      "name": "unikill-30m-rework",
+      "posts": "Pine Unikill"
+    },
+    {
+      "id": "1389014862738227210",
+      "label": "pine-unikill-1h",
+      "kind": "alerts",
+      "guild": "strikezone",
+      "name": "unikill-1h",
+      "posts": "Pine Unikill"
+    },
+    {
+      "id": "1477460607660982457",
+      "label": "pine-fvg-5m",
+      "kind": "alerts",
+      "guild": "strikezone",
+      "name": "scored-fvg-entry-5m-rework",
+      "posts": "Pine scored FVG"
+    },
+    {
+      "id": "1387480950883094650",
+      "label": "pine-fvg-15m",
+      "kind": "alerts",
+      "guild": "strikezone",
+      "name": "scored-fvg-entry-15m",
+      "posts": "Pine scored FVG"
+    },
+    {
+      "id": "1477460393147371601",
+      "label": "pine-fvg-30m",
+      "kind": "alerts",
+      "guild": "strikezone",
+      "name": "scored-fvg-entry-30m-rework",
+      "posts": "Pine scored FVG"
+    },
+    {
+      "id": "1477460582645895168",
+      "label": "pine-fvg-1h",
+      "kind": "alerts",
+      "guild": "strikezone",
+      "name": "scored-fvg-entry-1h",
+      "posts": "Pine scored FVG"
+    },
+    {
+      "id": "1520761778634489866",
+      "label": "pine-fvg-confirmation",
+      "kind": "alerts",
+      "guild": "strikezone",
+      "name": "fvg-confirmation",
+      "posts": "Pine FVG confirmation"
+    },
+    {
+      "id": "1520761794459865169",
+      "label": "pine-liquidity-sweeps",
+      "kind": "alerts",
+      "guild": "strikezone",
+      "name": "liquidity-sweeps",
+      "posts": "Pine sweeps"
+    },
+    {
+      "id": "1477005299712917617",
+      "label": "pine-eqh-eql-5m-btc",
+      "kind": "alerts",
+      "guild": "strikezone",
+      "name": "btc-eqh-eql-5m-rework",
+      "posts": "Pine EQH/EQL"
+    },
+    {
+      "id": "1477005570681606245",
+      "label": "pine-eqh-eql-5m-eth",
+      "kind": "alerts",
+      "guild": "strikezone",
+      "name": "eth-eqh-eql-5m",
+      "posts": "Pine EQH/EQL"
+    },
+    {
+      "id": "1389596555270557809",
+      "label": "pine-ethbtc-rotation",
+      "kind": "alerts",
+      "guild": "strikezone",
+      "name": "ethbtc-rotation",
+      "posts": "Pine rotation"
+    },
+    {
+      "id": "1397263060242272296",
+      "label": "pine-btcdom-rotation",
+      "kind": "alerts",
+      "guild": "strikezone",
+      "name": "btcdom-rotation",
+      "posts": "Pine rotation"
+    },
+    {
+      "id": "1476787789432619110",
+      "label": "pine-alt-risk-regime",
+      "kind": "alerts",
+      "guild": "strikezone",
+      "name": "altcoin-risk-regime-index",
+      "posts": "Pine alt regime"
+    },
+    {
+      "id": "1520761813149421730",
+      "label": "sz-hl-tradfi-alerts",
+      "kind": "alerts",
+      "guild": "strikezone",
+      "name": "hyperliquid-tradfi-alerts",
+      "posts": "TradFi alerts"
+    },
+    {
+      "id": "1518330703878557808",
+      "label": "sz-thesis-feed",
+      "kind": "agent",
+      "guild": "strikezone",
+      "name": "strikezone-thesis-feed",
+      "posts": "thesis availability watchdog"
+    },
+    {
+      "id": "1508901758955552808",
+      "label": "sz-ops-review",
+      "kind": "operator",
+      "guild": "strikezone",
+      "name": "strikezone-ops-review",
+      "posts": "publish previews"
+    },
+    {
+      "id": "1518330699655155854",
+      "label": "sz-approvals",
+      "kind": "operator",
+      "guild": "strikezone",
+      "name": "strikezone-approvals",
+      "posts": "approvals"
+    },
+    {
+      "id": "1518330711898329229",
+      "label": "sz-model-quality",
+      "kind": "agent",
+      "guild": "strikezone",
+      "name": "model-quality",
+      "posts": "operator feedback logger"
+    },
+    {
+      "id": "1520762323734888449",
+      "label": "sz-evidence-health",
+      "kind": "agent",
+      "guild": "strikezone",
+      "name": "evidence-health",
+      "posts": "quant integrity, readiness"
+    },
+    {
+      "id": "1518330716255944816",
+      "label": "sz-cron-health",
+      "kind": "operator",
+      "guild": "strikezone",
+      "name": "strikezone-cron-health",
+      "posts": "fleet health"
+    },
+    {
+      "id": "1520762554949832754",
+      "label": "sz-setup-candidates",
+      "kind": "agent",
+      "guild": "strikezone",
+      "name": "setup-candidates",
+      "posts": "setup candidates"
+    },
+    {
+      "id": "1520762558556930108",
+      "label": "sz-trade-plan-review",
+      "kind": "operator",
+      "guild": "strikezone",
+      "name": "trade-plan-review",
+      "posts": "trade plan review"
+    },
+    {
+      "id": "1520762561979613386",
+      "label": "sz-approved-watchlist",
+      "kind": "operator",
+      "guild": "strikezone",
+      "name": "approved-watchlist",
+      "posts": "approved watchlist"
+    },
+    {
+      "id": "1520762566148751410",
+      "label": "sz-execution-journal",
+      "kind": "operator",
+      "guild": "strikezone",
+      "name": "execution-journal",
+      "posts": "execution journal"
+    },
+    {
+      "id": "1520762570120888321",
+      "label": "sz-risk-desk",
+      "kind": "operator",
+      "guild": "strikezone",
+      "name": "risk-desk",
+      "posts": "risk desk"
+    },
+    {
+      "id": "1520762789382328363",
+      "label": "sz-post-trade-review",
+      "kind": "operator",
+      "guild": "strikezone",
+      "name": "post-trade-review",
+      "posts": "post-trade review"
+    },
+    {
+      "id": "1529610926100316230",
+      "label": "sz-hl-assumptions",
+      "kind": "agent",
+      "guild": "strikezone",
+      "name": "hyperliquid-assumptions",
+      "posts": "paper assumptions (06:05)"
+    },
+    {
+      "id": "1529610931687002334",
+      "label": "sz-hl-forward-test",
+      "kind": "agent",
+      "guild": "strikezone",
+      "name": "signal-ledger-forward-test",
+      "posts": "closed-candle forward test (*/15)"
+    },
+    {
+      "id": "1529610939534409869",
+      "label": "sz-hl-paper-outcomes",
+      "kind": "agent",
+      "guild": "strikezone",
+      "name": "paper-outcomes",
+      "posts": "paper-outcome resolver"
+    },
+    {
+      "id": "1529610946866053210",
+      "label": "sz-hl-scorecards",
+      "kind": "agent",
+      "guild": "strikezone",
+      "name": "strategy-scorecards",
+      "posts": "scorecards, weekly P&L"
+    },
+    {
+      "id": "1529610953396719666",
+      "label": "sz-hl-regime-lab",
+      "kind": "agent",
+      "guild": "strikezone",
+      "name": "timeframe-regime-lab",
+      "posts": "weekly regime lab"
+    },
+    {
+      "id": "1530695654689476629",
+      "label": "sz-upgrade-approvals",
+      "kind": "agent",
+      "guild": "strikezone",
+      "name": "strategy-upgrade-approvals",
+      "posts": "strategy upgrade review"
+    },
+    {
+      "id": "1518389637868159058",
+      "label": "chaseos-auto-research",
+      "kind": "agent",
+      "guild": "control",
+      "name": "agent-harness-auto-research",
+      "posts": "research intake, paper scout"
+    }
   ]
 }
