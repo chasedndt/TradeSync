@@ -19,6 +19,7 @@ than no event.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping, Sequence
@@ -34,8 +35,8 @@ MARKET_MOVING = (
     "fomc", "fed chair", "federal funds", "cpi", "consumer price index",
     "core pce", "pce price", "personal income and outlays",
     "non-farm", "nonfarm", "employment situation", "unemployment rate",
-    "gdp", "gross domestic product", "ecb", "boe ", "boj ",
-    "ppi", "producer price index", "retail sales", "ism ", "treasury",
+    "gdp", "gross domestic product", "ecb", "boe", "boj",
+    "ppi", "producer price index", "retail sales", "ism", "treasury",
     "rate decision", "rate statement",
 )
 
@@ -73,9 +74,18 @@ class Normalised:
     rejections: list[str] = field(default_factory=list)
 
 
+_MARKET_MOVING_RE = re.compile(
+    r"(?<![a-z])(" + "|".join(re.escape(k.strip()) for k in MARKET_MOVING) + r")(?![a-z])"
+)
+
+
 def _is_market_moving(title: str) -> bool:
-    lowered = title.lower()
-    return any(key in lowered for key in MARKET_MOVING)
+    """Keyword match on word boundaries.
+
+    Plain substring matching flagged "CBOE Market Statistics" because "cboe"
+    contains "boe": a central bank inside an exchange's name.
+    """
+    return bool(_MARKET_MOVING_RE.search(title.lower()))
 
 
 def _parse_iso(value: Any) -> datetime | None:

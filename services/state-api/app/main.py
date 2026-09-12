@@ -91,6 +91,11 @@ logging.basicConfig(
 )
 for handler in logging.getLogger().handlers:
     handler.addFilter(DefaultTraceIdFilter())
+# httpx logs every request URL at INFO. FRED accepts its API key only as a
+# query parameter, so that line would carry the key into the container log.
+# Seen once on 2026-09-12 and closed here: no outbound URL is logged at all.
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 logger = logging.getLogger("state-api")
 
 # --- Metrics Storage ---

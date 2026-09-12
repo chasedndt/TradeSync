@@ -74,6 +74,17 @@ def test_spelled_out_release_names_are_recognised_like_abbreviations() -> None:
     assert all(e.market_moving for e in out.events)
 
 
+def test_keywords_match_whole_words_not_fragments() -> None:
+    """'CBOE Market Statistics' contains 'boe'; it is an exchange, not the Bank of England."""
+    out = normalise_forexfactory(
+        [ff(title="CBOE Market Statistics"), ff(title="BoE Gov Bailey Speaks"), ff(title="ISM Manufacturing PMI")],
+        NOW,
+    )
+    assert {e.title: e.market_moving for e in out.events} == {
+        "CBOE Market Statistics": False, "BoE Gov Bailey Speaks": True, "ISM Manufacturing PMI": True,
+    }
+
+
 def test_market_moving_is_by_title_not_by_feed_rating() -> None:
     low_but_matters = ff(title="FOMC Member Speaks", impact="Low")
     high_but_not = ff(title="ANZ Job Advertisements m/m", impact="High", country="AUD")
