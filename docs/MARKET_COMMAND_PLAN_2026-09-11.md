@@ -288,6 +288,15 @@ This follows Codex's review order; slice 1 is accepted today.
 - **Pine ingress decision (2026-09-12)**: Cloudflare Tunnel, implemented by
   Codex through its wrangler connection. When the tunnel is the only blocker,
   a handover is written, committed and pushed for Codex.
+- **Slice 7 delivered by Codex (2026-09-12 evening, `b6fdffd`)**: tunnel
+  `tradesync-webhook` healthy, exact-host WAF allowlist, secret loaded,
+  `https://tradesync-pine.chaseintech.com/webhook/tradingview` live; every
+  other path 404s at the edge. Remaining acceptance: one genuine TradingView
+  alert appearing as `source=tradingview` in Intake.
+- **ChaseOS fleet in Market Command (2026-09-12 evening)**: host bridge for
+  every Hermes job run, discord-reader on 65 channels with the existing
+  Hermes bot (read-only), Agents page at `/agents`.
+  `changes/2026-09-12_discord-reader-and-agents-page.md`.
 
 ## 7. Where things stand at the end of 2026-09-11
 
