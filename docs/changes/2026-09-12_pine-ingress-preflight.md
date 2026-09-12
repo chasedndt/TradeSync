@@ -42,9 +42,20 @@ Runtime acceptance passed: `cloudflared` is healthy with four registered QUIC
 edge connections; public workstation requests to the webhook, `/state/health`,
 and `/` return Cloudflare `403` with Ray IDs; local State API health remains
 `200`; and the local ingress matcher sends only the exact webhook path to the
-origin. The remaining provider acceptance is one genuine TradingView alert in
-quarantine. No live execution is enabled. Claude's Discord ingestion work and
-all unrelated ChaseInTech configuration are untouched.
+origin.
+
+Provider acceptance completed at `2026-09-12T21:54:29.09368+01:00`. The
+isolated StrikeZone Chromium profile created and fired a one-time BTCUSD 15m
+alert from the licensed `StrikeZone — Universal EMA 21/55 Cross Alerts (v6)`
+indicator. TradeSync stored receipt `3f010cb5-7c27-4587-a860-f7f38f6d27f3`
+as source `tradingview`, schema `tradingview_alert_v1`, with the expected
+indicator, ticker, interval, exchange, close, time, and note. Rendered
+Knowledge Intake readback showed it first in the list as accepted and awaiting
+review. The stored/rendered payload did not contain the shared secret.
+
+Slice 7 is therefore accepted end to end. No live execution is enabled.
+Claude's Discord ingestion work and all unrelated ChaseInTech configuration
+are untouched.
 
 Verification: `git diff --check` passed. Initial pytest collection could not
 find the local package; rerunning with `PYTHONPATH=libs/tradesync_core` and

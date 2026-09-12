@@ -25,7 +25,7 @@ one governed unit.
 - Tunnel connector: running and healthy with four registered edge connections.
 - WAF allowlist: enabled and read back from Cloudflare.
 - `TRADINGVIEW_WEBHOOK_SECRET`: configured and loaded by the healthy State API.
-- First genuine TradingView receipt: pending.
+- First genuine TradingView receipt: accepted and rendered in Knowledge Intake.
 
 ## Mandatory WAF rule
 
@@ -64,7 +64,15 @@ Neither DNS creation nor a healthy container alone proves acceptance.
 - `cloudflared` ingress validation passed; only the webhook path matches the
   origin rule and other paths match the terminal `http_status:404` rule.
 
-The only remaining end-to-end evidence is a genuine TradingView alert receipt.
-That provider alert must use this profile's URL and the same body secret; use
-`tools/copy-runtime-secret.ps1 -Name TRADINGVIEW_WEBHOOK_SECRET` to copy it
-without displaying it, then clear the clipboard after pasting.
+End-to-end acceptance completed with receipt
+`3f010cb5-7c27-4587-a860-f7f38f6d27f3` at
+`2026-09-12T21:54:29.09368+01:00`. TradingView generated it from the licensed
+`StrikeZone — Universal EMA 21/55 Cross Alerts (v6)` indicator on BTCUSD 15m.
+The one-time acceptance condition was `EMA Fast > 0`; its submitted content
+rendered in Knowledge Intake as source `tradingview`, schema
+`tradingview_alert_v1`, awaiting review. The secret was absent from the stored
+and rendered payload.
+
+For future provider alerts, use
+`tools/copy-runtime-secret.ps1 -Name TRADINGVIEW_WEBHOOK_SECRET` to copy the
+secret without displaying it, then clear the clipboard after pasting.

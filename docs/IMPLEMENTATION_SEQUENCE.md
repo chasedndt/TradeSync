@@ -248,7 +248,7 @@ do, and TradeSync's boundary is that it does not write canonical knowledge.
 
 See [the change record](changes/2026-09-08_chaseos-graph-projection.md).
 
-### 3.5 TradingView + Pine Script — receipt validation ✅ delivered 2026-09-08; ingress still open
+### 3.5 TradingView + Pine Script — ✅ accepted end to end 2026-09-12
 
 `strike_zone.py` turns an authenticated Pine receipt into a `trade_candidate_v1`,
 wired as `POST /state/quarantine/{id}/extract-candidate` — the extraction step of
@@ -264,16 +264,20 @@ The acceptance criterion is `paper_ledger._validate_candidate`, which re-checks
 the same invariants without trusting who built the candidate — and a test proves
 that second lock bites.
 
-**Precondition still outstanding: the ingress decision.** Cloudflare Tunnel plus
-the four-IP WAF allowlist is infrastructure, and none of the above needs it.
+The ingress precondition is closed. The hostname-scoped Cloudflare Tunnel and
+four-IP WAF allowlist are live, the shared body secret is loaded, and a genuine
+TradingView alert from the licensed StrikeZone Universal EMA indicator was
+accepted into quarantine and rendered in Knowledge Intake. Receipt:
+`3f010cb5-7c27-4587-a860-f7f38f6d27f3`.
 
 Constraints already verified: ports 80/443 only, **no custom headers** so the
 shared secret must travel in the JSON body, four fixed source IPs (the strongest
 available control), and a 3-second timeout. One webhook URL per alert, but many
 alerts may target one endpoint and self-identify in the body.
 
-Requires Cloudflare Tunnel plus a four-IP WAF allowlist. Full analysis in
-[Webhook ingress security](architecture/WEBHOOK_INGRESS_SECURITY.md).
+The implementation and acceptance evidence are recorded in
+[the Pine ingress activation record](changes/2026-09-12_pine-ingress-preflight.md).
+Full threat analysis remains in [Webhook ingress security](architecture/WEBHOOK_INGRESS_SECURITY.md).
 
 **The risk is evidence poisoning, not theft.** A Pine alert becomes quarantined
 evidence, never a signal.
