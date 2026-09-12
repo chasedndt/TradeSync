@@ -192,6 +192,7 @@ async def poll_cross_venue_loop():
 news_tone_reference: dict = {}
 NEWS_TONE_POLL_INTERVAL_S = int(os.getenv("NEWS_TONE_POLL_INTERVAL_S", "900"))
 NEWS_TONE_STALE_AFTER_MS = int(os.getenv("NEWS_TONE_STALE_AFTER_MS", "3600000"))
+NEWS_TONE_STARTUP_DELAY_S = int(os.getenv("NEWS_TONE_STARTUP_DELAY_S", "180"))
 
 
 async def poll_news_tone_loop():
@@ -203,6 +204,9 @@ async def poll_news_tone_loop():
     disturb Hyperliquid observation.
     """
     logger.info("Starting GDELT news tone poller")
+    # Every redeploy used to fire a full cycle at once; several redeploys in an
+    # afternoon read, to GDELT, like a burst. Wait before the first cycle.
+    await asyncio.sleep(NEWS_TONE_STARTUP_DELAY_S)
     while True:
         try:
             async with httpx.AsyncClient() as client:

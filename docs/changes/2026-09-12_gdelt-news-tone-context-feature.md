@@ -83,3 +83,19 @@ reports catalog **1.7.0** (digest `ed1a467c9fe39a8e`, 21 features) and lists
 `gdelt_news_tone` for BTC at **+0.4939**, `status: not_normalized`,
 `scoring_allowed: False`, `provenance: context_only` — exactly the state a new
 source must start in.
+
+## Rate limiting, stated plainly
+
+After the first cycle, GDELT refused every request from this host — at six
+seconds apart, then at fifteen — including the *first* request of a cycle.
+That is not spacing; it is a per-IP penalty from earlier bursts: my manual
+probes during development, and the fact that each of today's several
+redeploys started a fresh polling cycle the moment the container came up.
+
+Three things now limit our own behaviour: fifteen seconds between coins, a
+two-minute back-off after any refusal, and a three-minute delay before the
+first cycle after startup so a rebuild is not a burst. The penalty is left to
+expire on its own; nothing here retries harder. The one clean reading (BTC
++0.4939) reached the snapshot, the Regime Lab and the feature history, so the
+path is proven end to end. Coverage for the other coins begins when GDELT
+admits the host again, and shows as `absent` until then — never as zero.
