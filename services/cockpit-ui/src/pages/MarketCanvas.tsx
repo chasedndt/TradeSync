@@ -16,8 +16,8 @@ import {
   useShapes,
 } from '../components/canvas/useCanvasLayers'
 import { EvidenceTimeline } from '../components/canvas/EvidenceTimeline'
+import { useTrackedSymbols } from '../api/hooks/useTrackedSymbols'
 
-const SYMBOLS = ['BTC-PERP', 'ETH-PERP', 'SOL-PERP']
 const INTERVALS = ['1m', '5m', '15m', '1h', '4h', '1d']
 const CANDLE_LIMIT = 300
 
@@ -33,6 +33,7 @@ export function MarketCanvas() {
   // Symbol and interval live in the URL so a chart can be linked to directly
   // from Mission Control and shared or reopened as a specific view.
   const [params, setParams] = useSearchParams()
+  const { symbols: SYMBOLS } = useTrackedSymbols()
   const requested = params.get('symbol')
   const symbol = requested && SYMBOLS.includes(requested) ? requested : SYMBOLS[0]
   const requestedInterval = params.get('interval')
@@ -53,6 +54,7 @@ export function MarketCanvas() {
   const [placing, setPlacing] = useState<PlacingKind | null>(null)
   const [firstAnchor, setFirstAnchor] = useState<{ time_s: number; price: number } | null>(null)
   const [showDepth, setShowDepth] = useState(false)
+  const showEvidence = params.get('view') === 'evidence'
   // Held so the context panes can follow this chart's time scale.
   const [chart, setChart] = useState<IChartApi | null>(null)
 
@@ -122,6 +124,16 @@ export function MarketCanvas() {
       </header>
 
       <section className="panel" style={{ padding: 16 }}>
+        <div role="group" aria-label="Chart view" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+          {(['chart', 'evidence'] as const).map((view) => (
+            <button key={view} type="button" className={(showEvidence === (view === 'evidence')) ? 'chip chip--active' : 'chip'}
+              aria-pressed={showEvidence === (view === 'evidence')}
+              onClick={() => { const next = new URLSearchParams(params); next.set('view', view); setParams(next, { replace: true }) }}>
+              {view === 'chart' ? 'Chart & drawings' : 'Research signals'}
+            </button>
+          ))}
+          <span className="metric-sub">Drawings stay visible in both views. Research signals are not executed positions.</span>
+        </div>
         <CanvasToolbar
           symbols={SYMBOLS}
           intervals={INTERVALS}
@@ -165,21 +177,22 @@ export function MarketCanvas() {
         ) : (
           <>
             <PriceChart
+              key={`${symbol}:${interval}`}
               candles={candles}
-              markers={markers}
+              markers={showEvidence ? markers : []}
               levels={levels}
               shapes={shapes}
               onChartReady={setChart}
               onPickPrice={placing === 'horizontal' ? placeLevel : undefined}
               onPickPoint={placing === 'trendline' || placing === 'range' ? placePoint : undefined}
             />
-            <ContextPanes
+            {showEvidence && <ContextPanes
               candleTimes={candleTimes}
               context={context.data}
               isLoading={context.isLoading}
               isError={context.isError}
               syncWith={chart}
-            />
+            />}
           </>
         )}
 
@@ -189,6 +202,8 @@ export function MarketCanvas() {
           onRemove={(id) => deleteDrawing.mutate(id)}
           removing={deleteDrawing.isPending}
         />
+        {createDrawing.isError && <p role="alert" className="tone-bad">Drawing was not saved. Check the connection and try again.</p>}
+        {deleteDrawing.isError && <p role="alert" className="tone-bad">Drawing was not removed. Its stored history is unchanged.</p>}
 
         <p className="market-footnote" style={{ marginTop: 12 }}>
           Source: Hyperliquid <code>candleSnapshot</code> &nbsp;•&nbsp; markers are
@@ -221,10 +236,10 @@ export function MarketCanvas() {
       <section className="panel" style={{ padding: 16, marginTop: 16 }}>
         <div className="panel-heading" style={{ marginBottom: 10 }}>
           <div>
-            <h2 style={{ fontSize: 17 }}>Evidence timeline</h2>
+            <h2 style={{ fontSize: 17 }}>Paper outcomes & evidence</h2>
             <p>
-              Each recorded call, from the evidence that produced it to what the
-              market did next. Reconstructable without screenshots or memory.
+              Compare each recorded call at fixed horizons. Returns are hypothetical,
+              before fees, funding and slippage — not realized account P&amp;L.
             </p>
           </div>
         </div>

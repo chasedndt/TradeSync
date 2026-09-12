@@ -27,8 +27,6 @@ import {
 } from '../api/hooks'
 import type { MarketSnapshotWithMicrostructure } from '../api/types'
 
-const TRACKED_ORDER = ['BTC-PERP', 'ETH-PERP', 'SOL-PERP']
-
 function formatUsd(value?: number, digits = 2) {
   if (value == null || !Number.isFinite(value)) return '—'
   return new Intl.NumberFormat('en-US', {
@@ -87,9 +85,9 @@ function ReadinessItem({ icon, label, value, detail, tone, to }: ReadinessItemPr
 }
 
 function MarketPulse({ snapshots }: { snapshots: MarketSnapshotWithMicrostructure[] }) {
-  const rows = [...snapshots]
-    .filter((snapshot) => TRACKED_ORDER.includes(snapshot.symbol))
-    .sort((a, b) => TRACKED_ORDER.indexOf(a.symbol) - TRACKED_ORDER.indexOf(b.symbol))
+  // Every Hyperliquid symbol market-data reports, in its configured order.
+  // The list used to be a constant here; it is configured once in compose now.
+  const rows = snapshots.filter((snapshot) => snapshot.venue === 'hyperliquid')
 
   return (
     <section className="panel market-panel" aria-labelledby="market-pulse-title">
@@ -210,7 +208,9 @@ export function Overview() {
   const { data: opportunities, isLoading: opportunitiesLoading } = useOpportunities('all', 50)
   const snapshots = (marketData?.snapshots || []) as MarketSnapshotWithMicrostructure[]
   const freshest = snapshots.length ? Math.min(...snapshots.map((item) => item.data_age_ms)) / 1000 : null
-  const marketLive = !marketError && snapshots.length > 0 && (freshest ?? 999) < 15
+  const oldest = snapshots.length ? Math.max(...snapshots.map((item) => item.data_age_ms)) / 1000 : null
+  const marketLive = !marketError && snapshots.length > 0 && (oldest ?? Infinity) < 15
+  const marketState = marketError ? 'UNREACHABLE' : snapshots.length === 0 ? 'WAITING' : marketLive ? 'LIVE' : 'STALE'
   const redisHealthy = snapshot ? Object.values(snapshot.stream_lengths || {}).every((value) => value >= 0) : false
   const opportunityCount = opportunities?.length || 0
   const hasSignals = Boolean(snapshot?.latest_signal_ts)
@@ -218,7 +218,7 @@ export function Overview() {
   return (
     <div className="mission-control">
       <section className="panel readiness-strip" aria-label="System readiness">
-        <ReadinessItem to="/pipeline" icon={<ChartLineUp size={35} weight="duotone" />} label="Market Data" value={marketLive ? 'LIVE' : 'UNAVAILABLE'} detail={`Hyperliquid · ${freshest == null ? 'waiting for data' : `last update ${formatAge(freshest)}`}`} tone={marketLive ? 'good' : 'bad'} />
+        <ReadinessItem to="/pipeline" icon={<ChartLineUp size={35} weight="duotone" />} label="Market Data" value={marketState} detail={`Hyperliquid · ${oldest == null ? 'waiting for data' : `oldest symbol update ${formatAge(oldest)}`}`} tone={marketLive ? 'good' : marketError ? 'bad' : 'warn'} />
         <ReadinessItem to="/pipeline" icon={<Heartbeat size={35} weight="duotone" />} label="Intelligence Pipeline" value={hasSignals ? 'ACTIVE' : 'PARTIAL'} detail={hasSignals ? 'Scoring output detected' : 'No current scoring output'} tone={hasSignals ? 'good' : 'warn'} />
         <ReadinessItem to="/pipeline" icon={<Prohibit size={35} weight="bold" />} label="Execution" value="DISABLED" detail="Paper-only · No wallet connected" tone="bad" />
       </section>
@@ -237,7 +237,7 @@ export function Overview() {
           <div className="health-grid">
             <HealthItem icon={<HardDrives size={24} weight="duotone" />} name="PostgreSQL" state={health?.postgres ? 'HEALTHY' : 'UNAVAILABLE'} detail={health?.latency_ms != null ? `${health.latency_ms.toFixed(0)}ms` : '—'} tone={health?.postgres ? 'good' : 'bad'} />
             <HealthItem icon={<Stack size={24} weight="duotone" />} name="Redis" state={redisHealthy ? 'HEALTHY' : 'UNAVAILABLE'} detail={redisHealthy ? 'stream checks pass' : '—'} tone={redisHealthy ? 'good' : 'bad'} />
-            <HealthItem icon={<PulseIcon />} name="Hyperliquid Market Data" state={marketLive ? 'LIVE' : 'UNAVAILABLE'} detail={freshest == null ? '—' : formatAge(freshest)} tone={marketLive ? 'good' : 'bad'} />
+            <HealthItem icon={<PulseIcon />} name="Hyperliquid Market Data" state={marketState} detail={freshest == null ? '—' : `Newest ${formatAge(freshest)} · oldest ${formatAge(oldest)}`} tone={marketLive ? 'good' : marketError ? 'bad' : 'warn'} />
             <HealthItem icon={<BracketsCurly size={24} weight="duotone" />} name="State API" state={!healthError && health ? 'HEALTHY' : 'UNAVAILABLE'} detail={health ? `${health.latency_ms.toFixed(0)}ms DB read` : '—'} tone={!healthError && health ? 'good' : 'bad'} />
             <HealthItem icon={<Gauge size={24} weight="duotone" />} name="Scorer Service" state={hasSignals ? 'OUTPUT SEEN' : 'NO OUTPUT'} detail={hasSignals ? 'signal timestamp present' : 'not measured directly'} tone={hasSignals ? 'good' : 'warn'} />
             <HealthItem icon={<CirclesThreePlus size={24} weight="duotone" />} name="Fusion Engine" state={opportunityCount ? 'OUTPUT SEEN' : 'NO OUTPUT'} detail={opportunityCount ? `${opportunityCount} opportunities` : 'not measured directly'} tone={opportunityCount ? 'good' : 'warn'} />

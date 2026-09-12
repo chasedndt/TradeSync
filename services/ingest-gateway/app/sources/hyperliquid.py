@@ -1,4 +1,5 @@
 import asyncio
+import os
 import httpx
 import uuid
 import json
@@ -10,7 +11,12 @@ from ..normalize import normalize_symbol
 
 # Configuration
 HYPERLIQUID_API_URL = "https://api.hyperliquid.xyz/info"
-TARGET_MARKETS = ["BTC", "ETH", "SOL"]
+# Same list as the rest of the stack (MARKET_SYMBOLS), in bare-coin form.
+TARGET_MARKETS = [
+    s.strip().replace("-PERP", "")
+    for s in os.getenv("MARKET_SYMBOLS", "BTC-PERP,ETH-PERP,SOL-PERP").split(",")
+    if s.strip()
+]
 
 async def poll_hyperliquid_markets():
     """

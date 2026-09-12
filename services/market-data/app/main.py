@@ -521,8 +521,18 @@ async def status():
 
 @app.get("/snapshots")
 async def get_snapshots():
-    """Get all current snapshots."""
-    snapshots = await redis_client.get_all_snapshots()
+    """All current snapshots, in the configured symbol order.
+
+    Redis returns keys in an arbitrary order, and the Cockpit now derives its
+    symbol list from this response instead of a constant — so the order here
+    is the order the operator sees everywhere. Anything not in MARKET_SYMBOLS
+    (a symbol removed from the list whose key has not expired yet) sorts last.
+    """
+    rank = {symbol: index for index, symbol in enumerate(SYMBOLS)}
+    snapshots = sorted(
+        await redis_client.get_all_snapshots(),
+        key=lambda s: (rank.get(s.get("symbol"), len(rank)), s.get("symbol", "")),
+    )
     return {"snapshots": snapshots, "count": len(snapshots)}
 
 

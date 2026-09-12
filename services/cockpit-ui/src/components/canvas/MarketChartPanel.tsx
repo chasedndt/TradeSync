@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useCandles } from '../../api/hooks/useCandles'
+import { useTrackedSymbols } from '../../api/hooks/useTrackedSymbols'
 import { PriceChart } from './PriceChart'
 
-const SYMBOLS = ['BTC-PERP', 'ETH-PERP', 'SOL-PERP']
 const INTERVALS = ['5m', '15m', '1h', '4h']
 
 /**
@@ -14,6 +14,7 @@ const INTERVALS = ['5m', '15m', '1h', '4h']
  * carries evidence markers and the longer window.
  */
 export function MarketChartPanel() {
+  const { symbols: SYMBOLS } = useTrackedSymbols()
   const [symbol, setSymbol] = useState(SYMBOLS[0])
   const [interval, setInterval] = useState('15m')
   const { data, isLoading, isError } = useCandles(symbol, interval, 120)

@@ -6,8 +6,8 @@ import {
   useSaveRegimeLab,
 } from '../api/hooks'
 import type { RegimeLabExperimentRequest } from '../api/types'
+import { useTrackedSymbols } from '../api/hooks/useTrackedSymbols'
 
-const SYMBOLS = ['BTC-PERP', 'ETH-PERP', 'SOL-PERP']
 const BLOCK_LABELS: Record<string, string> = {
   price_volatility: 'Price & volatility',
   liquidity: 'Liquidity',
@@ -44,6 +44,7 @@ function gateLabel(feature: {
 }
 
 export function RegimeLab() {
+  const { symbols: trackedSymbols } = useTrackedSymbols()
   const [symbol, setSymbol] = useState('BTC-PERP')
   const [weights, setWeights] = useState<Record<string, number>>({})
   const [name, setName] = useState('Liquidity challenger 01')
@@ -126,7 +127,7 @@ export function RegimeLab() {
           <label>
             Evidence market
             <select value={symbol} onChange={(event) => setSymbol(event.target.value)}>
-              {SYMBOLS.map((item) => <option key={item}>{item}</option>)}
+              {trackedSymbols.map((item) => <option key={item}>{item}</option>)}
             </select>
           </label>
           <span className={`lab-live-pill lab-live-pill--${data.source_status.status}`}>

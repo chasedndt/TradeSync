@@ -1,5 +1,17 @@
 name: tradesync-full
 
+# The one symbol list for the whole stack. market-data polls these, core-scorer
+# scores them, the Cockpit reads whatever market-data reports. Change it here
+# only.
+#
+# Selection rule (reviewed 2026-09-12 against Hyperliquid metaAndAssetCtxs):
+# 24h notional volume >= $30M AND max leverage >= 10x. That gave, in volume
+# order: BTC 3.6B, ETH 2.6B, HYPE 596M, ZEC 519M, SOL 311M, XRP 103M, NEAR 77M,
+# PUMP 76M, LINK 33M, UNI 31M. Review monthly; the rule is the authority, not
+# the list. Spot-premium context will be unavailable for coins Coinbase does not
+# list, and that shows as lower coverage rather than as a substitute value.
+x-market-symbols: &market_symbols "BTC-PERP,ETH-PERP,HYPE-PERP,ZEC-PERP,SOL-PERP,XRP-PERP,NEAR-PERP,PUMP-PERP,LINK-PERP,UNI-PERP"
+
 services:
   # --- Infra (same as compose.infra.yml) ---
   postgres:
@@ -97,6 +109,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
+      MARKET_SYMBOLS: *market_symbols
       PG_DSN: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       SCORING_INTERVAL: 10
       REDIS_URL: redis://redis:6379
@@ -197,10 +210,13 @@ services:
         condition: service_healthy
     environment:
       REDIS_URL: redis://redis:6379
-      MARKET_SYMBOLS: "BTC-PERP,ETH-PERP,SOL-PERP"
+      MARKET_SYMBOLS: *market_symbols
       ENABLE_HYPERLIQUID: "true"
       POLL_INTERVAL_CONTEXT: "5000"
-      POLL_INTERVAL_ORDERBOOK: "3000"
+      # One request per symbol per cycle against a 60/min venue limiter: ten
+      # symbols at 3s would ask for 200/min and the book would silently age.
+      # 10s keeps it at 60/min. Raise this again if the list grows.
+      POLL_INTERVAL_ORDERBOOK: "10000"
       PYTHONUNBUFFERED: 1
     dns:
       - 8.8.8.8

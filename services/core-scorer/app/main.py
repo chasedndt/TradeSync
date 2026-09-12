@@ -29,7 +29,14 @@ app = FastAPI(title="TradeSync Core Scorer", version="0.1.0")
 PG_DSN = os.getenv("PG_DSN", "postgresql://tradesync:CHANGE_ME@localhost:5432/tradesync")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 SCORING_INTERVAL = int(os.getenv("SCORING_INTERVAL", "60"))
-SYMBOLS = os.getenv("SYMBOLS", "BTC,ETH,SOL").split(",")
+# One symbol list for the whole stack: MARKET_SYMBOLS, as market-data reads it.
+# The scorer speaks in bare coins, so the -PERP suffix is dropped here rather
+# than kept as a second, divergent list.
+SYMBOLS = [
+    s.strip().replace("-PERP", "")
+    for s in os.getenv("MARKET_SYMBOLS", os.getenv("SYMBOLS", "BTC,ETH,SOL")).split(",")
+    if s.strip()
+]
 
 # The regime path is the native Hyperliquid paper pipeline. The legacy
 # events-table path below remains importable for replay of historical rows,
