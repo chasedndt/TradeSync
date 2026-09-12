@@ -63,4 +63,23 @@ Coinbase premium took in 1.4.0 → 1.5.0.
 - The catalog edit is 28 lines added, one changed (the version); the file was
   not reformatted.
 
-Live results after deploy are appended below.
+## Live, after deploy
+
+Two more things the live API taught, both now in the code and tests:
+
+- A six-hour window returns a bare `{}` for smaller coins (too few articles to
+  build a timeline). The window is now a day; freshness still governs what is
+  attached, so an hours-old bucket is absent, not stale-but-shown.
+- **GDELT fills a bucket with no matching articles with a tone of exactly
+  `0`**, not a gap. Read naively that is "neutral news"; it is actually "no
+  news". An exactly-zero bucket is now treated as absent, and the newest
+  closed bucket *with articles* is used.
+- My own manual probes shared the container's IP and collided with the poller,
+  which is where most of the 429s came from. The poller backs off 60s on a
+  429 regardless.
+
+state-api bakes the catalog into its image; after a rebuild the Regime Lab
+reports catalog **1.7.0** (digest `ed1a467c9fe39a8e`, 21 features) and lists
+`gdelt_news_tone` for BTC at **+0.4939**, `status: not_normalized`,
+`scoring_allowed: False`, `provenance: context_only` — exactly the state a new
+source must start in.
