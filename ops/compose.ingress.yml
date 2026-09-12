@@ -26,11 +26,11 @@
 
 services:
   cloudflared:
-    image: cloudflare/cloudflared:2024.8.3
+    image: cloudflare/cloudflared:2026.9.1
     restart: unless-stopped
     # Runs the named tunnel from the mounted config. No ports are published:
     # cloudflared connects OUTBOUND to Cloudflare, which is the entire point.
-    command: tunnel --config /etc/cloudflared/config.yml run
+    command: tunnel --config /etc/cloudflared/cloudflared.config.yml run
     volumes:
       - ./ingress:/etc/cloudflared:ro
     depends_on:
