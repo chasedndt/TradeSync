@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { WatchOnlyWallet } from '../components/WatchOnlyWallet'
+import { PaperRehearsal } from '../components/PaperRehearsal'
 import { useExecutionStatus } from '../api/hooks'
 import { Database, ListChecks, LockKey, Prohibit, ShieldCheck, Wallet } from '../components/icons'
 
@@ -51,6 +52,7 @@ export function Execution() {
       </div>
 
       <WatchOnlyWallet />
+      <PaperRehearsal />
       <section className="panel">
         <div className="panel-heading"><div><h2>Activation gates</h2><p>These are safety requirements, not controls</p></div></div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-slate-800">

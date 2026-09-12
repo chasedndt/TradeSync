@@ -74,7 +74,13 @@ class RiskGuardian:
         Validates a proposed trade against comprehensive hardening rules.
         """
         # 0. Global Killswitch
-        if not self.execution_enabled:
+        #
+        # A rehearsal is the one phase that does not consult it: a rehearsal
+        # produces a simulated fill in its own journal and by construction
+        # never reaches an execution service, so the gate has nothing to
+        # guard there. Every per-symbol rule below still applies to it — the
+        # point of rehearsing is to see those rules refuse.
+        if not self.execution_enabled and phase != "rehearsal":
             return RiskVerdict(
                 allowed=False,
                 reason_code=ReasonCode.EXEC_DISABLED,
@@ -96,6 +102,12 @@ class RiskGuardian:
                 allowed=False,
                 reason_code=ReasonCode.DUPLICATE,
                 reason=f"Opportunity is already in status: {status}"
+            )
+        if phase == "rehearsal" and status not in ("new", "previewed"):
+            return RiskVerdict(
+                allowed=False,
+                reason_code=ReasonCode.DUPLICATE,
+                reason=f"Opportunity is {status}; only new or previewed ones can be rehearsed"
             )
         if phase == "execute" and status not in ["new", "previewed"]:
              return RiskVerdict(

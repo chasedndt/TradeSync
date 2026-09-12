@@ -3662,3 +3662,11 @@ async def execute_action_alias(response: Response, req: ExecuteRequest):
 async def get_execution_status_alias(response: Response):
     apply_deprecation_headers(response, "/state/execution/status")
     return await get_execution_status()
+
+
+# Paper rehearsal: preview, refuse, journal, with the execution gate shut.
+# Registered last so it sees the same pool the rest of the app uses. It has no
+# path to an execution service; see app/rehearsal.py.
+from app.rehearsal import register as register_rehearsal  # noqa: E402
+
+register_rehearsal(app, state)
