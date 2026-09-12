@@ -176,3 +176,33 @@ services:
     logging:
       driver: json-file
       options: {max-size: "20m", max-file: "3"}
+
+  # Reads the ChaseOS agent channels (Hermes fleet, Strike Zone alerts) on the
+  # operator's private Discord into quarantine, with provenance. Read-only:
+  # it never posts to Discord, never talks to a model, never touches the
+  # catalog. Idle unless DISCORD_BOT_TOKEN and DISCORD_READER_CHANNELS are set
+  # in runtime.env (the token via tools/set-runtime-secret.ps1, never in git).
+  # DISCORD_READER_CHANNELS is "label=channel_id[:kind],..." with kind one of
+  # agent | alerts | operator.
+  discord-reader:
+    build:
+      context: ..
+      dockerfile: services/discord-reader/Dockerfile
+    restart: unless-stopped
+    mem_limit: 128m
+    mem_reservation: 64m
+    cpus: 0.10
+    environment:
+      STATE_API_URL: http://state-api:8000
+      REDIS_URL: redis://redis:6379
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}
+      DISCORD_READER_CHANNELS: ${DISCORD_READER_CHANNELS:-}
+      DISCORD_POLL_SECONDS: ${DISCORD_POLL_SECONDS:-30}
+    depends_on:
+      redis:
+        condition: service_healthy
+      state-api:
+        condition: service_started
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}

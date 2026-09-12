@@ -37,7 +37,7 @@ SCHEMA_VERSION = "quarantine_v1"
 # Sources permitted to submit at all. An unknown source is rejected rather than
 # accepted with a warning, so adding a connector is a deliberate act.
 KNOWN_SOURCES = frozenset(
-    {"tradingview", "strike_zone", "agent_harness", "chaseos", "operator"}
+    {"tradingview", "strike_zone", "agent_harness", "chaseos", "operator", "discord"}
 )
 
 # Fields a submission must never set. These name trust, authority or identity,
