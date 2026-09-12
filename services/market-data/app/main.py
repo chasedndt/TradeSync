@@ -664,6 +664,15 @@ async def get_snapshots():
         await redis_client.get_all_snapshots(),
         key=lambda s: (rank.get(s.get("symbol"), len(rank)), s.get("symbol", "")),
     )
+    # Two different ages, stated separately. ``data_age_ms`` (set by the
+    # snapshotter) is the age of the oldest *metric* inside the snapshot — a
+    # completeness measure. ``snapshot_age_ms`` is how long since the venue
+    # was last observed for the symbol at all — a liveness measure. Mission
+    # Control judged "LIVE" on the first and read a healthy feed as stale.
+    now_ms = int(time.time() * 1000)
+    for snapshot in snapshots:
+        ts = snapshot.get("ts")
+        snapshot["snapshot_age_ms"] = max(0, now_ms - int(ts)) if isinstance(ts, int) else None
     return {"snapshots": snapshots, "count": len(snapshots)}
 
 

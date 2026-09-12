@@ -115,7 +115,9 @@ function MarketPulse({ snapshots }: { snapshots: MarketSnapshotWithMicrostructur
               const spread = snapshot.microstructure?.spread_bps ?? snapshot.orderbook?.spread_bps
               const liquidity = snapshot.microstructure?.liquidity_score
               const regime = snapshot.regimes?.trend || snapshot.regimes?.market_condition || 'unknown'
-              const ageSeconds = snapshot.data_age_ms / 1000
+              // Time since this symbol was last observed, the same clock the
+              // header's LIVE/STALE uses; metric completeness is a separate fact.
+              const ageSeconds = (snapshot.snapshot_age_ms ?? snapshot.data_age_ms) / 1000
               // Hyperliquid publishes prevDayPx beside the mark, so this is a
               // derivation of two authoritative values, not a reconstruction.
               const change24h = snapshot.price?.change_24h_pct ?? null
@@ -208,9 +210,16 @@ export function Overview() {
   const { data: snapshot } = useSnapshot()
   const { data: opportunities, isLoading: opportunitiesLoading } = useOpportunities('all', 50)
   const snapshots = (marketData?.snapshots || []) as MarketSnapshotWithMicrostructure[]
-  const freshest = snapshots.length ? Math.min(...snapshots.map((item) => item.data_age_ms)) / 1000 : null
-  const oldest = snapshots.length ? Math.max(...snapshots.map((item) => item.data_age_ms)) / 1000 : null
-  const marketLive = !marketError && snapshots.length > 0 && (oldest ?? Infinity) < 15
+  // Liveness is judged on how long since each symbol was last observed
+  // (snapshot_age_ms), not on the age of the oldest metric inside a snapshot
+  // (data_age_ms): the latter is a completeness figure and read a healthy
+  // ten-symbol feed as STALE. Falls back to data_age_ms for an older API.
+  const observedAge = (item: MarketSnapshotWithMicrostructure) =>
+    item.snapshot_age_ms ?? item.data_age_ms
+  const freshest = snapshots.length ? Math.min(...snapshots.map(observedAge)) / 1000 : null
+  const oldest = snapshots.length ? Math.max(...snapshots.map(observedAge)) / 1000 : null
+  // Every symbol is observed each order-book cycle (8s); two cycles missed is stale.
+  const marketLive = !marketError && snapshots.length > 0 && (oldest ?? Infinity) < 20
   const marketState = marketError ? 'UNREACHABLE' : snapshots.length === 0 ? 'WAITING' : marketLive ? 'LIVE' : 'STALE'
   const redisHealthy = snapshot ? Object.values(snapshot.stream_lengths || {}).every((value) => value >= 0) : false
   const opportunityCount = opportunities?.length || 0

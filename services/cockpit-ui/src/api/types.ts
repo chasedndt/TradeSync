@@ -271,6 +271,12 @@ export interface MarketSnapshot {
   venue: string
   symbol: string
   ts: number
+  /**
+   * Time since the venue was last observed for this symbol — liveness.
+   * Distinct from data_age_ms, the age of the oldest metric inside the
+   * snapshot — completeness. Judge "is the feed alive" on this one.
+   */
+  snapshot_age_ms?: number | null
   data_age_ms: number
   available_metrics: MetricAvailability[]
   price?: PriceData
