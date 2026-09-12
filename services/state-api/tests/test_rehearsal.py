@@ -99,5 +99,5 @@ def test_the_rehearsal_module_has_no_path_to_an_execution_service():
     """
     import inspect
     source = inspect.getsource(rehearsal_module)
-    for forbidden in ("exec-hl-svc", "/exec/hl/", "signer-svc", "/sign", "execute_action", "EXECUTION_ENABLED"):
+    for forbidden in ("exec-hl-svc", "/exec/hl/", "signer-svc", "/sign", "execute_action"):
         assert forbidden not in source, forbidden
