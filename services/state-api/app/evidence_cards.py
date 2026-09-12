@@ -135,20 +135,25 @@ def _next_step(earned: bool, standing: str) -> str:
     return "stays context-only; keeps recording"
 
 
+async def compute_evidence_cards(pool, symbol: str | None) -> dict[str, Any]:
+    """The full evidence-card reading; shared by the endpoint and the thesis."""
+    catalog = load_catalog(default_catalog_path())
+    specs = {f: catalog.features[f] for f in candidate_features(catalog.features)}
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(ROWS_SQL, symbol)
+        cov_rows = await conn.fetch(COVERAGE_SQL, symbol)
+        pending = await conn.fetchval(PENDING_SQL)
+    coverage = {r["feature_id"]: {"present": r["present"], "absent": r["absent"]} for r in cov_rows}
+    return build_response(
+        symbol, catalog.version, specs, rows_to_feature_outcomes(rows), coverage, int(pending or 0)
+    )
+
+
 def register(app, state) -> None:
     @router.get("/state/outcomes/evidence-cards")
     async def evidence_cards(symbol: str | None = None):
         if not state.pool:
             raise HTTPException(status_code=503, detail="DB Pool not ready")
-        catalog = load_catalog(default_catalog_path())
-        specs = {f: catalog.features[f] for f in candidate_features(catalog.features)}
-        async with state.pool.acquire() as conn:
-            rows = await conn.fetch(ROWS_SQL, symbol)
-            cov_rows = await conn.fetch(COVERAGE_SQL, symbol)
-            pending = await conn.fetchval(PENDING_SQL)
-        coverage = {r["feature_id"]: {"present": r["present"], "absent": r["absent"]} for r in cov_rows}
-        return build_response(
-            symbol, catalog.version, specs, rows_to_feature_outcomes(rows), coverage, int(pending or 0)
-        )
+        return await compute_evidence_cards(state.pool, symbol)
 
     app.include_router(router)

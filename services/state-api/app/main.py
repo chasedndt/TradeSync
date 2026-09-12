@@ -3680,3 +3680,14 @@ register_skill_gate(app, state)
 from app.evidence_cards import register as register_evidence_cards  # noqa: E402
 
 register_evidence_cards(app, state)
+
+# The Thesis page's read model: the SOP's minimum valid thesis from evidence.
+from app.thesis import register as register_thesis  # noqa: E402
+
+register_thesis(
+    app,
+    state,
+    market_data_url=MARKET_DATA_URL,
+    calendar=lambda: context_feed.fetch_overview(force_refresh=False),
+    evidence=_regime_lab_evidence,
+)

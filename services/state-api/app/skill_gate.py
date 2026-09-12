@@ -64,76 +64,81 @@ def rows_to_observations(rows) -> dict[tuple[int, str], list[Observation]]:
     return cells
 
 
+async def compute_skill_gate(pool, symbol: str | None) -> dict[str, Any]:
+    """The full skill-gate reading; shared by the endpoint and the thesis."""
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT x.horizon_minutes, x.symbol, x.direction, x.opened_at,
+                   x.forward_return_pct, x.signed_return_pct, r.regime
+            FROM opportunity_outcomes x
+            LEFT JOIN opportunity_entry_regimes r ON r.opportunity_id = x.opportunity_id
+            WHERE x.status = 'measured'
+              AND x.forward_return_pct IS NOT NULL AND x.signed_return_pct IS NOT NULL
+              AND ($1::text IS NULL OR x.symbol = $1)
+            """,
+            symbol,
+        )
+        unlabelled = await conn.fetchval(
+            """
+            SELECT count(*) FROM opportunities o
+            LEFT JOIN opportunity_entry_regimes r ON r.opportunity_id = o.id
+            WHERE o.dir IN ('LONG','SHORT') AND r.opportunity_id IS NULL
+            """
+        )
+
+    cells = rows_to_observations(rows)
+    assessed = assess_cells(
+        [(f"{h}m {regime}", h, obs) for (h, regime), obs in sorted(cells.items())],
+        costs=COSTS,
+        draws=400,
+        seed=0,
+    )
+    out: list[dict[str, Any]] = []
+    for (h, regime), cell in zip(sorted(cells.keys()), assessed):
+        d = cell.to_dict()
+        d["horizon_minutes"], d["regime"] = h, regime
+        out.append(d)
+
+    any_positive = any(c.positive_skill for c in assessed)
+    any_edge = any(c.economic_edge for c in assessed)
+    return {
+        "schema_version": "skill_gate_v2",
+        "symbol": symbol,
+        "horizons": list(DEFAULT_HORIZONS_MINUTES),
+        "cells": out,
+        "cells_assessed_together": len(assessed),
+        "verdict": {
+            "any_detectable": any(c.detectable for c in assessed),
+            "any_positive_skill": any_positive,
+            "any_economic_edge": any_edge,
+            "gate": "OPEN" if any_edge else "CLOSED",
+        },
+        "costs": {
+            "round_trip_fee_pct": COSTS.round_trip_fee_pct,
+            "spread_pct": COSTS.spread_pct,
+            "slippage_pct": COSTS.slippage_pct,
+            "total_pct": COSTS.total_pct,
+            "source": COSTS.source,
+        },
+        "entry_regimes_pending": int(unlabelled or 0),
+        "note": (
+            "Regimes are entry-time labels from candles closed before each signal. "
+            "Standard errors count non-overlapping windows with symbols pooled and "
+            "take the larger of that and a block bootstrap. positive_skill is "
+            "Holm-adjusted across every cell here. economic_edge requires positive "
+            "skill and a positive mean return after the stated costs. None of this "
+            "is trading readiness; the gate opens only on economic_edge AND explicit "
+            "operator approval."
+        ),
+    }
+
+
 def register(app, state) -> None:
     @router.get("/state/outcomes/skill-gate")
     async def skill_gate(symbol: str | None = None):
         if not state.pool:
             raise HTTPException(status_code=503, detail="DB Pool not ready")
-        async with state.pool.acquire() as conn:
-            rows = await conn.fetch(
-                """
-                SELECT x.horizon_minutes, x.symbol, x.direction, x.opened_at,
-                       x.forward_return_pct, x.signed_return_pct, r.regime
-                FROM opportunity_outcomes x
-                LEFT JOIN opportunity_entry_regimes r ON r.opportunity_id = x.opportunity_id
-                WHERE x.status = 'measured'
-                  AND x.forward_return_pct IS NOT NULL AND x.signed_return_pct IS NOT NULL
-                  AND ($1::text IS NULL OR x.symbol = $1)
-                """,
-                symbol,
-            )
-            unlabelled = await conn.fetchval(
-                """
-                SELECT count(*) FROM opportunities o
-                LEFT JOIN opportunity_entry_regimes r ON r.opportunity_id = o.id
-                WHERE o.dir IN ('LONG','SHORT') AND r.opportunity_id IS NULL
-                """
-            )
-
-        cells = rows_to_observations(rows)
-        assessed = assess_cells(
-            [(f"{h}m {regime}", h, obs) for (h, regime), obs in sorted(cells.items())],
-            costs=COSTS,
-            draws=400,
-            seed=0,
-        )
-        out: list[dict[str, Any]] = []
-        for (h, regime), cell in zip(sorted(cells.keys()), assessed):
-            d = cell.to_dict()
-            d["horizon_minutes"], d["regime"] = h, regime
-            out.append(d)
-
-        any_positive = any(c.positive_skill for c in assessed)
-        any_edge = any(c.economic_edge for c in assessed)
-        return {
-            "schema_version": "skill_gate_v2",
-            "symbol": symbol,
-            "horizons": list(DEFAULT_HORIZONS_MINUTES),
-            "cells": out,
-            "cells_assessed_together": len(assessed),
-            "verdict": {
-                "any_detectable": any(c.detectable for c in assessed),
-                "any_positive_skill": any_positive,
-                "any_economic_edge": any_edge,
-                "gate": "OPEN" if any_edge else "CLOSED",
-            },
-            "costs": {
-                "round_trip_fee_pct": COSTS.round_trip_fee_pct,
-                "spread_pct": COSTS.spread_pct,
-                "slippage_pct": COSTS.slippage_pct,
-                "total_pct": COSTS.total_pct,
-                "source": COSTS.source,
-            },
-            "entry_regimes_pending": int(unlabelled or 0),
-            "note": (
-                "Regimes are entry-time labels from candles closed before each signal. "
-                "Standard errors count non-overlapping windows with symbols pooled and "
-                "take the larger of that and a block bootstrap. positive_skill is "
-                "Holm-adjusted across every cell here. economic_edge requires positive "
-                "skill and a positive mean return after the stated costs. None of this "
-                "is trading readiness; the gate opens only on economic_edge AND explicit "
-                "operator approval."
-            ),
-        }
+        return await compute_skill_gate(state.pool, symbol)
 
     app.include_router(router)

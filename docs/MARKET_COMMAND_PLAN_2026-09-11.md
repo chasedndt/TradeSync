@@ -279,7 +279,15 @@ This follows Codex's review order; slice 1 is accepted today.
   `changes/2026-09-12_evidence-cards-earned-weights.md`. **Strike Zone / Pine
   signals will enter through exactly this mechanism; what blocks them is the
   public route (Cloudflare Tunnel or a Discord reader), an operator decision
-  flagged in that record.** Slice 6 (Thesis page) is next.
+  flagged in that record.**
+- **Slice 6 delivered**: the Thesis page at `/thesis` renders the SOP's minimum
+  valid thesis from measured evidence — structure, anchors, derivatives and
+  context, confirmation stack with earned status, invalidation, six no-trade
+  conditions, confidence as coverage — as data and as text, every line with its
+  source and age; private. `changes/2026-09-12_thesis-page.md`.
+- **Pine ingress decision (2026-09-12)**: Cloudflare Tunnel, implemented by
+  Codex through its wrangler connection. When the tunnel is the only blocker,
+  a handover is written, committed and pushed for Codex.
 
 ## 7. Where things stand at the end of 2026-09-11
 

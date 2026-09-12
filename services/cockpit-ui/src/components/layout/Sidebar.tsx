@@ -21,6 +21,7 @@ const navItems = [
   { to: '/market', label: 'Market', description: 'Hyperliquid market evidence.', icon: ChartBar },
   { to: '/canvas', label: 'Market Canvas', description: 'Candles with recorded paper evidence.', icon: ChartLineUp },
   { to: '/opportunities', label: 'Opportunities', description: 'Ranked paper research setups.', icon: ChartLineUp },
+  { to: '/thesis', label: 'Thesis', description: 'The daily thesis, assembled from measured evidence.', icon: ListChecks },
   { to: '/regime-lab', label: 'Regime Lab', description: 'Feature evidence and rulebook experiments.', icon: BracketsCurly },
   { to: '/pipeline', label: 'Integration pipeline', description: 'Live dependencies, missing links, and restart targets.', icon: FlowArrow },
   { to: '/intake', label: 'Knowledge intake', description: 'Quarantined connector submissions awaiting review.', icon: Database },
