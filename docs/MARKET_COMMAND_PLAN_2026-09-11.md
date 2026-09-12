@@ -256,6 +256,15 @@ This follows Codex's review order; slice 1 is accepted today.
   wrote older windows off); 240m outcomes are accruing for the first time
   since 8 September, with a 5m fallback where the venue has dropped 1m history.
 - **Slice 1 accepted and committed**, including Codex's watch-only wallet.
+- **Slice 2 delivered (paper rehearsal)**: preview → refuse → journal with the
+  execution gate shut; simulated fills priced from the live mark and spread
+  with Hyperliquid's published fees; duplicates and missing dependencies
+  handled. `changes/2026-09-12_paper-rehearsal.md`.
+- **FRED key configured** by the operator (via a desktop prompt that wrote it
+  straight to `runtime.env`); macro reference and official release dates live.
+  A key leak into the state-api log was found and closed the same hour.
+- **Mission Control liveness** now judged on observation age, not metric age;
+  order books polled concurrently. All ten symbols LIVE.
 
 ## 7. Where things stand at the end of 2026-09-11
 
