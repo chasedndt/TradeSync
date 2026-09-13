@@ -64,13 +64,15 @@ docker compose --env-file E:\Projects\TradeSync\dashboard-runtime\runtime.env `
 | Item | State |
 |---|---|
 | Migration `020_hermes_jobs_api.sql` | applied (schema-init log: "Applied migrations: 020") |
-| state-api and cockpit images with this work | a rebuild was started before the last files were written; **redeploy both and check health** |
+| state-api with gateway job control | deployed and healthy; `GET /state/fleet/jobs` reports `control.gateway_api: true`, status `live`; a `run_now` directive returned `applied` via channel `api` |
+| state-api with the timeframe routes | the first image predated the route registration (route returned 404); a second redeploy was started at handover time: **confirm `/state/market/horizons` answers** |
+| cockpit with the Timeframes page | build started at handover time; **build, redeploy and open `/timeframes`** |
 | Core horizon engine + features | written; `tests/test_horizon_outlook.py` and `tests/test_horizon_features.py`: 15 passed |
 | state-api gateway directives | written; state-api suite 107 passed including `test_fleet_gateway_directives.py` |
 | state-api horizon routes | written; `tests/test_horizons.py` **not yet run** |
 | Cockpit Timeframes page and fleet controls | written; fleet controls built once (`npm run build` passed); **Timeframes files not yet built** |
 | Hermes line endings | restored and verified (see 4A) |
-| Hermes targeted script fixes | applied and syntax-checked (see 4A); **not yet observed passing on a live run** |
+| Hermes targeted script fixes | applied and syntax-checked; the first live runs after the repair passed (see 4A) |
 
 First actions for Codex: run `tools\run_tests.py`, run `npm run build`, redeploy
 state-api and cockpit, open `http://localhost:3000/timeframes` and `/fleet`.
@@ -158,14 +160,25 @@ jobs through the Hermes gateway's jobs API on its port.
   the operator's decision; member-facing StrikeZone publishing must not be switched
   without them.
 
+**Verified live after the repair** (read from the gateway's `GET /api/jobs/{id}`,
+all with `failure_streak` 0 and no last error):
+
+| Job | Last run (BST) | Status |
+|---|---|---|
+| `6a1fdf7894c7` StrikeZone health watchdog | 20:14 | ok |
+| `25cae0290b3d` unified paper-approval bridge | 20:14 | ok |
+| `09490ac9c6d7` paper-outcome resolver | 20:10 | ok |
+| `c7b1fa0a2f3f` approval publish watcher | 20:02 | ok |
+| `83d45255c926` quant integrity watchdog | 19:53 | ok |
+
+A `run_now` directive for `6a1fdf7894c7` was also applied through the gateway
+(channel `api`).
+
 **Still to do for 4A:**
 
-1. Redeploy; run `run_now` on `6a1fdf7894c7` (local delivery, read-only health
-   check) from `/fleet` and confirm `last_status` becomes ok.
-2. Watch the next scheduled runs of the other repaired jobs (`25cae0290b3d` every
-   30 m, `c7b1fa0a2f3f` every 30 m, `09490ac9c6d7` quarter-hourly, `6cc8ce77dfe8`
-   19:00, `e6d0e5d87336` 07:30, `109d391ae292` 07:50, `9b8976a0804e` 08:00,
-   `cd7d95dd50ca` every 720 m). Do not run publishing jobs by hand.
+1. Watch the first scheduled runs of the repaired jobs that have not run since:
+   `6cc8ce77dfe8` 19:00, `e6d0e5d87336` 07:30, `109d391ae292` 07:50,
+   `9b8976a0804e` 08:00, `cd7d95dd50ca` every 720 m. Do not run publishing jobs by hand.
 3. Not fixed, with causes:
    - `95a0edd1754d` weekly member recap: last error names a missing
      `step8b3_result.json` under the old vault path; code is already re-pointed.
