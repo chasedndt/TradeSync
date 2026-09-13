@@ -58,3 +58,36 @@ def test_outlook_notes_lead_reads_events_and_standing_conditions_and_render() ->
     spoken = outlook_narration(o)
     assert spoken[0] == o["breadth"]["summary"] and "CPI m/m, in 10h 0m." in spoken
     assert outlook_text({}) == [] and outlook_narration(None) == []
+
+
+def test_key_events_need_the_right_country_and_decision_day_and_merge_variants() -> None:
+    core = {**CPI, "title": "Core CPI m/m", "impact": "Medium"}
+    canada = {**CPI, "title": "Median CPI y/y", "country": "CAD"}
+    fred_daily = {"title": "FOMC Press Release", "country": "USD", "impact": "Medium", "market_moving": True,
+                  "minutes_until": 900, "scheduled_at": "2026-09-14T00:00:00+00:00", "source": "fred"}
+    decision = {"title": "FOMC Statement", "country": "USD", "impact": "High", "minutes_until": 4000,
+                "scheduled_at": "2026-09-16T18:00:00+00:00", "source": "forexfactory"}
+    ke = key_events([CPI, core, canada, fred_daily, decision], {"cpi": {"BTC-PERP": PROFILE}}, {})
+    by_title = {k["title"]: k for k in ke}
+    assert set(by_title) == {"CPI m/m", "Median CPI y/y", "FOMC Press Release", "FOMC Statement"}
+    assert by_title["CPI m/m"]["kind"] == "cpi" and by_title["CPI m/m"]["related_titles"] == ["Core CPI m/m"]
+    assert by_title["Median CPI y/y"]["kind"] is None and by_title["Median CPI y/y"]["guidance"] == []
+    assert by_title["FOMC Press Release"]["kind"] is None
+    assert by_title["FOMC Statement"]["kind"] == "fomc"
+
+
+def test_one_release_day_is_one_key_event_led_by_the_timed_card() -> None:
+    fred_retail = {"title": "Advance Monthly Sales for Retail and Food Services", "country": "USD", "impact": "Medium",
+                   "market_moving": True, "minutes_until": 3000, "scheduled_at": "2026-09-16T00:00:00+00:00", "source": "fred"}
+    ff_retail = {"title": "Retail Sales m/m", "country": "USD", "impact": "Medium", "market_moving": True, "minutes_until": 3750,
+                 "scheduled_at": "2026-09-16T12:30:00+00:00", "source": "forexfactory", "url": "https://ff/retail"}
+    statement = {"title": "FOMC Statement", "country": "USD", "impact": "High", "minutes_until": 4080,
+                 "scheduled_at": "2026-09-16T18:00:00+00:00", "source": "forexfactory"}
+    presser = {**statement, "title": "FOMC Press Conference", "minutes_until": 4110, "scheduled_at": "2026-09-16T18:30:00+00:00"}
+    ke = key_events([fred_retail, ff_retail, statement, presser], {}, {})
+    assert [(k["title"], k["kind"], k["source"]) for k in ke] == [
+        ("Retail Sales m/m", "retail_sales", "forexfactory"), ("FOMC Statement", "fomc", "forexfactory")
+    ]
+    assert ke[0]["related_titles"] == ["Advance Monthly Sales for Retail and Food Services"]
+    assert ke[0]["scheduled_at"].startswith("2026-09-16T12:30") and ke[0]["minutes_until"] == 3750 and ke[0]["url"] == "https://ff/retail"
+    assert ke[1]["related_titles"] == ["FOMC Press Conference"]

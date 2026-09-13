@@ -1156,6 +1156,8 @@ export interface OutlookKeyEvent {
   reaction: Record<string, Record<string, EventReactionHorizon>>
   guidance: string[]
   articles: OutlookArticle[]
+  /** Other titles for the same release at the same instant, merged into this event. */
+  related_titles?: string[]
 }
 
 export interface MarketOutlook {

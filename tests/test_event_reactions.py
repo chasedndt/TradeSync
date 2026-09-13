@@ -11,6 +11,7 @@ from tradesync_core.event_reactions import (
     _by_close,
     baseline_moves,
     guidance,
+    kind_for_event,
     kind_for_title,
     profile,
     release_instant_s,
@@ -43,6 +44,19 @@ def test_calendar_titles_map_to_event_kinds() -> None:
     assert kind_for_title("FOMC Statement").key == "fomc"
     assert kind_for_title("Federal Funds Rate").key == "fomc"
     assert kind_for_title("German ZEW Economic Sentiment") is None
+    # FRED spells its releases out.
+    assert kind_for_title("Advance Monthly Sales for Retail and Food Services").key == "retail_sales"
+    assert kind_for_title("Unemployment Insurance Weekly Claims Report").key == "jobless_claims"
+
+
+def test_an_event_needs_the_right_country_and_for_fomc_a_decision_day() -> None:
+    assert kind_for_event({"title": "CPI m/m", "country": "USD"}).key == "cpi"
+    assert kind_for_event({"title": "CPI m/m"}).key == "cpi"
+    assert kind_for_event({"title": "CPI m/m", "country": "CAD"}) is None
+    assert kind_for_event({"title": "PPI m/m", "country": "CHF"}) is None
+    assert kind_for_event({"title": "FOMC Press Release", "country": "USD", "scheduled_at": "2026-09-14T00:00:00+00:00"}) is None
+    assert kind_for_event({"title": "FOMC Statement", "country": "USD", "scheduled_at": "2026-09-16T18:00:00+00:00"}).key == "fomc"
+    assert kind_for_event({"title": "FOMC Meeting Minutes", "country": "USD", "scheduled_at": "2026-10-07T18:00:00+00:00"}) is None
 
 
 def test_release_instant_uses_us_eastern_time_including_daylight_saving() -> None:

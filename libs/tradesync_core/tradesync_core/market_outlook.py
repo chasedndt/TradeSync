@@ -12,7 +12,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Mapping, Sequence
 
-from .event_reactions import guidance, kind_for_title
+from .event_reactions import guidance, kind_for_event
 
 LOOKAHEAD_MINUTES = 7 * 24 * 60
 LEAD_SYMBOLS = ("BTC-PERP", "ETH-PERP")
@@ -58,20 +58,37 @@ def lead_reads(theses: Mapping[str, Mapping[str, Any]]) -> list[dict[str, Any]]:
 
 def key_events(events: Sequence[Mapping[str, Any]], profiles: Mapping[str, Mapping[str, Any]],
                articles: Mapping[str, Sequence[Mapping[str, Any]]]) -> list[dict[str, Any]]:
-    """Upcoming High-impact or market-moving events, each with its measured reaction and reading."""
-    out = []
-    seen: set[tuple[str, str]] = set()
+    """Upcoming High-impact or market-moving events, each with its measured reaction and reading.
+
+    Variants of one release on one day (CPI m/m and Core CPI m/m, the FOMC
+    statement and its press conference, FRED's date-only card and the feed's
+    timed one) become a single event that lists the others, so its reaction
+    and guidance appear once. A card with a time of day leads a date-only one.
+    """
+    out: list[dict[str, Any]] = []
+    by_key: dict[tuple[str, str], dict[str, Any]] = {}
     for e in events:
         minutes = e.get("minutes_until")
         if not isinstance(minutes, int) or minutes < -60 or minutes > LOOKAHEAD_MINUTES:
             continue
         if not (e.get("impact") == "High" or e.get("market_moving")):
             continue
-        kind = kind_for_title(str(e.get("title") or ""))
-        key = (str(e.get("title")), str(e.get("scheduled_at"))[:10])
-        if key in seen:
+        kind = kind_for_event(e)
+        title = str(e.get("title"))
+        when = str(e.get("scheduled_at"))
+        key = (kind.key if kind else title, when[:10])
+        if key in by_key:
+            existing = by_key[key]
+            if existing["source"] == "fred" and e.get("source") != "fred":
+                # FRED gives the date only; the feed with the time of day leads.
+                related = [existing["title"], *existing["related_titles"]]
+                existing.update(title=e.get("title"), impact=e.get("impact"), scheduled_at=e.get("scheduled_at"),
+                                minutes_until=minutes, source=e.get("source"), url=e.get("url") or existing["url"],
+                                forecast=e.get("forecast"), previous=e.get("previous"))
+                existing["related_titles"] = [t for t in related if t != title]
+            elif title != existing["title"] and title not in existing["related_titles"]:
+                existing["related_titles"].append(title)
             continue
-        seen.add(key)
         reaction = {}
         notes = []
         if kind:
@@ -80,7 +97,7 @@ def key_events(events: Sequence[Mapping[str, Any]], profiles: Mapping[str, Mappi
                 if prof:
                     reaction[symbol] = prof["horizons"]
                     notes.append(guidance(kind.label, symbol.replace("-PERP", ""), prof))
-        out.append({
+        item = {
             "title": e.get("title"), "country": e.get("country"), "impact": e.get("impact"),
             "scheduled_at": e.get("scheduled_at"), "minutes_until": minutes, "source": e.get("source"),
             "url": e.get("url") or (kind.source_url if kind else None),
@@ -88,7 +105,10 @@ def key_events(events: Sequence[Mapping[str, Any]], profiles: Mapping[str, Mappi
             "kind": kind.key if kind else None, "kind_label": kind.label if kind else None,
             "reaction": reaction, "guidance": notes,
             "articles": list(articles.get(kind.key, []))[:4] if kind else [],
-        })
+            "related_titles": [],
+        }
+        by_key[key] = item
+        out.append(item)
     return out
 
 

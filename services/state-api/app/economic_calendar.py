@@ -24,21 +24,35 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping, Sequence
 
+from tradesync_core.event_reactions import EVENT_KINDS
+
 IMPACTS = ("High", "Medium", "Low", "Holiday")
 FF_FEED_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
 
-# Titles that matter for crypto whatever the impact rating says. Matched
-# case-insensitively as substrings. ForexFactory abbreviates ("CPI m/m");
+# Titles that matter for crypto whatever the impact rating says, matched
+# case-insensitively on word boundaries. ForexFactory abbreviates ("CPI m/m");
 # FRED spells release names out ("Consumer Price Index"), so both forms are
-# listed.
-MARKET_MOVING = (
-    "fomc", "fed chair", "federal funds", "cpi", "consumer price index",
-    "core pce", "pce price", "personal income and outlays",
-    "non-farm", "nonfarm", "employment situation", "unemployment rate",
-    "gdp", "gross domestic product", "ecb", "boe", "boj",
-    "ppi", "producer price index", "retail sales", "ism", "treasury",
-    "rate decision", "rate statement",
+# listed. Central-bank decisions and their speakers count whichever bank it
+# is; data releases count only as US releases, because Canada's or
+# Switzerland's CPI is not the print a BTC or ETH position sizes around.
+# "treasury" is not listed: it matched FRED's capital-flow and daily yield
+# series, not events.
+CENTRAL_BANK = ("fomc", "fed chair", "federal funds", "ecb", "boe", "boj", "rate decision", "rate statement")
+US_DATA = (
+    "cpi", "consumer price index", "core pce", "pce price", "personal income and outlays",
+    "non-farm", "nonfarm", "employment situation", "unemployment rate", "unemployment claims", "jobless claims",
+    "gdp", "gross domestic product", "ppi", "producer price index", "retail sales", "ism",
 )
+MARKET_MOVING = CENTRAL_BANK + US_DATA
+US_COUNTRIES = ("USD", "US")
+
+# FRED releases whose past reactions the thesis measures (CPI, PPI, jobs, retail
+# sales, GDP, PCE, jobless claims): market-moving by id, whatever FRED names them.
+MEASURED_FRED_RELEASES = frozenset(k.release_id for k in EVENT_KINDS.values() if k.release_id is not None)
+# A FRED release listed on this many dates inside the window is a data series
+# that updates daily ("Daily Treasury Inflation-Indexed Securities", "FOMC Press
+# Release", "Federal Funds Data"), not a scheduled event, whatever its name says.
+RECURRING_DATES = 3
 
 
 @dataclass(frozen=True)
@@ -78,18 +92,24 @@ class Normalised:
     rejections: list[str] = field(default_factory=list)
 
 
-_MARKET_MOVING_RE = re.compile(
-    r"(?<![a-z])(" + "|".join(re.escape(k.strip()) for k in MARKET_MOVING) + r")(?![a-z])"
-)
+def _keywords(words: Sequence[str]) -> re.Pattern[str]:
+    return re.compile(r"(?<![a-z])(" + "|".join(re.escape(k.strip()) for k in words) + r")(?![a-z])")
 
 
-def _is_market_moving(title: str) -> bool:
-    """Keyword match on word boundaries.
+_CENTRAL_BANK_RE = _keywords(CENTRAL_BANK)
+_US_DATA_RE = _keywords(US_DATA)
+
+
+def _is_market_moving(title: str, country: str = "USD") -> bool:
+    """Keyword match on word boundaries: a central bank anywhere, a data release in the US.
 
     Plain substring matching flagged "CBOE Market Statistics" because "cboe"
     contains "boe": a central bank inside an exchange's name.
     """
-    return bool(_MARKET_MOVING_RE.search(title.lower()))
+    text = title.lower()
+    if _CENTRAL_BANK_RE.search(text):
+        return True
+    return country.strip().upper() in US_COUNTRIES and bool(_US_DATA_RE.search(text))
 
 
 def _parse_iso(value: Any) -> datetime | None:
@@ -163,7 +183,7 @@ def normalise_forexfactory(
                 source="forexfactory",
                 forecast=str(item.get("forecast") or "")[:24],
                 previous=str(item.get("previous") or "")[:24],
-                market_moving=impact != "Holiday" and _is_market_moving(title),
+                market_moving=impact != "Holiday" and _is_market_moving(title, country),
                 url=f"https://www.forexfactory.com/calendar?day={when.strftime('%b').lower()}{when.day}.{when.year}",
             )
         )
@@ -187,6 +207,7 @@ def normalise_fred_release_dates(
         out.rejections.append("no release_dates list")
         return out
     now = now.astimezone(timezone.utc)
+    kept: list[tuple[str, datetime, Any]] = []
     for index, row in enumerate(rows):
         if not isinstance(row, Mapping):
             out.rejected += 1
@@ -206,15 +227,22 @@ def normalise_fred_release_dates(
         days = (when - now).total_seconds() / 86400
         if days < -1 or days > horizon_days:
             continue
-        moving = _is_market_moving(name)
+        kept.append((name.strip(), when, row.get("release_id")))
+    dates_by_name: dict[str, set[str]] = {}
+    for name, when, _ in kept:
+        dates_by_name.setdefault(name, set()).add(when.date().isoformat())
+    for name, when, release_id in kept:
+        recurring = len(dates_by_name[name]) >= RECURRING_DATES
+        moving = release_id in MEASURED_FRED_RELEASES or (not recurring and _is_market_moving(name))
         out.events.append(
             EventCard(
-                title=name.strip()[:120],
+                title=name[:120],
                 country="USD",
                 # FRED lists every release, daily fillers included ("Coinbase
-                # Cryptocurrencies", "CBOE Market Statistics"). Only the ones
-                # that match a market-moving title rank as Medium; the rest are
-                # Low, which the strip does not surface.
+                # Cryptocurrencies", "CBOE Market Statistics", and series named
+                # after the Treasury or the FOMC that update every business day).
+                # Only measured releases, and keyword matches that are not daily,
+                # rank as Medium; the rest are Low, which the strip does not surface.
                 impact="Medium" if moving else "Low",
                 scheduled_at=when.isoformat(),
                 minutes_until=int((when - now).total_seconds() // 60),
@@ -227,8 +255,13 @@ def normalise_fred_release_dates(
     return out
 
 
-def merge(*parts: Normalised, limit: int = 60) -> dict[str, Any]:
-    """Combine feeds into the payload the context endpoint returns."""
+def merge(*parts: Normalised, limit: int = 80) -> dict[str, Any]:
+    """Combine feeds into the payload the context endpoint returns.
+
+    Cutting to ``limit`` keeps every High or market-moving event first and fills
+    the rest in time order. Cutting by time alone let two days of low-value rows
+    push the rest of the week, the FOMC decision included, out of the payload.
+    """
     events: list[EventCard] = []
     rejected = 0
     rejections: list[str] = []
@@ -236,11 +269,15 @@ def merge(*parts: Normalised, limit: int = 60) -> dict[str, Any]:
         events.extend(part.events)
         rejected += part.rejected
         rejections.extend(part.rejections[:5])
-    events.sort(key=lambda e: (e.scheduled_at, e.source))
+    order = lambda e: (e.scheduled_at, e.source)  # noqa: E731
+    events.sort(key=order)
+    important = [e for e in events if e.impact == "High" or e.market_moving]
+    others = [e for e in events if not (e.impact == "High" or e.market_moving)]
+    shown = sorted(important[:limit] + others[: max(0, limit - len(important))], key=order)
     upcoming = [e for e in events if e.minutes_until >= 0]
     return {
         "metric_family": "economic_calendar",
-        "events": [e.to_dict() for e in events[:limit]],
+        "events": [e.to_dict() for e in shown],
         "next_market_moving": next(
             (e.to_dict() for e in upcoming if e.market_moving), None
         ),

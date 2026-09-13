@@ -36,6 +36,8 @@ class EventKind:
     query: str
     source_url: str
     fixed_dates: tuple[str, ...] = field(default_factory=tuple)
+    # Calendar country codes this kind is measured for; every kind here is a US release.
+    countries: tuple[str, ...] = ("USD", "US")
 
     def matches(self, title: str) -> bool:
         return any(re.search(p, title, re.IGNORECASE) for p in self.patterns)
@@ -54,12 +56,12 @@ EVENT_KINDS: dict[str, EventKind] = {k.key: k for k in (
     EventKind("ppi", "US PPI", 46, 8, 30, (r"\bPPI\b", r"producer price"), '"producer price index"', "https://www.bls.gov/ppi/"),
     EventKind("nfp", "US jobs report (NFP)", 50, 8, 30, (r"non-?farm", r"employment situation", r"unemployment rate"),
               '"nonfarm payrolls" jobs report', "https://www.bls.gov/ces/"),
-    EventKind("retail_sales", "US retail sales", 9, 8, 30, (r"retail sales",), '"retail sales" US Census',
+    EventKind("retail_sales", "US retail sales", 9, 8, 30, (r"retail sales", r"sales for retail"), '"retail sales" US Census',
               "https://www.census.gov/retail/"),
     EventKind("gdp", "US GDP", 53, 8, 30, (r"\bGDP\b",), '"GDP" US economy BEA', "https://www.bea.gov/data/gdp"),
     EventKind("pce", "US PCE inflation", 54, 8, 30, (r"\bPCE\b", r"personal income", r"personal spending"),
               '"PCE" inflation personal income', "https://www.bea.gov/data/income-saving/personal-income"),
-    EventKind("jobless_claims", "US jobless claims", 180, 8, 30, (r"jobless claims", r"unemployment claims"),
+    EventKind("jobless_claims", "US jobless claims", 180, 8, 30, (r"jobless claims", r"unemployment claims", r"unemployment insurance weekly claims"),
               '"jobless claims"', "https://www.dol.gov/ui/data.pdf"),
 )}
 
@@ -69,6 +71,26 @@ def kind_for_title(title: str) -> EventKind | None:
         if kind.matches(title):
             return kind
     return None
+
+
+def kind_for_event(event: Mapping[str, Any]) -> EventKind | None:
+    """The kind of a calendar event, only when its title, country and (for FOMC) date all fit.
+
+    Calendars reuse titles: Canada and Switzerland publish a "CPI m/m" or
+    "PPI m/m" too, and FRED lists an "FOMC Press Release" entry every day. By
+    title alone, US CPI's record would be pinned on Canada's release and the
+    FOMC decision on an ordinary day. An event without a country is taken as
+    the calendar's own (the FRED feed is US-only).
+    """
+    kind = kind_for_title(str(event.get("title") or ""))
+    if kind is None:
+        return None
+    country = str(event.get("country") or "").upper()
+    if country and country not in kind.countries:
+        return None
+    if kind.fixed_dates and str(event.get("scheduled_at") or "")[:10] not in kind.fixed_dates:
+        return None
+    return kind
 
 
 def release_instant_s(day: date, kind: EventKind, tz) -> int:

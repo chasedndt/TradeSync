@@ -17,7 +17,7 @@ from typing import Any, Awaitable, Callable, Dict, Optional
 
 import httpx
 
-from . import context_shapes, economic_calendar
+from . import context_shapes, economic_calendar, fed_calendar
 
 logger = logging.getLogger(__name__)
 
@@ -222,13 +222,18 @@ class ContextFeedService:
                         "include_release_dates_with_no_data": "true",
                         "realtime_start": now.strftime("%Y-%m-%d"),
                         "sort_order": "asc",
-                        "limit": "200",
+                        # About forty releases a business day: 200 rows ended the
+                        # window after two days, and daily series need the whole
+                        # week to be recognised as daily.
+                        "limit": "1000",
                     },
                 )
                 fred.raise_for_status()
                 parts.append(economic_calendar.normalise_fred_release_dates(fred.json(), now))
             except Exception as exc:  # the other half still stands
                 logger.warning("FRED release dates failed: %s", type(exc).__name__)
+        # FOMC decision days from the Fed's published calendar, where the week's feed lacks them.
+        parts.append(fed_calendar.fomc_decisions(now, [e for part in parts for e in part.events]))
         payload = economic_calendar.merge(*parts)
         payload["fred_configured"] = bool(self.fred_api_key)
         return payload

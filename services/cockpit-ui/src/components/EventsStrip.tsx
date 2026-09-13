@@ -32,8 +32,11 @@ export function EventsStrip({ context }: Props) {
 
   if (!provider || provider.status === 'disabled') return null
 
+  // A key event stands for every variant of its release (CPI m/m, Core CPI m/m…), so each variant row gets its chip.
   const byKey = new Map<string, OutlookKeyEvent>(
-    (reactions.data?.key_events ?? []).map((k) => [`${k.title}|${k.scheduled_at?.slice(0, 10)}`, k]),
+    (reactions.data?.key_events ?? []).flatMap((k) =>
+      [k.title, ...(k.related_titles ?? [])].map((title): [string, OutlookKeyEvent] => [`${title}|${k.scheduled_at?.slice(0, 10)}`, k]),
+    ),
   )
   const shown = pickForStrip(events.filter((e) => e.minutes_until >= -60))
   const next = data?.next_market_moving ?? null

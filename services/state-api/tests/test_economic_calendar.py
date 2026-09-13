@@ -138,3 +138,44 @@ def test_merge_orders_by_time_and_names_the_next_market_mover() -> None:
 def test_merge_with_nothing_is_an_empty_calendar_not_an_error() -> None:
     payload = merge(normalise_forexfactory([], NOW))
     assert payload["events"] == [] and payload["next_market_moving"] is None
+
+
+def test_fred_series_that_update_daily_are_fillers_whatever_their_name() -> None:
+    days = ["2026-09-13", "2026-09-14", "2026-09-15"]
+    names = ("Daily Treasury Inflation-Indexed Securities", "FOMC Press Release", "Federal Funds Data")
+    rows = [{"release_id": 900 + i, "release_name": n, "date": d} for i, n in enumerate(names) for d in days]
+    rows.append({"release_id": 10, "release_name": "Consumer Price Index", "date": "2026-09-15"})
+    rows.append({"release_id": 180, "release_name": "Unemployment Insurance Weekly Claims Report", "date": "2026-09-17"})
+    out = normalise_fred_release_dates({"release_dates": rows}, NOW)
+    assert sorted({e.title for e in out.events if e.market_moving}) == [
+        "Consumer Price Index", "Unemployment Insurance Weekly Claims Report"
+    ]
+    assert all(e.impact == "Low" for e in out.events if not e.market_moving)
+
+
+def test_data_releases_count_in_the_us_and_central_banks_count_anywhere() -> None:
+    raw = [ff(title="PPI m/m", country="CHF"), ff(title="PPI m/m"), ff(title="CPI m/m", country="CAD"),
+           ff(title="ECB Press Conference", country="EUR"), ff(title="Unemployment Claims", impact="Medium")]
+    out = normalise_forexfactory(raw, NOW)
+    assert [(e.country, e.title, e.market_moving) for e in out.events] == [
+        ("CHF", "PPI m/m", False), ("USD", "PPI m/m", True), ("CAD", "CPI m/m", False),
+        ("EUR", "ECB Press Conference", True), ("USD", "Unemployment Claims", True),
+    ]
+
+
+def test_treasury_capital_flow_series_are_not_market_moving() -> None:
+    raw = {"release_dates": [{"release_id": 999, "release_name": "Treasury International Capital: Continuous Securities Long Term (CSLT)",
+                              "date": "2026-09-16"}]}
+    event = normalise_fred_release_dates(raw, NOW).events[0]
+    assert event.market_moving is False and event.impact == "Low"
+
+
+def test_merge_keeps_every_market_mover_when_it_cuts_to_the_limit() -> None:
+    fillers = normalise_forexfactory(
+        [ff(title=f"Filler {i}", impact="Low", country="NZD", date=(NOW + timedelta(minutes=10 + i)).isoformat()) for i in range(70)],
+        NOW,
+    )
+    later = normalise_forexfactory([ff(title="FOMC Statement", date=(NOW + timedelta(days=4)).isoformat())], NOW)
+    titles = [e["title"] for e in merge(fillers, later, limit=60)["events"]]
+    assert len(titles) == 60 and titles[-1] == "FOMC Statement"
+    assert "Filler 0" in titles and "Filler 69" not in titles

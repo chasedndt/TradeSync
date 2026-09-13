@@ -29,7 +29,7 @@ import httpx
 from fastapi import APIRouter
 
 from app import background
-from tradesync_core.event_reactions import EVENT_KINDS, kind_for_title, profile, release_instant_s
+from tradesync_core.event_reactions import EVENT_KINDS, kind_for_event, profile, release_instant_s
 from tradesync_core.market_outlook import LOOKAHEAD_MINUTES, key_events
 
 # httpx logs request URLs at INFO; a FRED URL carries the API key.
@@ -75,7 +75,7 @@ def upcoming_kinds(events: Sequence[Mapping[str, Any]]) -> list[str]:
             continue
         if not (e.get("impact") == "High" or e.get("market_moving")):
             continue
-        kind = kind_for_title(str(e.get("title") or ""))
+        kind = kind_for_event(e)
         if kind and kind.key not in seen:
             seen.append(kind.key)
     return seen

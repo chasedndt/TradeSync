@@ -59,6 +59,43 @@ of up moves and the sample size, and one plain sentence of guidance (for
 example: stand aside or cut size into the release, and give stops more than
 the median range). With fewer than four occurrences it says so instead.
 
+**Matching an event to its record.** Calendars reuse titles, so a title
+alone is not enough. On the first live read, Canada's "CPI m/m" and its
+median, trimmed and common CPI measures, and Switzerland's "PPI m/m", all
+carried US CPI and US PPI guidance, and FRED's daily "FOMC Press Release"
+entries on 14 and 15 September were treated as the FOMC decision, which falls
+on 16 September. An event now takes a kind only when its title, its country
+(every measured kind is a US release) and, for FOMC, one of the Fed's
+published decision days all fit; meeting minutes no longer count as a
+decision. Variants of one release at one instant (CPI m/m, Core CPI m/m) are
+one key event listing the others, so the reaction and its guidance appear
+once, and the events strip gives each variant row the same reaction chip.
+GDP and PCE share their release days in this window, so their measured
+reactions are identical by construction.
+
+**The week actually reaches the thesis.** The calendar payload held 296
+events but served the first 60 by time, and FRED's daily data series (Daily
+Treasury Inflation-Indexed Securities, Federal Funds Data, FOMC Press Release,
+Key ECB Interest Rates) matched the market-moving keywords, filled 45 of those
+60 rows and made a Treasury series the "next market-moving event". Nothing
+after 15 September reached the thesis or the events strip, so the FOMC
+decision on the 16th was missing. Now a FRED release is market-moving only
+if it is one of the measured releases (by FRED release id) or a keyword match
+that is not listed on three or more dates in the window; FRED is read with
+room for the whole week; the cut keeps every High or market-moving event first
+and fills the rest in time order; and FOMC decision days come from the Fed's
+calendar at 2 pm Eastern (`app/fed_calendar.py`) wherever the week's feed does
+not already list the decision.
+
+Reading the corrected week back showed the rest: Switzerland's PPI was the
+"next market-moving event" and FRED's Treasury capital-flow series was
+market-moving. Central-bank keywords now count for any country, data-release
+keywords only for US releases, "treasury" is no longer a keyword and jobless
+claims are. One kind on one day is one key event (the FOMC statement and its
+press conference, FRED's date-only retail sales card and the feed's timed
+one), led by the card that has a time of day; FRED's spelled-out retail sales
+and weekly claims titles map to their kinds.
+
 **Articles.** Recent coverage of each scheduled kind comes from GDELT's
 article list, cached three hours, spaced and backed off so a rate limit
 yields no articles rather than an error. Links open in the browser.
