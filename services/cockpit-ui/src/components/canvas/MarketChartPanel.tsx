@@ -13,9 +13,18 @@ const INTERVALS = ['5m', '15m', '1h', '4h']
  * rather than one navigation away. This is the compact read; the full canvas
  * carries evidence markers and the longer window.
  */
-export function MarketChartPanel() {
+interface Props {
+  /** When given, the panel follows the caller's selection (the market table on Mission Control). */
+  symbol?: string
+  onSymbolChange?: (symbol: string) => void
+  height?: number
+}
+
+export function MarketChartPanel({ symbol: controlled, onSymbolChange, height = 260 }: Props = {}) {
   const { symbols: SYMBOLS } = useTrackedSymbols()
-  const [symbol, setSymbol] = useState(SYMBOLS[0])
+  const [own, setOwn] = useState(SYMBOLS[0])
+  const symbol = controlled ?? own
+  const setSymbol = (s: string) => { setOwn(s); onSymbolChange?.(s) }
   const [interval, setInterval] = useState('15m')
   const { data, isLoading, isError } = useCandles(symbol, interval, 120)
 
@@ -86,7 +95,7 @@ export function MarketChartPanel() {
           No candles returned for this window. Nothing is interpolated.
         </p>
       ) : (
-        <PriceChart candles={candles} height={260} />
+        <PriceChart candles={candles} height={height} />
       )}
     </section>
   )

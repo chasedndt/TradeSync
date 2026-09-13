@@ -59,7 +59,13 @@ export function EventsStrip({ context }: Props) {
                 {e.impact === 'Holiday' ? 'HOL' : e.impact[0]}
               </span>
               <span className={styles.country}>{e.country}</span>
-              <span className={styles.name}>{e.title}</span>
+              {e.url ? (
+                <a className={styles.name} href={e.url} target="_blank" rel="noopener noreferrer" title={`Open ${e.source} for this event`} style={{ color: 'inherit' }}>
+                  {e.title} ↗
+                </a>
+              ) : (
+                <span className={styles.name}>{e.title}</span>
+              )}
               <span className={styles.when}>{formatCountdown(e.minutes_until, e.source)}</span>
               {(e.forecast || e.previous) && (
                 <span className={styles.figures}>

@@ -52,6 +52,9 @@ class EventCard:
     forecast: str = ""
     previous: str = ""
     market_moving: bool = False
+    # Where to read more. ForexFactory has no per-event page in its feed, so
+    # the link is that day's calendar; FRED links the release calendar.
+    url: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -64,6 +67,7 @@ class EventCard:
             "forecast": self.forecast,
             "previous": self.previous,
             "market_moving": self.market_moving,
+            "url": self.url,
         }
 
 
@@ -160,6 +164,7 @@ def normalise_forexfactory(
                 forecast=str(item.get("forecast") or "")[:24],
                 previous=str(item.get("previous") or "")[:24],
                 market_moving=impact != "Holiday" and _is_market_moving(title),
+                url=f"https://www.forexfactory.com/calendar?day={when.strftime('%b').lower()}{when.day}.{when.year}",
             )
         )
     out.events.sort(key=lambda e: e.scheduled_at)
@@ -215,6 +220,7 @@ def normalise_fred_release_dates(
                 minutes_until=int((when - now).total_seconds() // 60),
                 source="fred",
                 market_moving=moving,
+                url="https://fred.stlouisfed.org/releases/calendar",
             )
         )
     out.events.sort(key=lambda e: e.scheduled_at)

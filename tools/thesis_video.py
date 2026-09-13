@@ -29,8 +29,16 @@ import os
 import subprocess
 from pathlib import Path
 
+import sys
+
 import httpx
 from PIL import Image, ImageDraw, ImageFont
+
+# Under pythonw.exe (no console window) there is no stdout; log to a file instead.
+if sys.stdout is None or sys.stderr is None:
+    _log = Path(os.getenv("TRADESYNC_LOG_DIR", r"E:\Projects\TradeSync\dashboard-runtime\logs")) / "thesis_video.log"
+    _log.parent.mkdir(parents=True, exist_ok=True)
+    sys.stdout = sys.stderr = open(_log, "a", encoding="utf-8", buffering=1)
 
 STATE_API = os.getenv("STATE_API_URL", "http://localhost:8000").rstrip("/")
 OUT_ROOT = Path(os.getenv("EDITIONS_HOST_DIR", r"E:\Projects\TradeSync\dashboard-runtime\editions"))

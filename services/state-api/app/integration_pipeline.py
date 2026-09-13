@@ -171,26 +171,56 @@ def assemble_pipeline_status(
         else "offline"
     )
 
-    optional_probe_specs = {
-        "strike_zone": ("Strike Zone Crypto", "Strike Zone Crypto"),
-        "agent_harness": ("Agent harnesses", "ChaseOS / local AI runtimes"),
-        "chaseos": ("ChaseOS knowledge + Gate", "ChaseOS"),
-    }
+    # Optional connectors are judged on their own evidence, not on a generic
+    # /healthz that some of them do not have (the Hermes API server answers
+    # /health; the knowledge connector is a directory of snapshots; Pine
+    # alerts are receipts, not a service).
     optional_states: dict[str, tuple[str, list[str]]] = {}
-    for key, _ in optional_probe_specs.items():
-        probe = probes.get(key, {})
-        if probe.get("configured") and probe.get("ok"):
-            optional_states[key] = ("live", ["Configured health probe passed"])
-        elif probe.get("configured"):
-            optional_states[key] = (
-                "offline",
-                [f"Configured health probe failed: {probe.get('reason', 'unreachable')}"],
-            )
-        else:
-            optional_states[key] = (
-                "contract_only",
-                ["Repository contract exists; no runtime endpoint is configured"],
-            )
+
+    tv = probes.get("tradingview", {})
+    tv_configured = bool(tv.get("configured"))
+    tv_recent = tv.get("accepted_24h", 0) or 0
+    if tv_configured and tv_recent:
+        tv_status = "live"
+    elif tv_configured and tv.get("accepted_total"):
+        tv_status = "partial"
+    elif tv_configured:
+        tv_status = "partial"
+    else:
+        tv_status = "offline"
+    tv_evidence = [
+        "Receiver: secret " + ("configured" if tv_configured else "NOT configured (endpoint refuses every alert)"),
+        f"Public route: {tv.get('public_url') or 'not declared'}",
+        f"Accepted alerts: {tv.get('accepted_total', 0)} total, {tv_recent} in the last 24 h"
+        + (f"; latest {tv.get('latest_at')} from {tv.get('latest_indicator')}" if tv.get("latest_at") else ""),
+    ]
+    optional_states["strike_zone"] = (
+        "live" if tv_status == "live" else "partial" if tv.get("accepted_total") else "contract_only",
+        [f"Strike Zone indicators arrive as TradingView alerts: {tv.get('accepted_total', 0)} received, "
+         f"{tv.get('claims_total', 0)} became measured claims"],
+    )
+
+    h = probes.get("agent_harness", {})
+    if h.get("configured") and h.get("ok"):
+        optional_states["agent_harness"] = (
+            "live",
+            [f"Hermes API server answered at {h.get('url')}: models {', '.join(h.get('models') or []) or 'none listed'}"],
+        )
+    elif h.get("configured"):
+        optional_states["agent_harness"] = ("offline", [f"Hermes API server not answering: {h.get('reason', 'unreachable')}"])
+    else:
+        optional_states["agent_harness"] = ("contract_only", ["AGENT_HARNESS_URL is unset"])
+
+    g = probes.get("chaseos", {})
+    if g.get("configured") and g.get("ok"):
+        optional_states["chaseos"] = (
+            "live",
+            [f"Canonical vault snapshot projected: {g.get('snapshot_id')} ({g.get('nodes')} nodes, {g.get('edges')} edges, built {g.get('created_at')})"],
+        )
+    elif g.get("configured"):
+        optional_states["chaseos"] = ("offline", [f"Snapshot directory configured but nothing projected: {g.get('reason', 'no snapshot')}"])
+    else:
+        optional_states["chaseos"] = ("contract_only", ["CHASEOS_GRAPH_DIR is unset"])
 
     nodes = [
         _node(
@@ -398,21 +428,23 @@ def assemble_pipeline_status(
             owner="TradingView / operator",
             tier="B",
             stage="advisory_ingress",
-            status="partial" if ingest_live else "offline",
+            status=tv_status,
             required_for_tier_a=False,
             authority="advisory_signal",
-            summary="Webhook contract exists, but no live Pine alert path is verified in the bounded runtime.",
-            evidence=[
-                "POST /ingest/tv and TradingView scoring rules exist",
-                f"ingest-gateway health: {probe_label('ingest_gateway')}",
-            ],
-            missing=["Verified Pine payload version", "Webhook authentication/configuration", "Fresh alert receipt"],
+            summary=(
+                "Pine alerts are arriving through the authenticated public route and landing in quarantine."
+                if tv_status == "live"
+                else "The receiver is configured; no alert has arrived in the last 24 hours."
+                if tv_status == "partial"
+                else "The webhook receiver refuses every alert until TRADINGVIEW_WEBHOOK_SECRET is set."
+            ),
+            evidence=tv_evidence,
+            missing=[] if tv_status == "live" else ["A fresh alert receipt (last 24 h)"] if tv_configured else ["TRADINGVIEW_WEBHOOK_SECRET"],
             impact="Hyperliquid observation and deterministic regime evidence continue without Pine alerts.",
             recovery=_recovery(
-                "repair_then_restart",
-                "Harden the webhook-only path, configure the Pine alert, then start ingest-gateway",
-                "ingest-gateway",
-                "Set PIPELINE_INGEST_GATEWAY_URL, then docker compose ... up -d --build ingest-gateway state-api",
+                "configure",
+                "Point a TradingView alert at the public webhook with the shared secret in its JSON body",
+                "TradingView alert + Cloudflare tunnel",
             ),
         ),
         _node(
@@ -438,7 +470,8 @@ def assemble_pipeline_status(
             ],
             missing=[]
             if optional_states["strike_zone"][0] == "live"
-            else ["Webhook ingress decision", "Alerts configured to post to the receiver"],
+            else ["A Strike Zone alert in the last 24 h"] if optional_states["strike_zone"][0] == "partial"
+            else ["Alerts configured to post to the receiver"],
             impact="Only new Strike Zone alert intake is blocked; TradeSync-native analysis continues.",
             recovery=_recovery(
                 "implement",
@@ -448,14 +481,14 @@ def assemble_pipeline_status(
         ),
         _node(
             node_id="agent_harness",
-            label="Agent harnesses",
-            owner="ChaseOS / local AI runtimes",
+            label="Hermes (advisory harness)",
+            owner="ChaseOS Hermes gateway",
             tier="B",
             stage="advisory_analysis",
             status=optional_states["agent_harness"][0],
             required_for_tier_a=False,
             authority="advisory_only",
-            summary="Agent runtimes may explain, compare, and draft proposals; deterministic policy remains authoritative.",
+            summary="Hermes may explain, compare, draft proposals and read posts for claims; deterministic policy remains authoritative.",
             evidence=optional_states["agent_harness"][1]
             + [
                 # The envelope, the probe and the receipt all exist now, so the
@@ -468,9 +501,9 @@ def assemble_pipeline_status(
             ],
             missing=[]
             if optional_states["agent_harness"][0] == "live"
-            else ["A reachable runtime at AGENT_HARNESS_URL"],
+            else ["The Hermes gateway API server answering at AGENT_HARNESS_URL"],
             impact="Deterministic scoring and UI continue without model availability.",
-            recovery=_recovery("configure", "Set AGENT_HARNESS_URL to a reachable runtime; the envelope and quarantine route are in place", "agent-harness adapter"),
+            recovery=_recovery("restart", "Start the Hermes gateway (its API server platform); the connector probes /v1/models with the Bearer key", "Hermes gateway"),
         ),
         _node(
             node_id="chaseos",
@@ -492,9 +525,9 @@ def assemble_pipeline_status(
             ],
             missing=[]
             if optional_states["chaseos"][0] == "live"
-            else ["A built snapshot in .chaseos/graph and CHASEOS_GRAPH_DIR set"],
+            else ["A graph snapshot in the canonical vault's 07_LOGS/Graph-Snapshots and CHASEOS_GRAPH_DIR set"],
             impact="Knowledge promotion and ChaseOS approvals are blocked; Tier A market work continues.",
-            recovery=_recovery("configure", "Build a ChaseOS snapshot, then set CHASEOS_GRAPH_DIR; the adapter and Gate are in place", "ChaseOS connector"),
+            recovery=_recovery("configure", "Run the vault's runtime/graph/builder.py to write a fresh snapshot; the connector projects the newest file", "ChaseOS connector"),
         ),
         _node(
             node_id="execution",
@@ -663,11 +696,7 @@ async def collect_integration_pipeline(
             "FUSION_ENGINE_URL", "http://fusion-engine:8002"
         ).strip(),
     }
-    optional_urls = {
-        "strike_zone": os.getenv("STRIKEZONE_CONNECTOR_URL", "").strip(),
-        "agent_harness": os.getenv("AGENT_HARNESS_URL", "").strip(),
-        "chaseos": os.getenv("CHASEOS_CONNECTOR_URL", "").strip(),
-    }
+    optional_urls: dict[str, str] = {}
 
     probe_timeout = float(os.getenv("INTEGRATION_PROBE_TIMEOUT_SECONDS", "3.0"))
     service_probe_timeout = float(
@@ -720,6 +749,11 @@ async def collect_integration_pipeline(
         else:
             probes[key]["configured"] = bool(url)
 
+    # The three optional connectors, on their own evidence.
+    probes["agent_harness"] = await _harness_probe()
+    probes["chaseos"] = await _knowledge_probe(pool)
+    probes["tradingview"] = await _tradingview_probe(pool)
+
     postgres_result: dict[str, Any] = {"ok": False}
     if pool:
         try:
@@ -756,3 +790,74 @@ async def collect_integration_pipeline(
         redis=redis_result,
         catalog_feature_count=catalog_feature_count,
     )
+
+
+async def _harness_probe() -> dict[str, Any]:
+    """The Hermes API server, through the connector that knows its dialect."""
+    from app import agent_connector
+
+    if not agent_connector.configured():
+        return {"ok": False, "configured": False}
+    result = await agent_connector.probe()
+    return {
+        "ok": result.get("status") == "live",
+        "configured": True,
+        "url": result.get("url"),
+        "models": result.get("models", []),
+        "reason": result.get("detail", ""),
+    }
+
+
+async def _knowledge_probe(pool: Any) -> dict[str, Any]:
+    """The projected canonical-vault snapshot, if the connector is configured."""
+    from app import graph_projection
+
+    if graph_projection.snapshot_directory() is None:
+        return {"ok": False, "configured": False}
+    if not pool:
+        return {"ok": False, "configured": True, "reason": "database pool not ready"}
+    try:
+        async with pool.acquire() as conn:
+            current = await graph_projection.current_snapshot(conn)
+    except Exception as exc:  # evidence, never an endpoint failure
+        return {"ok": False, "configured": True, "reason": f"{type(exc).__name__}: {exc}"}
+    if not current:
+        files = graph_projection.available_snapshots()
+        return {"ok": False, "configured": True,
+                "reason": f"{len(files)} snapshot file(s) present, none projected yet" if files else "no snapshot files in the directory"}
+    return {
+        "ok": True, "configured": True,
+        "snapshot_id": current.get("snapshot_id"), "nodes": current.get("node_count"), "edges": current.get("edge_count"),
+        "created_at": current.get("created_at"),
+    }
+
+
+async def _tradingview_probe(pool: Any) -> dict[str, Any]:
+    """Pine alert receipts: the receiver's configuration and what has actually arrived."""
+    configured = bool(os.getenv("TRADINGVIEW_WEBHOOK_SECRET", "").strip())
+    out: dict[str, Any] = {"ok": False, "configured": configured, "public_url": os.getenv("TRADINGVIEW_PUBLIC_URL", "").strip() or None,
+                           "accepted_total": 0, "accepted_24h": 0, "claims_total": 0}
+    if not pool:
+        return out
+    try:
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT count(*) FILTER (WHERE accepted) AS total,
+                       count(*) FILTER (WHERE accepted AND received_at > now() - interval '24 hours') AS recent,
+                       max(received_at) FILTER (WHERE accepted) AS latest,
+                       (SELECT payload->>'indicator' FROM quarantine_intake WHERE source = 'tradingview' AND accepted
+                          ORDER BY received_at DESC LIMIT 1) AS latest_indicator,
+                       (SELECT count(*) FROM evidence_claims WHERE source = 'tradingview') AS claims
+                FROM quarantine_intake WHERE source = 'tradingview'
+                """
+            )
+        out.update({
+            "accepted_total": int(row["total"] or 0), "accepted_24h": int(row["recent"] or 0),
+            "latest_at": row["latest"].isoformat() if row["latest"] else None,
+            "latest_indicator": row["latest_indicator"], "claims_total": int(row["claims"] or 0),
+        })
+        out["ok"] = configured and out["accepted_24h"] > 0
+    except Exception as exc:
+        out["reason"] = f"{type(exc).__name__}: {exc}"
+    return out

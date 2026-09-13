@@ -88,6 +88,8 @@ services:
       # acceptable default, and TradingView cannot send auth headers so
       # the secret must travel in the alert body.
       TRADINGVIEW_WEBHOOK_SECRET: ${TRADINGVIEW_WEBHOOK_SECRET:-}
+      # The public address the tunnel exposes; shown on the pipeline, never used to send.
+      TRADINGVIEW_PUBLIC_URL: ${TRADINGVIEW_PUBLIC_URL:-}
       # FRED (free key from https://fredaccount.stlouisfed.org/apikeys). Set both
       # in runtime.env; the key is read here only, never printed. Enables the
       # macro-reference provider and adds official release dates to the

@@ -433,6 +433,8 @@ export interface CalendarEvent {
   previous: string
   /** By title (FOMC, CPI, NFP…), not by the feed's own impact rating. */
   market_moving: boolean
+  /** Where to read more: that day's ForexFactory calendar, or FRED's release calendar. */
+  url?: string
 }
 
 export interface CalendarProviderData {

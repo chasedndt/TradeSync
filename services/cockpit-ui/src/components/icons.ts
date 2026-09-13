@@ -1,4 +1,6 @@
 export { Bell } from '@phosphor-icons/react/dist/csr/Bell'
+export { CaretLeft } from '@phosphor-icons/react/dist/csr/CaretLeft'
+export { CaretRight } from '@phosphor-icons/react/dist/csr/CaretRight'
 export { Bank } from '@phosphor-icons/react/dist/csr/Bank'
 export { ChartBar } from '@phosphor-icons/react/dist/csr/ChartBar'
 export { ChartLineDown } from '@phosphor-icons/react/dist/csr/ChartLineDown'

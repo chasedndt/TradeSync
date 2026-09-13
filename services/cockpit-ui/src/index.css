@@ -42,17 +42,30 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--blue); outline-
 .sidebar {
   position: fixed; inset: 0 auto 0 0; z-index: 40; width: 68px;
   display: flex; flex-direction: column; background: var(--rail); border-right: 1px solid var(--border-soft);
+  transition: width 160ms ease;
 }
-.sidebar-brand { height: 68px; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid var(--border-soft); position: relative; }
+.sidebar--expanded { width: 236px; }
+html.sidebar-expanded .app-frame { margin-left: 236px; }
+.sidebar-brand { height: 68px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; gap: 12px; border-bottom: 1px solid var(--border-soft); position: relative; padding: 0 12px; }
 .brand-mark { width: 30px; height: 30px; object-fit: contain; display: block; }
 .brand-name { font-weight: 700; font-size: 18px; }
 .sidebar-label { display: none; }
-.sidebar-nav { flex: 1; padding: 27px 7px; display: flex; flex-direction: column; gap: 12px; }
+.sidebar--expanded .sidebar-label { display: flex; flex-direction: column; min-width: 0; text-align: left; line-height: 1.2; }
+.sidebar-label-title { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sidebar-label-desc { font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.sidebar-toggle {
+  position: absolute; right: -11px; top: 76px; z-index: 41; width: 22px; height: 22px; border-radius: 50%;
+  border: 1px solid #32445a; background: #0d1a2a; color: #bac5d4; display: grid; place-items: center; cursor: pointer;
+}
+.sidebar-toggle:hover { color: #fff; background: #17273d; }
+/* The nav scrolls on its own so a short window still reaches the last entry. */
+.sidebar-nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 20px 7px; display: flex; flex-direction: column; gap: 8px; scrollbar-width: thin; }
 .nav-link {
-  width: 54px; min-height: 48px; border: 0; background: transparent; color: #bac5d4;
-  display: flex; align-items: center; justify-content: center; gap: 12px; border-radius: 5px;
+  width: 54px; min-height: 44px; border: 0; background: transparent; color: #bac5d4;
+  display: flex; align-items: center; justify-content: center; gap: 12px; border-radius: 5px; flex: 0 0 auto;
   text-decoration: none; cursor: pointer; position: relative; transition: color 140ms ease, background-color 140ms ease;
 }
+.sidebar--expanded .nav-link { width: 100%; justify-content: flex-start; padding: 0 12px; }
 .nav-link:hover { color: #fff; background: #122136; }
 .nav-link--active { color: #f7faff; background: #17273d; }
 .nav-link--active::before { content: ''; position: absolute; left: -7px; top: 12px; bottom: 12px; width: 3px; background: var(--blue); border-radius: 0 2px 2px 0; }
@@ -70,7 +83,31 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--blue); outline-
 .nav-hover-card small { margin-top: 4px; color: var(--muted); font-size: 10px; line-height: 1.45; }
 .nav-hover-card em { margin-top: 8px; color: var(--amber); font: 600 9px/1.3 var(--font-mono); font-style: normal; text-transform: uppercase; }
 .nav-link:hover .nav-hover-card, .nav-link:focus-visible .nav-hover-card { opacity: 1; visibility: visible; transform: translate(0, -50%); }
-.sidebar-footer { padding: 12px 7px 20px; display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--border-soft); }
+.sidebar-footer { flex: 0 0 auto; padding: 10px 7px 14px; display: flex; flex-direction: column; gap: 4px; border-top: 1px solid var(--border-soft); }
+
+/* Mission Control, fitted to one screen: a thin readiness bar, the market table
+   driving the chart beside it, live opportunities and the latest edition. */
+.readiness-strip--compact { padding: 6px 12px; grid-template-columns: repeat(3, 1fr); }
+.readiness-strip--compact .readiness-item { min-height: 40px; padding: 2px 14px; gap: 10px; }
+.readiness-strip--compact .readiness-item:first-child { padding-left: 4px; }
+.readiness-strip--compact .readiness-value { font-size: 13px; }
+.readiness-strip--compact .readiness-detail { font-size: 10px; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.readiness-strip--compact .eyebrow { font-size: 9px; }
+.market-panel--compact .market-table th { padding: 8px 10px; font-size: 11px; }
+.market-panel--compact .market-table td { padding: 8px 10px; }
+.market-panel--compact .market-table { min-width: 560px; }
+.market-row--selectable { cursor: pointer; }
+.market-row--selectable:hover td { background: rgba(91, 169, 255, 0.05); }
+.market-row--selected td { background: rgba(91, 169, 255, 0.10); }
+.opps-list { list-style: none; margin: 0; padding: 6px 0; }
+.opps-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 7px 17px; border-bottom: 1px solid var(--border); font-size: 12px; text-decoration: none; color: inherit; }
+.opps-row:last-child { border-bottom: 0; }
+.opps-row:hover { background: rgba(91, 169, 255, 0.05); }
+.edition-card { padding: 10px 17px 12px; display: grid; gap: 6px; }
+.edition-card strong { font-size: 12px; line-height: 1.4; }
+.edition-card .pill { margin-right: 4px; }
+.health-grid--compact { padding: 8px 0 4px; }
+.health-grid--compact .health-item { padding: 6px 12px; }
 .notification-wrap { position: relative; display: grid; place-items: center; }
 .notification-dot { position: absolute; top: -4px; right: -6px; width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
 .sidebar-close, .sidebar-backdrop, .sidebar-mobile-only { display: none; }

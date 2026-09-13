@@ -32,7 +32,15 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+import sys
+
 import httpx
+
+# Under pythonw.exe (no console window) there is no stdout; log to a file instead.
+if sys.stdout is None or sys.stderr is None:
+    _log = Path(os.getenv("TRADESYNC_LOG_DIR", r"E:\Projects\TradeSync\dashboard-runtime\logs")) / "hermes_fleet_bridge.log"
+    _log.parent.mkdir(parents=True, exist_ok=True)
+    sys.stdout = sys.stderr = open(_log, "a", encoding="utf-8", buffering=1)
 
 HERMES_HOME = Path(os.getenv("HERMES_HOME_WINDOWS", r"\\wsl.localhost\Ubuntu\home\chaseos\runtimes\hermes-home"))
 CRON = HERMES_HOME / "cron"

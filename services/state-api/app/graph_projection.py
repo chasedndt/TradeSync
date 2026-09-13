@@ -40,6 +40,10 @@ CHASEOS_GRAPH_DIR = os.getenv("CHASEOS_GRAPH_DIR", "").strip()
 # A snapshot of a 27k-note vault is large but bounded. This refuses a file big
 # enough to be a mistake before parsing it into memory.
 MAX_SNAPSHOT_BYTES = int(os.getenv("CHASEOS_GRAPH_MAX_BYTES", str(256 * 1024 * 1024)))
+# Seven thousand nodes and ten thousand edges through executemany exceeds the
+# pool's default statement timeout on a loaded host (2026-09-13). The
+# projection is one transaction, so a bounded but generous limit is right.
+PROJECT_TIMEOUT_S = float(os.getenv("CHASEOS_GRAPH_PROJECT_TIMEOUT_S", "900"))
 
 
 def snapshot_directory() -> Path | None:
@@ -150,6 +154,7 @@ async def project_snapshot(conn, snapshot: dict[str, Any]) -> dict[str, Any]:
                 )
                 for n in nodes
             ],
+            timeout=PROJECT_TIMEOUT_S,
         )
         await conn.executemany(
             """
@@ -171,6 +176,7 @@ async def project_snapshot(conn, snapshot: dict[str, Any]) -> dict[str, Any]:
                 )
                 for e in edges
             ],
+            timeout=PROJECT_TIMEOUT_S,
         )
 
     return {

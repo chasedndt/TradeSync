@@ -30,6 +30,12 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "libs" / "tradesync_core"))
 
+# Under pythonw.exe (no console window) there is no stdout; log to a file instead.
+if sys.stdout is None or sys.stderr is None:
+    _log = Path(os.getenv("TRADESYNC_LOG_DIR", r"E:\Projects\TradeSync\dashboard-runtime\logs")) / "hermes_output_bridge.log"
+    _log.parent.mkdir(parents=True, exist_ok=True)
+    sys.stdout = sys.stderr = open(_log, "a", encoding="utf-8", buffering=1)
+
 import httpx  # noqa: E402
 
 from tradesync_core.hermes_output import (  # noqa: E402
