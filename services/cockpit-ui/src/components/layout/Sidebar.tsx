@@ -13,6 +13,7 @@ import {
   ListChecks,
   Robot,
   ShieldCheck,
+  Stack,
   Target,
   X,
 } from '../icons'
@@ -21,6 +22,7 @@ import { useIntegrationPipeline } from '../../api/hooks'
 const navItems = [
   { to: '/', label: 'Mission Control', description: 'Thesis, market, opportunities, health.', icon: Target, end: true },
   { to: '/thesis', label: 'Market thesis', description: 'Editions, outlook and the live read.', icon: ListChecks },
+  { to: '/timeframes', label: 'Timeframes', description: 'Lower, medium and higher time frame outlook.', icon: Stack },
   { to: '/market', label: 'Market', description: 'Hyperliquid market evidence.', icon: ChartBar },
   { to: '/canvas', label: 'Market Canvas', description: 'Candles with recorded paper evidence.', icon: ChartLineUp },
   { to: '/opportunities', label: 'Opportunities', description: 'Ranked paper research setups.', icon: ChartLineUp },

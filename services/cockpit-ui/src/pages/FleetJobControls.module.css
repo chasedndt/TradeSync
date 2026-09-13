@@ -1,0 +1,4 @@
+.controls { display: grid; gap: 4px; min-width: 330px; }
+.row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.select { background: #0d1826; color: inherit; border: 1px solid var(--border); border-radius: 4px; padding: 3px 6px; font-size: 11px; }
+.note { font-size: 10.5px; line-height: 1.35; max-width: 360px; white-space: normal; }

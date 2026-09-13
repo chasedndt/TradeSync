@@ -7,9 +7,10 @@ const fmtTokens = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(2)
 
 /**
  * The Hermes fleet: every cron job with its description, cadence, delivery,
- * last result, run count and token usage, and the controls that send a
- * directive to the host bridge. Directives are requests until the bridge
- * applies them to the fleet's registry and reports what it replaced.
+ * last result, run count and token usage, and its controls. Controls go
+ * through the Hermes gateway's jobs API on its port and apply at once; the
+ * host bridge edits the registry only for the working directory, or when the
+ * gateway is down. Every change is recorded with what it replaced.
  */
 export function Fleet() {
   const jobs = useFleetJobs()
@@ -39,14 +40,20 @@ export function Fleet() {
     <div className={styles.page}>
       <section className={`panel ${styles.hero}`}>
         <div>
-          <div className={styles.kicker}>Hermes fleet · read model · directives via the host bridge</div>
+          <div className={styles.kicker}>Hermes fleet · controls through the gateway's jobs API · read model from the host bridge</div>
           <h2>Every job, its cadence, and what it costs.</h2>
           <p>
-            The bridge posts the fleet's registry, run ledger and token audit every five minutes and applies your directives with a backup first.
-            A change shows as pending until the bridge reports it applied; the replaced value is kept so it can be reversed.
+            Schedule, enable, pause, run now and delivery changes go to the Hermes gateway's jobs API on its port and apply at once. The host bridge
+            posts the registry, run ledger and token audit every five minutes, and edits the registry itself only for the working directory or while
+            the gateway is down. Every change keeps the value it replaced, so it can be reversed.
           </p>
         </div>
-        <span className="metric-sub">snapshot {jobs.data?.snapshot_at ? new Date(jobs.data.snapshot_at).toUTCString().slice(17, 25) : '—'} UTC</span>
+        <div style={{ display: 'grid', gap: 4, justifyItems: 'end' }}>
+          <span className={jobs.data?.control?.gateway_api && jobs.data.control.gateway_status === 'live' ? 'tone-good' : 'tone-warn'} style={{ fontSize: 11 }}>
+            {jobs.data?.control ? (jobs.data.control.gateway_api ? `gateway jobs API · ${jobs.data.control.gateway_status}` : 'gateway jobs API not configured · bridge only') : '—'}
+          </span>
+          <span className="metric-sub">snapshot {jobs.data?.snapshot_at ? new Date(jobs.data.snapshot_at).toUTCString().slice(17, 25) : '—'} UTC</span>
+        </div>
       </section>
 
       <div className={styles.stats}>
@@ -97,13 +104,13 @@ export function Fleet() {
       </section>
 
       <section className="panel">
-        <div className="panel-heading"><div><h3>Directives</h3><p>newest first · pending until the bridge applies them · previous value kept</p></div></div>
+        <div className="panel-heading"><div><h3>Directives</h3><p>newest first · applied by the gateway at once, or pending for the host bridge · previous value kept</p></div></div>
         <div style={{ padding: '10px 17px 14px', display: 'grid', gap: 4, fontSize: 11 }}>
           {(directives.data?.directives ?? []).length === 0 && <span className="tone-dim">No directives yet.</span>}
           {(directives.data?.directives ?? []).map((d) => (
             <div key={d.id} style={{ display: 'grid', gridTemplateColumns: 'auto minmax(0,1fr) auto auto', gap: 12 }}>
-              <span className={d.status === 'applied' ? 'tone-good' : d.status === 'failed' ? 'tone-bad' : 'tone-warn'}>{d.status}</span>
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name ?? d.job_id} · {d.kind} {JSON.stringify(d.payload)}{d.previous ? ` (was ${JSON.stringify(d.previous)})` : ''}</span>
+              <span className={d.status === 'applied' ? 'tone-good' : d.status === 'failed' ? 'tone-bad' : 'tone-warn'}>{d.status}{d.channel ? ` · ${d.channel === 'api' ? 'gateway' : 'bridge'}` : ''}</span>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={d.detail}>{d.name ?? d.job_id} · {d.kind.split('_').join(' ')} {Object.keys(d.payload).length ? JSON.stringify(d.payload) : ''}{d.previous ? ` (was ${JSON.stringify(d.previous)})` : ''}{d.detail ? ` · ${d.detail}` : ''}</span>
               <span className={styles.mono}>{d.requested_by}</span>
               <span className={styles.mono}>{new Date(d.requested_at).toUTCString().slice(5, 22)}</span>
             </div>

@@ -13,12 +13,22 @@ import json
 from datetime import datetime, timezone
 from typing import Any
 
+import re
+
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from app import hermes_jobs, hermes_link
+
 router = APIRouter(tags=["fleet"])
 
-DIRECTIVE_KINDS = ("set_schedule", "set_enabled", "set_workdir")
+DIRECTIVE_KINDS = ("set_schedule", "set_enabled", "set_workdir", "set_deliver", "pause", "resume", "run_now")
+# Applied at once through the Hermes gateway's jobs API on its port.
+GATEWAY_KINDS = frozenset({"set_schedule", "set_enabled", "set_deliver", "pause", "resume", "run_now"})
+# The host bridge can apply these by editing jobs.json: the working directory
+# (which the API does not expose), and schedule or enabled when the gateway is down.
+BRIDGE_KINDS = frozenset({"set_schedule", "set_enabled", "set_workdir"})
+DELIVER_RE = re.compile(r"^(local|discord:[0-9][0-9:]{5,63})$")
 # Schedules the panel offers. Anything else is a hand edit on the fleet host.
 SCHEDULE_PRESETS = {
     "15m": {"kind": "interval", "minutes": 15, "display": "every 15m"},
@@ -101,6 +111,7 @@ class DirectiveRequest(BaseModel):
     preset: str | None = None  # for set_schedule
     enabled: bool | None = None  # for set_enabled
     workdir: str | None = None  # for set_workdir
+    deliver: str | None = None  # for set_deliver: "local" or "discord:<channel id>"
     requested_by: str = "operator"
 
 
@@ -157,6 +168,65 @@ async def _upsert_usage(conn, usage: list[UsageSnapshot]) -> None:
         )
 
 
+async def apply_via_gateway(job_id: str, kind: str, payload: dict[str, Any]) -> tuple[dict[str, Any], str, dict[str, Any]]:
+    """Apply a directive through the Hermes jobs API: (values it replaced, detail, job afterwards)."""
+    before = await hermes_jobs.get_job(job_id)
+    if kind == "set_schedule":
+        schedule = payload["schedule"]
+        text = schedule.get("expr") if schedule.get("kind") == "cron" else schedule.get("display")
+        after = await hermes_jobs.patch_job(job_id, {"schedule": text})
+        return {"schedule_display": hermes_jobs.schedule_display(before)}, f"schedule -> {hermes_jobs.schedule_display(after)}", after
+    if kind == "set_enabled":
+        after = await hermes_jobs.patch_job(job_id, {"enabled": payload["enabled"]})
+        return {"enabled": before.get("enabled", True)}, f"enabled -> {after.get('enabled')}", after
+    if kind == "set_deliver":
+        after = await hermes_jobs.patch_job(job_id, {"deliver": payload["deliver"]})
+        return {"deliver": before.get("deliver")}, f"deliver -> {after.get('deliver')}", after
+    if kind == "pause":
+        after = await hermes_jobs.pause_job(job_id)
+        return {"state": before.get("state")}, f"state -> {after.get('state')}", after
+    if kind == "resume":
+        after = await hermes_jobs.resume_job(job_id)
+        return {"state": before.get("state")}, f"state -> {after.get('state')}", after
+    after = await hermes_jobs.run_job(job_id)
+    return {"last_run_at": before.get("last_run_at")}, "run requested; the gateway runs it on its next tick", after
+
+
+async def refresh_job_row(conn, job: dict[str, Any]) -> None:
+    """Bring the read model in line with the gateway's answer instead of waiting for the next bridge snapshot."""
+    schedule = job.get("schedule") if isinstance(job.get("schedule"), dict) else {}
+    await conn.execute(
+        """
+        UPDATE fleet_jobs SET enabled = $2, schedule = $3::jsonb, schedule_display = $4, deliver = $5, state = $6,
+            next_run_at = $7, snapshot_at = now() WHERE job_id = $1
+        """,
+        str(job.get("id")), bool(job.get("enabled", True)), json.dumps(schedule), hermes_jobs.schedule_display(job),
+        str(job.get("deliver") or "local"), job.get("state"), _parse_ts(job.get("next_run_at")),
+    )
+
+
+def directive_payload(req: "DirectiveRequest") -> dict[str, Any]:
+    if req.kind not in DIRECTIVE_KINDS:
+        raise HTTPException(status_code=400, detail=f"kind must be one of {', '.join(DIRECTIVE_KINDS)}")
+    if req.kind == "set_schedule":
+        if req.preset not in SCHEDULE_PRESETS:
+            raise HTTPException(status_code=400, detail=f"preset must be one of {', '.join(SCHEDULE_PRESETS)}")
+        return {"schedule": SCHEDULE_PRESETS[req.preset], "preset": req.preset}
+    if req.kind == "set_enabled":
+        if req.enabled is None:
+            raise HTTPException(status_code=400, detail="enabled is required")
+        return {"enabled": req.enabled}
+    if req.kind == "set_workdir":
+        if not req.workdir:
+            raise HTTPException(status_code=400, detail="workdir is required")
+        return {"workdir": req.workdir}
+    if req.kind == "set_deliver":
+        if not req.deliver or not DELIVER_RE.fullmatch(req.deliver):
+            raise HTTPException(status_code=400, detail="deliver must be 'local' or 'discord:<channel id>'")
+        return {"deliver": req.deliver}
+    return {}
+
+
 def register(app, state) -> None:
     @router.post("/state/fleet/snapshot")
     async def post_snapshot(snapshot: FleetSnapshot):
@@ -200,6 +270,11 @@ def register(app, state) -> None:
                 """
             )
             pending = await conn.fetch("SELECT job_id, kind, payload, requested_at FROM fleet_directives WHERE status = 'pending'")
+            # The Discord target a job had before an operator switched it to TradeSync only, so it can be restored.
+            restorable = await conn.fetch(
+                "SELECT DISTINCT ON (job_id) job_id, previous->>'deliver' AS deliver FROM fleet_directives "
+                "WHERE kind = 'set_deliver' AND status = 'applied' AND previous ? 'deliver' ORDER BY job_id, applied_at DESC")
+        restore_by = {r["job_id"]: r["deliver"] for r in restorable if str(r["deliver"] or "").startswith("discord:")}
         run_by = {r["job_id"]: r for r in runs}
         use_by = {u["job_id"]: u for u in usage}
         pend_by: dict[str, list[dict[str, Any]]] = {}
@@ -214,10 +289,14 @@ def register(app, state) -> None:
                 "runs_24h": int(r["runs_24h"]) if r else 0, "failed_24h": int(r["failed_24h"]) if r else 0,
                 "tokens_24h": int(u["tokens_24h"]) if u else 0, "tokens_7d": int(u["tokens_7d"]) if u else 0,
                 "fires_7d": int(u["fires_7d"]) if u else 0, "pending_directives": pend_by.get(j["job_id"], []),
+                "restorable_deliver": restore_by.get(j["job_id"]) if j["deliver"] == "local" else None,
             })
         newest = max((j["snapshot_at"] for j in jobs), default=None)
         return {"schema_version": "fleet_jobs_v1", "jobs": out, "snapshot_at": newest.isoformat() if newest else None,
                 "presets": SCHEDULE_PRESETS,
+                "control": {"gateway_api": hermes_jobs.available(), "gateway_status": hermes_link.status_now()["status"],
+                            "note": "Changes go through the Hermes gateway's jobs API on its port and apply at once; "
+                                    "the host bridge edits jobs.json only for the working directory or when the gateway is down."},
                 "note": "Read model of the Hermes fleet, posted by the host bridge. Directives are requests until the bridge applies them."}
 
     @router.get("/state/fleet/usage")
@@ -257,32 +336,43 @@ def register(app, state) -> None:
 
     @router.post("/state/fleet/directives")
     async def create_directive(req: DirectiveRequest):
+        """Apply through the gateway's jobs API when it can; otherwise leave it pending for the host bridge.
+
+        Every directive is recorded with the channel that applied it and the values it replaced.
+        """
         if not state.pool:
             raise HTTPException(status_code=503, detail="DB Pool not ready")
-        if req.kind not in DIRECTIVE_KINDS:
-            raise HTTPException(status_code=400, detail=f"kind must be one of {', '.join(DIRECTIVE_KINDS)}")
-        if req.kind == "set_schedule":
-            if req.preset not in SCHEDULE_PRESETS:
-                raise HTTPException(status_code=400, detail=f"preset must be one of {', '.join(SCHEDULE_PRESETS)}")
-            payload = {"schedule": SCHEDULE_PRESETS[req.preset], "preset": req.preset}
-        elif req.kind == "set_enabled":
-            if req.enabled is None:
-                raise HTTPException(status_code=400, detail="enabled is required")
-            payload = {"enabled": req.enabled}
-        else:
-            if not req.workdir:
-                raise HTTPException(status_code=400, detail="workdir is required")
-            payload = {"workdir": req.workdir}
+        payload = directive_payload(req)
         async with state.pool.acquire() as conn:
             exists = await conn.fetchval("SELECT 1 FROM fleet_jobs WHERE job_id = $1", req.job_id)
-            if not exists:
-                raise HTTPException(status_code=404, detail="unknown job; wait for the next fleet snapshot")
+        if not exists:
+            raise HTTPException(status_code=404, detail="unknown job; wait for the next fleet snapshot")
+        status, channel, previous, detail, after = "pending", "bridge", None, "", None
+        if req.kind in GATEWAY_KINDS and hermes_jobs.available():
+            try:
+                previous, detail, after = await apply_via_gateway(req.job_id, req.kind, payload)
+                status, channel = "applied", "api"
+            except hermes_jobs.HermesJobsError as exc:
+                if req.kind not in BRIDGE_KINDS:
+                    code = exc.status_code if 400 <= exc.status_code < 500 else 502
+                    raise HTTPException(status_code=code, detail=f"Hermes gateway: {exc.detail}") from None
+                detail = f"gateway did not apply it ({exc.detail}); left for the host bridge"
+        elif req.kind not in BRIDGE_KINDS:
+            raise HTTPException(status_code=503, detail="pause, resume, run now and delivery need the Hermes gateway's jobs API, which is not configured")
+        async with state.pool.acquire() as conn:
             row = await conn.fetchrow(
-                "INSERT INTO fleet_directives (job_id, kind, payload, requested_by) VALUES ($1, $2, $3::jsonb, $4) RETURNING id, requested_at",
-                req.job_id, req.kind, json.dumps(payload), req.requested_by,
+                """
+                INSERT INTO fleet_directives (job_id, kind, payload, requested_by, status, channel, previous, detail, applied_at)
+                VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7::jsonb, $8, CASE WHEN $5 = 'applied' THEN now() END)
+                RETURNING id, requested_at
+                """,
+                req.job_id, req.kind, json.dumps(payload), req.requested_by, status, channel,
+                json.dumps(previous) if previous is not None else None, detail,
             )
-        return {"id": str(row["id"]), "job_id": req.job_id, "kind": req.kind, "payload": payload, "status": "pending",
-                "requested_at": row["requested_at"].isoformat()}
+            if after:
+                await refresh_job_row(conn, after)
+        return {"id": str(row["id"]), "job_id": req.job_id, "kind": req.kind, "payload": payload, "status": status,
+                "channel": channel, "previous": previous, "detail": detail, "requested_at": row["requested_at"].isoformat()}
 
     @router.get("/state/fleet/directives")
     async def list_directives(status: str | None = Query(None), limit: int = Query(50, ge=1, le=200)):

@@ -1054,6 +1054,8 @@ export interface FleetJob {
   tokens_7d: number
   fires_7d: number
   pending_directives: { kind: string; payload: Record<string, unknown>; requested_at: string }[]
+  /** The Discord target this job had before it was switched to TradeSync only. */
+  restorable_deliver?: string | null
 }
 
 export interface FleetJobsResponse {
@@ -1062,6 +1064,7 @@ export interface FleetJobsResponse {
   snapshot_at: string | null
   presets: Record<string, FleetSchedule>
   note: string
+  control?: { gateway_api: boolean; gateway_status: string; note: string }
 }
 
 export interface FleetUsageResponse {
@@ -1077,7 +1080,7 @@ export interface FleetDirective {
   id: string
   job_id: string
   name?: string | null
-  kind: 'set_schedule' | 'set_enabled' | 'set_workdir'
+  kind: FleetDirectiveKind
   payload: Record<string, unknown>
   requested_by: string
   requested_at: string
@@ -1085,7 +1088,11 @@ export interface FleetDirective {
   applied_at: string | null
   previous: Record<string, unknown> | null
   detail: string
+  /** "api": applied at once by the Hermes gateway's jobs API; "bridge": the host bridge edits jobs.json. */
+  channel?: 'api' | 'bridge'
 }
+
+export type FleetDirectiveKind = 'set_schedule' | 'set_enabled' | 'set_workdir' | 'set_deliver' | 'pause' | 'resume' | 'run_now'
 
 // === Thesis editions ===
 

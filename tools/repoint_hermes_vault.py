@@ -71,7 +71,7 @@ def backup(paths: list[Path], stamp: str) -> Path:
 
 def repoint_jobs(dry: bool) -> dict[str, int]:
     path = HERMES_HOME / "cron" / "jobs.json"
-    data = json.loads(path.read_text(encoding="utf-8"))
+    data = json.loads(_read(path))
     counts = {"workdir": 0, "prompt": 0}
     for job in data.get("jobs", []):
         wd = job.get("workdir")
@@ -86,9 +86,21 @@ def repoint_jobs(dry: bool) -> dict[str, int]:
                 counts["prompt"] += 1
     if not dry and (counts["workdir"] or counts["prompt"]):
         tmp = path.with_name(f".jobs_repoint_{os.getpid()}.tmp")
-        tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        _write(tmp, json.dumps(data, indent=2, ensure_ascii=False))
         os.replace(tmp, path)
     return counts
+
+
+# Read and write bytes, never text mode: on Windows ``write_text`` turns every
+# "\n" into "\r\n", and the first run of this tool (2026-09-13) broke fleet
+# scripts that way (bash rejects CRLF; a "python3\r" shebang names nothing).
+# tools/restore_hermes_line_endings.py repaired them.
+def _read(path: Path) -> str:
+    return path.read_bytes().decode("utf-8")
+
+
+def _write(path: Path, text: str) -> None:
+    path.write_bytes(text.encode("utf-8"))
 
 
 def repoint_tree(root: Path, dry: bool) -> dict[str, int]:
@@ -97,7 +109,7 @@ def repoint_tree(root: Path, dry: bool) -> dict[str, int]:
         if not p.is_file() or p.suffix.lower() not in TEXT_SUFFIXES or any(part in ("venv", "node_modules", "__pycache__") for part in p.parts):
             continue
         try:
-            text = p.read_text(encoding="utf-8")
+            text = _read(p)
         except (UnicodeDecodeError, OSError):
             continue
         new, n = swap(text)
@@ -105,20 +117,20 @@ def repoint_tree(root: Path, dry: bool) -> dict[str, int]:
             counts["files"] += 1
             counts["lines"] += n
             if not dry:
-                p.write_text(new, encoding="utf-8")
+                _write(p, new)
     return counts
 
 
 def repoint_file(path: Path, dry: bool, extra: tuple[tuple[str, str], ...] = ()) -> int:
     if not path.exists():
         return 0
-    text = path.read_text(encoding="utf-8")
+    text = _read(path)
     new, n = swap(text)
     for old, rep in extra:
         n += new.count(old)
         new = new.replace(old, rep)
     if n and not dry:
-        path.write_text(new, encoding="utf-8")
+        _write(path, new)
     return n
 
 

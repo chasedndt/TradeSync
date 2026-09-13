@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { useFleetDirective } from '../api/hooks/useFleet'
 import type { FleetJob, FleetSchedule } from '../api/types'
+import { FleetJobControls } from './FleetJobControls'
 import styles from './Fleet.module.css'
 
 const fmtTokens = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${Math.round(n / 1000)}k` : String(n))
@@ -10,13 +10,10 @@ const ago = (iso: string | null) => {
   return m < 60 ? `${m}m ago` : m < 1440 ? `${Math.round(m / 60)}h ago` : `${Math.round(m / 1440)}d ago`
 }
 
-/** One fleet job: what it is, when it runs, what it costs, and the controls that send a directive. */
+/** One fleet job: what it is, when it runs, what it costs, its last error, and its controls. */
 export function FleetJobRow({ job, presets }: { job: FleetJob; presets: Record<string, FleetSchedule> }) {
-  const directive = useFleetDirective()
-  const [preset, setPreset] = useState('')
   const [open, setOpen] = useState(false)
   const pendingSchedule = job.pending_directives.find((d) => d.kind === 'set_schedule')
-  const pendingEnabled = job.pending_directives.find((d) => d.kind === 'set_enabled')
   const statusTone = job.last_status === 'error' || job.last_status === 'failed' ? 'tone-bad' : job.last_status === 'ok' || job.last_status === 'completed' ? 'tone-good' : 'tone-dim'
 
   return (
@@ -30,31 +27,17 @@ export function FleetJobRow({ job, presets }: { job: FleetJob; presets: Record<s
         </td>
         <td className={styles.mono}>
           {job.schedule_display || '—'}
+          {job.state === 'paused' && <div className="tone-warn">paused</div>}
           {pendingSchedule && <div className={styles.pending}>→ {String((pendingSchedule.payload as { preset?: string }).preset)} pending</div>}
         </td>
         <td className={styles.mono}>{job.no_agent ? 'script' : job.model || 'agent'}</td>
-        <td className={styles.mono}>{job.deliver.startsWith('discord:') ? 'discord' : job.deliver}</td>
+        <td className={styles.mono}>{job.deliver.startsWith('discord:') ? 'discord' : job.deliver === 'local' ? 'TradeSync only' : job.deliver}</td>
         <td className={`${styles.mono} ${statusTone}`} title={job.next_run_at ? `next ${new Date(job.next_run_at).toUTCString()}` : ''}>
           {job.last_status || '—'} · {ago(job.last_run_at)}
         </td>
         <td className={styles.mono}>{job.runs_24h}{job.failed_24h > 0 ? <span className="tone-bad"> ({job.failed_24h} failed)</span> : ''}</td>
         <td className={styles.mono}>{fmtTokens(job.tokens_24h)} / {fmtTokens(job.tokens_7d)}</td>
-        <td>
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            <select className={styles.select} value={preset} onChange={(e) => setPreset(e.target.value)} aria-label={`schedule for ${job.name}`}>
-              <option value="">schedule…</option>
-              {Object.entries(presets).map(([k, v]) => <option key={k} value={k}>{v.display}</option>)}
-            </select>
-            <button type="button" className="chip" disabled={!preset || directive.isPending}
-              onClick={() => { directive.mutate({ job_id: job.job_id, kind: 'set_schedule', preset }); setPreset('') }}>
-              set
-            </button>
-            <button type="button" className="chip" disabled={directive.isPending || Boolean(pendingEnabled)}
-              onClick={() => directive.mutate({ job_id: job.job_id, kind: 'set_enabled', enabled: !job.enabled })}>
-              {pendingEnabled ? 'pending' : job.enabled ? 'disable' : 'enable'}
-            </button>
-          </div>
-        </td>
+        <td><FleetJobControls job={job} presets={presets} /></td>
       </tr>
       {open && (
         <tr>

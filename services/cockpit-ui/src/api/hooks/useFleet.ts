@@ -1,6 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiPost } from '../client'
-import type { FleetDirective, FleetJobsResponse, FleetUsageResponse } from '../types'
+import type { FleetDirective, FleetDirectiveKind, FleetJobsResponse, FleetUsageResponse } from '../types'
+
+export interface FleetDirectiveBody {
+  job_id: string
+  kind: FleetDirectiveKind
+  preset?: string
+  enabled?: boolean
+  workdir?: string
+  deliver?: string
+}
 
 /** The Hermes fleet as the host bridge last reported it. */
 export function useFleetJobs() {
@@ -32,13 +41,14 @@ export function useFleetDirectives(limit = 50) {
 }
 
 /**
- * A directive is a request to the bridge, not a change: it stays pending
- * until the bridge applies it to the fleet's registry and reports back.
+ * A directive the state API applies through the Hermes gateway's jobs API at
+ * once (status "applied", channel "api"). The working directory, or a schedule
+ * or enabled change while the gateway is down, stays pending for the host bridge.
  */
 export function useFleetDirective() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (body: { job_id: string; kind: 'set_schedule' | 'set_enabled' | 'set_workdir'; preset?: string; enabled?: boolean; workdir?: string }) =>
+    mutationFn: (body: FleetDirectiveBody) =>
       apiPost<FleetDirective>('/state/fleet/directives', { requested_by: 'operator', ...body }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['fleet-jobs'] })

@@ -22,6 +22,7 @@ import {
   Fleet,
   Pipeline,
   SignalLedger,
+  Timeframes,
 } from './pages'
 
 export default function App() {
@@ -45,6 +46,7 @@ export default function App() {
         <Route path="/logs" element={<Logs />} />
         <Route path="/regime-lab" element={<RegimeLab />} />
         <Route path="/thesis" element={<Thesis />} />
+        <Route path="/timeframes" element={<Timeframes />} />
         <Route path="/agents" element={<Agents />} />
         <Route path="/fleet" element={<Fleet />} />
         <Route path="/signal-ledger" element={<SignalLedger />} />

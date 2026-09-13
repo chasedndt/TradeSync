@@ -3764,3 +3764,8 @@ from app.strikezone_lab import register as register_strikezone_lab  # noqa: E402
 
 register_strikezone_ingest(app, state)
 register_strikezone_lab(app, state)
+
+# The timeframe outlook: three days to six months, from daily candles; see app/horizons.py.
+from app.horizons import register as register_horizons  # noqa: E402
+
+register_horizons(app, state, market_data_url=MARKET_DATA_URL)
