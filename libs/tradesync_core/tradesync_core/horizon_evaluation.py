@@ -52,7 +52,7 @@ def tally_sentence(h: Horizon, features: list[dict[str, Any]]) -> str:
 
 
 def evaluate_horizon(bars: Bars, h: Horizon) -> dict[str, Any]:
-    forward = forward_returns(bars.closes, h.days)
+    forward = forward_returns(bars.closes, h.days, last_complete=not bars.last_partial)
     features = [feature_evaluation(bars, h, f, forward) for f in FEATURES]
     counts = Counter(f["record_lean"] for f in features)
     return {

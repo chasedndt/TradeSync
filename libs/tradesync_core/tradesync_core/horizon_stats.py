@@ -14,12 +14,17 @@ from functools import lru_cache
 from typing import Sequence
 
 
-def forward_returns(closes: Sequence[float], days: int) -> list[float | None]:
-    """``close[t + days] / close[t] - 1`` for each day; None where the window runs past the data."""
+def forward_returns(closes: Sequence[float], days: int, last_complete: bool = True) -> list[float | None]:
+    """``close[t + days] / close[t] - 1`` for each day; None where the window runs past the data.
+
+    With ``last_complete=False`` the last close is a day still trading, so no
+    window ends on it: its close is not yet the day's close.
+    """
     n = len(closes)
+    end = n if last_complete else n - 1
     out: list[float | None] = []
     for t in range(n):
-        if t + days < n and closes[t] > 0:
+        if t + days < end and closes[t] > 0:
             out.append(closes[t + days] / closes[t] - 1.0)
         else:
             out.append(None)

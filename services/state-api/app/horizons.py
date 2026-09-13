@@ -72,7 +72,7 @@ async def fetch_daily(market_data_url: str, symbol: str) -> list[dict[str, Any]]
 
 
 def _measure(symbol: str, candles: list[dict[str, Any]]) -> dict[str, Any]:
-    bars = Bars.from_candles(candles)
+    bars = Bars.from_candles(candles, time.time())
     outlook = compose_horizons(symbol, candles, datetime.now(timezone.utc))
     evaluation = evaluate_all(bars) if len(bars) >= MIN_HISTORY_DAYS else {}
     return {"at": time.time(), "bars": bars, "outlook": outlook, "evaluation": evaluation}

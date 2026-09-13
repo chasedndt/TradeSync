@@ -30,6 +30,8 @@ class Participation:
             recent_mean = (running[t + 1] - running[t + 1 - recent]) / recent
             base_mean = (running[t + 1] - running[t + 1 - base]) / base
             out.append(recent_mean / base_mean if base_mean > 0 else None)
+        if bars.last_partial and len(out) >= 2:
+            out[-1] = out[-2]  # a day still trading has only part of its volume: read through the last closed day
         return out
 
     def states(self, bars: Bars, h: Horizon) -> list[str | None]:
@@ -42,7 +44,7 @@ class Participation:
             return Reading(None, "context", None, f"Needs {base} days of real traded volume.")
         state = self.states(bars, h)[-1]
         return Reading(state, "context", round(ratio, 2),
-                       f"Volume over the last {recent} days is {ratio:.2f} times its {base}-day average, {state}.")
+                       f"Volume over the last {recent} {'closed ' if bars.last_partial else ''}days is {ratio:.2f} times its {base}-day average, {state}.")
 
     def overlays(self, bars: Bars, h: Horizon, start: int) -> list[dict[str, Any]]:
         recent, _ = WINDOWS[h.band]

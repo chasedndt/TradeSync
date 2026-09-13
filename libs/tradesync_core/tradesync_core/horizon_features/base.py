@@ -18,6 +18,14 @@ from typing import Any, Mapping, Protocol, Sequence
 from ..horizon_outlook import Horizon
 
 
+DAY = 86400
+
+
+def day_in_progress(last_time: int | float | None, now_s: float | None) -> bool:
+    """Whether a daily bar opened at ``last_time`` (epoch seconds) is still trading at ``now_s``."""
+    return last_time is not None and now_s is not None and last_time + DAY > now_s
+
+
 @dataclass(frozen=True)
 class Bars:
     times: tuple[int, ...]
@@ -26,9 +34,11 @@ class Bars:
     lows: tuple[float, ...]
     closes: tuple[float, ...]
     volumes: tuple[float, ...]
+    last_partial: bool = False  # the last bar is today's, still trading
 
     @classmethod
-    def from_candles(cls, candles: Sequence[Mapping[str, Any]]) -> "Bars":
+    def from_candles(cls, candles: Sequence[Mapping[str, Any]], now_s: float | None = None) -> "Bars":
+        """Bars sorted by time; with ``now_s`` a last bar still trading is marked partial."""
         rows = sorted((c for c in candles if isinstance(c.get("close"), (int, float)) and c["close"] > 0), key=lambda c: c["time"])
 
         def column(name: str) -> tuple[float, ...]:
@@ -38,6 +48,7 @@ class Bars:
             times=tuple(int(c["time"]) for c in rows),
             opens=column("open"), highs=column("high"), lows=column("low"), closes=column("close"),
             volumes=tuple(float(c.get("volume") or 0.0) if isinstance(c.get("volume"), (int, float)) else 0.0 for c in rows),
+            last_partial=bool(rows) and day_in_progress(int(rows[-1]["time"]), now_s),
         )
 
     def __len__(self) -> int:

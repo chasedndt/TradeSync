@@ -81,7 +81,7 @@ def lean_of(stats: Mapping[str, Any]) -> str:
     return "up" if share >= LEAN_UP else "down" if share <= LEAN_DOWN else "mixed"
 
 
-def horizon_read(closes: Sequence[float], h: Horizon) -> dict[str, Any]:
+def horizon_read(closes: Sequence[float], h: Horizon, last_complete: bool = True) -> dict[str, Any]:
     base = {"key": h.key, "label": h.label, "days": h.days, "band": h.band}
     trend, ma = trend_states(closes, h.ma_days)
     momentum = momentum_states(closes, h.days)
@@ -91,7 +91,7 @@ def horizon_read(closes: Sequence[float], h: Horizon) -> dict[str, Any]:
         needed = h.ma_days + slope_days(h.ma_days)
         return {**base, "available": False, "reason": f"needs {needed} daily closes, has {len(closes)}"}
 
-    forward = forward_returns(closes, h.days)
+    forward = forward_returns(closes, h.days, last_complete)
     usable = [t for t in range(len(closes)) if forward[t] is not None and trend[t] is not None and momentum[t] is not None]
 
     def record(indices: list[int]) -> dict[str, Any]:
@@ -145,14 +145,17 @@ def compose_horizons(symbol: str, candles: Sequence[Mapping[str, Any]], now: dat
     if len(rows) < MIN_HISTORY_DAYS:
         return {**base, "available": False, "reason": f"{len(rows)} daily closes; at least {MIN_HISTORY_DAYS} are needed"}
     closes = [float(c["close"]) for c in rows]
-    reads = [horizon_read(closes, h) for h in HORIZONS]
+    # Today's bar is still trading: states read its live close, but no record window ends on it.
+    last_complete = not (rows[-1]["time"] + 86400 > (now or datetime.now(timezone.utc)).timestamp())
+    reads = [horizon_read(closes, h, last_complete) for h in HORIZONS]
     return {
         **base,
         "available": True,
         "last_close": closes[-1],
         "history": {"days": len(closes),
                     "from": datetime.fromtimestamp(rows[0]["time"], timezone.utc).date().isoformat(),
-                    "to": datetime.fromtimestamp(rows[-1]["time"], timezone.utc).date().isoformat()},
+                    "to": datetime.fromtimestamp(rows[-1]["time"], timezone.utc).date().isoformat(),
+                    "last_day_complete": last_complete},
         "horizons": reads,
         "bands": band_summaries(reads),
         "method": {

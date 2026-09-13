@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from datetime import datetime, timezone
 
 from tradesync_core.horizon_outlook import (
     HORIZONS,
@@ -88,3 +89,15 @@ def test_compose_groups_horizons_into_bands_and_refuses_thin_history() -> None:
     assert out["history"]["days"] == 400 and "not a forecast" in out["method"]["caveat"]
     thin = compose_horizons("BTC-PERP", candles(rising(MIN_HISTORY_DAYS - 1)))
     assert not thin["available"] and "at least 120" in thin["reason"]
+
+
+def test_a_day_still_trading_ends_no_record_window() -> None:
+    assert forward_returns([100, 110, 121], 1, last_complete=False) == [0.10000000000000009, None, None]
+    closes = rising(700)
+    opened = T0 + 699 * DAY
+    trading = compose_horizons("BTC-PERP", candles(closes), datetime.fromtimestamp(opened + 3600, timezone.utc))
+    closed = compose_horizons("BTC-PERP", candles(closes), datetime.fromtimestamp(opened + DAY + 60, timezone.utc))
+    assert trading["history"]["last_day_complete"] is False and closed["history"]["last_day_complete"] is True
+    for live, done in zip(trading["horizons"], closed["horizons"]):
+        assert live["record"]["all_history"]["days"] == done["record"]["all_history"]["days"] - 1, live["key"]
+        assert live["momentum"] == done["momentum"] and live["trend"] == done["trend"]  # today still reads the live close

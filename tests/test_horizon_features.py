@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from dataclasses import replace
 
 from tradesync_core.horizon_chart import chart_payload, projection
 from tradesync_core.horizon_evaluation import evaluate_all, evaluate_horizon, tally_sentence
@@ -81,3 +82,16 @@ def test_chart_payload_windows_candles_and_spreads_an_ordered_cone() -> None:
     assert ends["p10_pct"][1] <= ends["median_pct"][1] <= ends["p90_pct"][1]
     assert ends["median_pct"][0] == b.times[-1] + 7 * DAY and cone["lines"][0]["points"][0][1] == round(b.closes[-1], 8)
     assert projection(b, week, {"record": {}})["lines"] == []
+
+
+def test_a_day_still_trading_is_marked_and_its_volume_waits_for_the_close() -> None:
+    bar = [{"time": T0, "close": 1.0}]
+    assert Bars.from_candles(bar, now_s=T0 + DAY - 1).last_partial
+    assert not Bars.from_candles(bar, now_s=T0 + DAY).last_partial and not Bars.from_candles(bar).last_partial
+    closed, month = bars(), BY_KEY["1m"]
+    trading = replace(closed, volumes=closed.volumes[:-1] + (1.0,), last_partial=True)
+    participation = next(f for f in FEATURES if f.key == "participation")
+    assert participation.ratios(trading, month)[-1] == participation.ratios(closed, month)[-2]
+    assert "closed days" in participation.read(trading, month).text
+    week = evaluate_horizon(closed, BY_KEY["1w"])["features"][0]["record"]["days"]
+    assert evaluate_horizon(trading, BY_KEY["1w"])["features"][0]["record"]["days"] in (week, week - 1)
