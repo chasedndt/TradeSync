@@ -7,9 +7,9 @@ finish it: check the statistics for honesty, the code for correctness, and the
 UI against the operator's standards (section 7). Verify every claim here
 yourself; where this document says "verified", it names the evidence.
 
-Branch: `codex/2026-09-01-dashboard-overhaul`. Last pushed commits before this
-handover: `113f8e8`, `a8714b8`, `d2e5b9b`. This handover is committed together
-with the work in progress (section 3).
+Branch: `codex/2026-09-01-dashboard-overhaul`. Everything in section 3 is
+committed, pushed, deployed and checked unless a row says otherwise. Pull before
+you start: Claude kept refining small gaps after the first version of this file.
 
 ---
 
@@ -74,15 +74,12 @@ docker compose --env-file E:\Projects\TradeSync\dashboard-runtime\runtime.env `
 | Timeframes performance | volatility and momentum recomputed a window per day; now one-pass rolling volatility and rank, cached per series (`tests/test_horizon_rolling.py` proves identical numbers). Evaluating all horizons on 2,217 days: 36.7 s to 1.8 s locally. Deployed: a cold `/state/market/horizons?symbol=SOL-PERP` (2,191 daily candles fetched and measured) took 8 s, against 55 s for BTC before |
 | Candle off-by-one | left as is: `limit=1000` returns 1,001 candles because the window includes the current partial candle, and `/context` builds its time grid around the same extra slot; changing it would need both changed together |
 | Regime Lab feature charts | deployed and checked in the browser: 21 feature rows; `hl_return_1h_pct` drew a line against zero and its band (600 readings, "Scored -0.76: this reading leans short … 2.0 spreads below its recent centre"); `hl_funding_hourly_rate` drew a histogram (168 readings, context for playbooks, 0.7 spreads above centre). "show every chart" opened all rows: 17 drew a chart, no errors, no page overflow; the 4 planned or unavailable features (liquidation proxy, direct liquidation flow, Bitcoin ETF flow, external event risk) say they have no recorded history |
-| Core horizon engine + features | written; `tests/test_horizon_outlook.py` and `tests/test_horizon_features.py`: 15 passed |
-| state-api gateway directives | written; state-api suite 107 passed including `test_fleet_gateway_directives.py` |
-| state-api horizon routes | written; `tests/test_horizons.py` **not yet run** |
-| Cockpit Timeframes page and fleet controls | written; fleet controls built once (`npm run build` passed); **Timeframes files not yet built** |
 | Hermes line endings | restored and verified (see 4A) |
 | Hermes targeted script fixes | applied and syntax-checked; the first live runs after the repair passed (see 4A) |
 
-First actions for Codex: run `tools\run_tests.py`, run `npm run build`, redeploy
-state-api and cockpit, open `http://localhost:3000/timeframes` and `/fleet`.
+First actions for Codex: pull, run `tools\run_tests.py` and `npm run build` to
+confirm the numbers above, then open `http://localhost:3000/timeframes`,
+`/regime-lab` and `/fleet` and review against section 7.
 
 ---
 
@@ -137,7 +134,7 @@ is the safe way to integrate (rather than building a separate application).
 4. Checks: the four Python files compile; `bash -n` passes on the five shell
    scripts; zero carriage returns remain in them.
 
-**Done in code (tests pass; deploy and live check pending):** Market Command drives
+**Done, deployed and checked live:** Market Command drives
 jobs through the Hermes gateway's jobs API on its port.
 
 - Hermes 0.21.0 serves, behind the same Bearer key: `GET /api/jobs?include_disabled=true`,
@@ -275,9 +272,9 @@ to `#feature-<key>` and flash the card. `FeatureChart` uses lightweight-charts
 4.2 (no panes): candles plus price-pane overlays and cone lines on one chart;
 RSI and volume in a second chart kept in step by visible time range.
 
-**Still to do for 4B:** run `tests/test_horizons.py`, build, deploy, open the page
-for BTC and ETH at 1366x768 and 375 px, check every chart draws, that links scroll,
-and that the Hermes reading completes. Then improve (section 6).
+**Still to do for 4B:** built, deployed and checked for BTC (section 3). Not yet
+checked: ETH and the phone width on this page, a completed Hermes reading in the
+browser, and smooth scrolling in a real browser. Then improve (section 6).
 
 ### 4C. A chart for every feature on the market features page
 
@@ -287,8 +284,7 @@ the feature expects, drawn differently per feature, clickable from rich text.
 The operator's "market features page" is **Regime Lab** (`/regime-lab`,
 `pages/RegimeLab.tsx`), whose Feature evidence table showed numbers only.
 
-**Built after the handover was first written (tests pass; build, deploy and
-browser check were in progress):**
+**Built, deployed and checked in the browser (section 3):**
 
 - state-api `app/feature_history.py`: `GET /state/regime-lab/feature-history?symbol=&feature_ids=&window=7d&points=`
   proxies market-data's batched histories as `[seconds, value]` pairs, display only
@@ -333,9 +329,8 @@ The original suggestion, kept for reference:
 - ~~Hermes briefing mojibake~~: not a defect. The stored briefing holds correct
   U+2019 apostrophes and the page renders them; the garbling was a console encoding.
   `BriefingCard` collapsing paragraphs into one `<p>` is fixed (split on blank lines).
-- `GET /state/market/context` funding history returns the **oldest** 500 hours of
-  the window (Hyperliquid caps a call at 500 rows): paginate newest-first; the
-  premium field is dropped.
+- ~~Funding history held only the oldest 500 hours of a window~~: fixed, see
+  section 3 ("Funding history paging").
 - market-data candles: `limit=1000` returns 1001; no `1w` interval; state-api
   `/state/market/candles` ignores `start_ms`/`end_ms`; nothing stores candles, and
   Hyperliquid serves only about 5,000 candles per interval (1 h is about 208 days).
