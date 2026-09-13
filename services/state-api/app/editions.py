@@ -39,7 +39,17 @@ class MediaAttach(BaseModel):
     kind: str
     filename: str
 
-EDITION_TZ = ZoneInfo(os.getenv("THESIS_EDITION_TZ", "Europe/London"))
+def _edition_tz():
+    """The edition clock. Falls back to UTC, loudly, where no IANA database is installed."""
+    name = os.getenv("THESIS_EDITION_TZ", "Europe/London")
+    try:
+        return ZoneInfo(name)
+    except Exception:  # ZoneInfoNotFoundError on a host without tzdata
+        print(f"[Editions] timezone {name!r} unavailable (no tzdata); editions run on UTC")
+        return timezone.utc
+
+
+EDITION_TZ = _edition_tz()
 # "name=HH:MM,..." in EDITION_TZ. The StrikeZone fleet's three editions.
 EDITION_SCHEDULE = os.getenv("THESIS_EDITION_SCHEDULE", "ny-premarket=12:00,ny-midday=17:30,session-handoff=23:30")
 EDITIONS_ENABLED = os.getenv("THESIS_EDITIONS_ENABLED", "true").strip().lower() == "true"
