@@ -1,6 +1,6 @@
 import type { HorizonEvaluation, HorizonRead } from '../../api/horizonTypes'
 import { price } from '../ledger/format'
-import { LEAN_LABEL, TREND_WORDS, recordLine, signedPct } from './horizonText'
+import { LEAN_LABEL, TREND_WORDS, horizonAdjective, recordLine, signedPct } from './horizonText'
 import { LinkedText, type LinkTarget } from './LinkedText'
 import styles from './HorizonBands.module.css'
 
@@ -49,7 +49,7 @@ export function HorizonCard({ read, evaluation, selected, targets, onSelect, onP
         {read.lean_basis === 'same_trend' ? ' (the trend state alone: trend and momentum together were too thin).' : ''}
       </p>
       {implied && (
-        <p className={styles.line}>One ordinary {read.label} move spans {price(implied.low)} to {price(implied.high)} (±{implied.sigma_pct.toFixed(1)}%).</p>
+        <p className={styles.line}>One ordinary {horizonAdjective(read.label)} move spans {price(implied.low)} to {price(implied.high)} (±{implied.sigma_pct.toFixed(1)}%).</p>
       )}
       <p className={styles.line}>
         The trend state flips {above ? 'below' : 'above'} {price(levels.trend_flips_at)}; the last {levels.recent_days} days ranged {price(levels.recent_low)} to {price(levels.recent_high)}.

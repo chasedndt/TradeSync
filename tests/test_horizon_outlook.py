@@ -101,3 +101,7 @@ def test_a_day_still_trading_ends_no_record_window() -> None:
     for live, done in zip(trading["horizons"], closed["horizons"]):
         assert live["record"]["all_history"]["days"] == done["record"]["all_history"]["days"] - 1, live["key"]
         assert live["momentum"] == done["momentum"] and live["trend"] == done["trend"]  # today still reads the live close
+
+
+def test_horizon_labels_read_as_adjectives_before_a_noun() -> None:
+    assert [h.adjective for h in HORIZONS] == ["3-day", "1-week", "2-week", "1-month", "3-month", "6-month"]

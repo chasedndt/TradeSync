@@ -47,7 +47,7 @@ def projection(bars: Bars, h: Horizon, read: Mapping[str, Any]) -> dict[str, Any
     return {
         "basis": basis, "days": stats.get("days"), "independent_windows": stats.get("independent_windows"),
         "end_time": last_time + h.days * DAY, "lines": lines,
-        "note": f"Past {h.label} moves from {basis.replace('_', ' ')}, spread from the last close; a record, not a forecast.",
+        "note": f"Past {h.adjective} moves from {basis.replace('_', ' ')}, spread from the last close; a record, not a forecast.",
     }
 
 

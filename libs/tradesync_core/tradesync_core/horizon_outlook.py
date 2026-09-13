@@ -36,6 +36,12 @@ class Horizon:
     ma_days: int
     vol_lookback: int
 
+    @property
+    def adjective(self) -> str:
+        """``3-day``, ``2-week``: the label as it reads before a noun."""
+        number, unit = self.label.split(" ", 1)
+        return f"{number}-{unit.removesuffix('s')}"
+
 
 HORIZONS: tuple[Horizon, ...] = (
     Horizon("3d", "3 days", 3, "lower", 20, 30),

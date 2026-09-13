@@ -38,14 +38,14 @@ class Volatility:
         move = (math.exp(sigma * math.sqrt(h.days)) - 1) * 100
         return Reading(state, "context", round(annual, 1),
                        f"Realised volatility is {annual:.0f}% a year, {state} (percentile {rank * 100:.0f} of the past year); "
-                       f"an ordinary {h.label} move is about {move:.1f}%.")
+                       f"an ordinary {h.adjective} move is about {move:.1f}%.")
 
     def overlays(self, bars: Bars, h: Horizon, start: int) -> list[dict[str, Any]]:
         vols = self.daily(bars, h)
         upper = [c * math.exp(v * math.sqrt(h.days)) if v else None for c, v in zip(bars.closes, vols)]
         lower = [c * math.exp(-v * math.sqrt(h.days)) if v else None for c, v in zip(bars.closes, vols)]
-        return [series(f"one ordinary {h.label} move above", bars.times, upper, start, role="band_upper"),
-                series(f"one ordinary {h.label} move below", bars.times, lower, start, role="band_lower")]
+        return [series(f"one ordinary {h.adjective} move above", bars.times, upper, start, role="band_upper"),
+                series(f"one ordinary {h.adjective} move below", bars.times, lower, start, role="band_lower")]
 
 
 FEATURE = Volatility()

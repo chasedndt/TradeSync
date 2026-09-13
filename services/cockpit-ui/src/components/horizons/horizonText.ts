@@ -19,9 +19,12 @@ export const TREND_WORDS: Record<string, string> = {
 export const signedPct = (v: number | null | undefined, digits = 1): string =>
   v == null ? '—' : `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(digits)}%`
 
+/** "3 days" → "3-day", "2 weeks" → "2-week": a horizon label as it reads before a noun. */
+export const horizonAdjective = (label: string): string => label.replace(/^(\d+) (\w+?)s?$/, '$1-$2')
+
 export function recordLine(stats: RecordStats | undefined, horizonLabel: string): string {
   if (!stats || !stats.days) return 'No comparable days in the record.'
   const share = Math.round((stats.share_up ?? 0) * 100)
-  return `${stats.days.toLocaleString()} comparable days (${stats.independent_windows} independent ${horizonLabel} windows): ` +
+  return `${stats.days.toLocaleString()} comparable days (${stats.independent_windows} independent ${horizonAdjective(horizonLabel)} windows): ` +
     `higher ${share}% of the time, median ${signedPct(stats.median_pct)}, middle half ${signedPct(stats.p25_pct)} to ${signedPct(stats.p75_pct)}.`
 }
