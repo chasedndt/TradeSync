@@ -6,7 +6,9 @@ limit, kept for an hour per market, and measured by ``tradesync_core``:
 ``horizon_outlook`` (trend and momentum state and the record behind it),
 ``horizon_evaluation`` (each feature's reading and record) and
 ``horizon_chart`` (candles, overlays and the record's cone). The heavy
-measuring runs in a worker thread so no request waits behind it.
+measuring runs in a worker thread so no request waits behind it: a market
+measured within the last six hours is served at once while a stale hour is
+measured again behind it, and each horizon's chart is drawn once per measurement.
 
 Nothing here is a forecast and no feature carries a weight: none has measured
 skill at these horizons.
@@ -34,6 +36,7 @@ router = APIRouter(tags=["market"])
 HISTORY_START_S = int(datetime(2020, 8, 1, tzinfo=timezone.utc).timestamp())
 CHUNK_DAYS = 900
 CACHE_TTL_S = 3600
+SERVE_STALE_S = 6 * 3600
 WARM_SYMBOLS = ("BTC-PERP", "ETH-PERP")
 BACKFILL_UNTIL = "2023-02-26"
 SYMBOL_RE = re.compile(r"^[A-Z0-9]{1,15}-PERP$")
@@ -43,6 +46,7 @@ NOTE = ("A record of what followed past days in the same state, from Hyperliquid
 
 _cache: dict[str, dict[str, Any]] = {}
 _locks: dict[str, asyncio.Lock] = {}
+_refreshing: dict[str, asyncio.Task] = {}
 
 
 def checked_symbol(symbol: str) -> str:
@@ -74,10 +78,30 @@ def _measure(symbol: str, candles: list[dict[str, Any]]) -> dict[str, Any]:
     return {"at": time.time(), "bars": bars, "outlook": outlook, "evaluation": evaluation}
 
 
+def _refresh_behind(market_data_url: str, symbol: str) -> None:
+    if symbol in _refreshing:
+        return
+
+    async def refresh() -> None:
+        try:
+            await measured(market_data_url, symbol, force=True)
+        except Exception as exc:  # the stale entry stays; the next request tries again
+            print(f"[Horizons] {symbol} not re-measured: {type(exc).__name__}")
+        finally:
+            _refreshing.pop(symbol, None)
+
+    _refreshing[symbol] = asyncio.create_task(refresh())
+
+
 async def measured(market_data_url: str, symbol: str, force: bool = False) -> dict[str, Any]:
     entry = _cache.get(symbol)
-    if entry and not force and time.time() - entry["at"] < CACHE_TTL_S:
-        return entry
+    if entry and not force:
+        age = time.time() - entry["at"]
+        if age < CACHE_TTL_S:
+            return entry
+        if age < SERVE_STALE_S:
+            _refresh_behind(market_data_url, symbol)
+            return entry
     lock = _locks.setdefault(symbol, asyncio.Lock())
     async with lock:
         entry = _cache.get(symbol)
@@ -120,8 +144,11 @@ def register(app, state, *, market_data_url: str) -> None:
                             horizon: str = Query("1m", pattern="^(3d|1w|2w|1m|3m|6m)$")):
         symbol = checked_symbol(symbol)
         entry = await _entry_or_502(market_data_url, symbol)
-        read = next((r for r in entry["outlook"].get("horizons") or [] if r.get("key") == horizon), {})
-        return await asyncio.to_thread(chart_payload, entry["bars"], BY_KEY[horizon], read)
+        charts = entry.setdefault("charts", {})
+        if horizon not in charts:
+            read = next((r for r in entry["outlook"].get("horizons") or [] if r.get("key") == horizon), {})
+            charts[horizon] = await asyncio.to_thread(chart_payload, entry["bars"], BY_KEY[horizon], read)
+        return charts[horizon]
 
     @router.post("/state/market/horizons/reading")
     async def start_reading(symbol: str = Query("BTC-PERP", max_length=24)):

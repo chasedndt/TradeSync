@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import math
-from unittest.mock import AsyncMock, patch
+import time
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
 
@@ -59,3 +61,45 @@ def test_a_reading_starts_in_the_background() -> None:
         resp = client.post("/state/market/horizons/reading?symbol=BTC-PERP")
     assert resp.status_code == 200 and resp.json()["status"] == "started"
     assert run.await_count == 1 and run.await_args.args[0] == "BTC-PERP"
+
+
+def test_a_chart_is_drawn_once_per_measurement() -> None:
+    drawn = MagicMock(wraps=horizons.chart_payload)
+    with fresh_cache(), patch.object(horizons, "fetch_daily", AsyncMock(return_value=daily())), \
+            patch.object(horizons, "chart_payload", drawn):
+        first = client.get("/state/market/horizons/chart?symbol=BTC-PERP&horizon=1m")
+        again = client.get("/state/market/horizons/chart?symbol=BTC-PERP&horizon=1m")
+        other = client.get("/state/market/horizons/chart?symbol=BTC-PERP&horizon=3d")
+    assert first.status_code == again.status_code == other.status_code == 200
+    assert first.json() == again.json() and drawn.call_count == 2
+
+
+def measured_after(entry: dict, fetched: list) -> tuple[dict, dict]:
+    async def run() -> tuple[dict, dict]:
+        served = await horizons.measured("http://market-data", "BTC-PERP")
+        for _ in range(100):
+            if horizons._cache["BTC-PERP"].get("tag") == "new":
+                break
+            await asyncio.sleep(0.01)
+        return served, horizons._cache["BTC-PERP"]
+
+    async def fetch(url, symbol):
+        fetched.append(symbol)
+        return []
+
+    with patch.object(horizons, "_cache", {"BTC-PERP": entry}), patch.object(horizons, "_locks", {}), \
+            patch.object(horizons, "_refreshing", {}), patch.object(horizons, "fetch_daily", fetch), \
+            patch.object(horizons, "_measure", lambda symbol, candles: {"at": time.time(), "tag": "new"}):
+        return asyncio.run(run())
+
+
+def test_a_stale_hour_is_served_at_once_and_measured_again_behind_it() -> None:
+    fetched: list = []
+    served, later = measured_after({"at": time.time() - horizons.CACHE_TTL_S - 60, "tag": "old"}, fetched)
+    assert served["tag"] == "old" and later["tag"] == "new" and fetched == ["BTC-PERP"]
+
+
+def test_a_measurement_older_than_six_hours_is_not_served() -> None:
+    fetched: list = []
+    served, _ = measured_after({"at": time.time() - horizons.SERVE_STALE_S - 60, "tag": "old"}, fetched)
+    assert served["tag"] == "new" and fetched == ["BTC-PERP"]
