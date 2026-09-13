@@ -91,3 +91,16 @@ def test_one_release_day_is_one_key_event_led_by_the_timed_card() -> None:
     assert ke[0]["related_titles"] == ["Advance Monthly Sales for Retail and Food Services"]
     assert ke[0]["scheduled_at"].startswith("2026-09-16T12:30") and ke[0]["minutes_until"] == 3750 and ke[0]["url"] == "https://ff/retail"
     assert ke[1]["related_titles"] == ["FOMC Press Conference"]
+
+
+def test_foreign_release_bundles_merge_and_notes_lead_with_measured_events() -> None:
+    canada = [{"title": t, "country": "CAD", "impact": "High", "minutes_until": 300, "scheduled_at": "2026-09-14T12:30:00+00:00",
+               "source": "forexfactory"} for t in ("CPI m/m", "Median CPI y/y", "Trimmed CPI y/y")]
+    us = {**CPI, "minutes_until": 900}
+    o = compose_outlook({"BTC-PERP": thesis("NONE")}, [*canada, us], {"cpi": {"BTC-PERP": PROFILE}}, {})
+    assert [(k["country"], k["title"], k["related_titles"]) for k in o["key_events"]] == [
+        ("CAD", "CPI m/m", ["Median CPI y/y", "Trimmed CPI y/y"]), ("USD", "CPI m/m", []),
+    ]
+    event_notes = [n for n in o["notes"] if "CPI m/m" in n]
+    assert event_notes[0].startswith("CPI m/m in 15h 0m. US CPI has moved BTC")
+    assert event_notes[1] == "CAD CPI m/m (with Median CPI y/y, Trimmed CPI y/y) in 5h 0m."

@@ -94,7 +94,11 @@ keywords only for US releases, "treasury" is no longer a keyword and jobless
 claims are. One kind on one day is one key event (the FOMC statement and its
 press conference, FRED's date-only retail sales card and the feed's timed
 one), led by the card that has a time of day; FRED's spelled-out retail sales
-and weekly claims titles map to their kinds.
+and weekly claims titles map to their kinds. An unmeasured country's bundle at
+one minute (Canada's CPI m/m, median and trimmed CPI; the Bank of England's
+rate, votes and summary) is one key event too, and the trader notes for the
+next 48 hours lead with events that have a measured record and name the
+country of any non-US release.
 
 **Articles.** Recent coverage of each scheduled kind comes from GDELT's
 article list, cached three hours, spaced and backed off so a rate limit

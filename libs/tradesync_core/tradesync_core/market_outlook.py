@@ -76,7 +76,9 @@ def key_events(events: Sequence[Mapping[str, Any]], profiles: Mapping[str, Mappi
         kind = kind_for_event(e)
         title = str(e.get("title"))
         when = str(e.get("scheduled_at"))
-        key = (kind.key if kind else title, when[:10])
+        # One release: a measured kind on one day, or an unmeasured country's bundle at one minute
+        # (Canada's CPI m/m, median and trimmed CPI; the BoE's rate, votes and summary).
+        key = (f"kind:{kind.key}", when[:10]) if kind else (f"country:{e.get('country') or ''}", when[:16])
         if key in by_key:
             existing = by_key[key]
             if existing["source"] == "fred" and e.get("source") != "fred":
@@ -121,10 +123,15 @@ def trader_notes(breadth_: Mapping[str, Any], leads: Sequence[Mapping[str, Any]]
                          f"that read is wrong beyond {r['invalidation']:,.2f}.")
         elif r.get("last") is not None:
             notes.append(f"{r['symbol'].replace('-PERP', '')} has no admitted read; 24h range {r.get('low_24h', 0):,.2f} to {r.get('high_24h', 0):,.2f}.")
-    soon = [e for e in events if e["minutes_until"] <= 48 * 60]
+    # Events with a measured record lead; a non-US release is named with its country.
+    soon = sorted((e for e in events if e["minutes_until"] <= 48 * 60), key=lambda e: (e.get("kind") is None, e["minutes_until"]))
     for e in soon[:3]:
         when = "under way" if e["minutes_until"] < 0 else f"in {e['minutes_until'] // 60}h {e['minutes_until'] % 60}m"
-        notes.append(f"{e['title']} {when}." + (f" {e['guidance'][0]}" if e["guidance"] else ""))
+        country = str(e.get("country") or "")
+        name = f"{country} {e['title']}" if country and country not in ("USD", "US") else str(e["title"])
+        related = e.get("related_titles") or []
+        also = f" (with {', '.join(related)})" if related else ""
+        notes.append(f"{name}{also} {when}." + (f" {e['guidance'][0]}" if e["guidance"] else ""))
     active = {}
     for t in theses.values():
         for c in t.get("no_trade_conditions", []):
