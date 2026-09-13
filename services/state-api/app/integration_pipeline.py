@@ -201,13 +201,24 @@ def assemble_pipeline_status(
     )
 
     h = probes.get("agent_harness", {})
-    if h.get("configured") and h.get("ok"):
-        optional_states["agent_harness"] = (
-            "live",
-            [f"Hermes API server answered at {h.get('url')}: models {', '.join(h.get('models') or []) or 'none listed'}"],
+    link = h.get("link") or {}
+    gateway = ((h.get("gateway") or {}).get("payload") or {})
+    platforms = gateway.get("platforms") or {}
+    link_lines = []
+    if link:
+        link_lines.append(
+            f"Gateway {link.get('host')}:{link.get('port')} · {link.get('platform') or 'hermes'} {link.get('version') or ''} · "
+            f"last answer {link.get('seconds_since_seen')}s ago in {link.get('latency_ms')} ms · heartbeat every {int(link.get('heartbeat_s') or 0)}s"
         )
+        if link.get("availability_recent") is not None:
+            link_lines.append(f"Recent availability {round(link['availability_recent'] * 100)}% of heartbeats; models {', '.join(link.get('models') or []) or 'not yet listed'}")
+    if platforms:
+        link_lines.append("Gateway platforms: " + ", ".join(f"{k} {v.get('state')}" for k, v in platforms.items() if isinstance(v, dict)))
+    if h.get("configured") and h.get("ok"):
+        state_ = "live" if link.get("status") == "live" else "partial"
+        optional_states["agent_harness"] = (state_, link_lines or ["Hermes gateway answering"])
     elif h.get("configured"):
-        optional_states["agent_harness"] = ("offline", [f"Hermes API server not answering: {h.get('reason', 'unreachable')}"])
+        optional_states["agent_harness"] = ("offline", [f"Hermes gateway not answering: {h.get('reason') or 'no heartbeat yet'}"] + link_lines)
     else:
         optional_states["agent_harness"] = ("contract_only", ["AGENT_HARNESS_URL is unset"])
 
@@ -481,14 +492,18 @@ def assemble_pipeline_status(
         ),
         _node(
             node_id="agent_harness",
-            label="Hermes (advisory harness)",
-            owner="ChaseOS Hermes gateway",
+            label="Hermes gateway",
+            owner="ChaseOS Hermes",
             tier="B",
             stage="advisory_analysis",
             status=optional_states["agent_harness"][0],
             required_for_tier_a=False,
             authority="advisory_only",
-            summary="Hermes may explain, compare, draft proposals and read posts for claims; deterministic policy remains authoritative.",
+            summary=(
+                "Hermes is the ChaseOS agent gateway: the fleet's scheduler, its Discord platform and its API server. "
+                "TradeSync reads its job outputs, runs its TradeSync jobs from the Fleet page, and asks it to explain, "
+                "compare, brief and read posts for claims. Inside TradeSync it cannot score, approve or execute."
+            ),
             evidence=optional_states["agent_harness"][1]
             + [
                 # The envelope, the probe and the receipt all exist now, so the
@@ -750,7 +765,7 @@ async def collect_integration_pipeline(
             probes[key]["configured"] = bool(url)
 
     # The three optional connectors, on their own evidence.
-    probes["agent_harness"] = await _harness_probe()
+    probes["agent_harness"] = await _harness_probe(pool)
     probes["chaseos"] = await _knowledge_probe(pool)
     probes["tradingview"] = await _tradingview_probe(pool)
 
@@ -792,19 +807,21 @@ async def collect_integration_pipeline(
     )
 
 
-async def _harness_probe() -> dict[str, Any]:
-    """The Hermes API server, through the connector that knows its dialect."""
-    from app import agent_connector
+async def _harness_probe(pool: Any = None) -> dict[str, Any]:
+    """The Hermes link as the heartbeat last saw it; never a request of its own."""
+    from app import hermes_link
 
-    if not agent_connector.configured():
+    link = hermes_link.status_now()
+    if link["status"] == "not_configured":
         return {"ok": False, "configured": False}
-    result = await agent_connector.probe()
     return {
-        "ok": result.get("status") == "live",
+        "ok": link["status"] in ("live", "degraded"),
         "configured": True,
-        "url": result.get("url"),
-        "models": result.get("models", []),
-        "reason": result.get("detail", ""),
+        "url": link["url"],
+        "models": link["models"],
+        "reason": link["last_error"] or "",
+        "link": link,
+        "gateway": await hermes_link.gateway_state(pool),
     }
 
 

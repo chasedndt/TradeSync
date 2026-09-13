@@ -66,7 +66,8 @@ export function MarketCanvas() {
   const createDrawing = useCreateDrawing()
   const deleteDrawing = useDeleteDrawing()
 
-  const markers = useEvidenceMarkers(opportunities, symbol, interval)
+  const markerMode = params.get('signals') === 'all' ? 'all' : 'changes'
+  const markers = useEvidenceMarkers(opportunities, symbol, interval, markerMode)
   const shapes = useShapes(drawings?.drawings)
   const { levels, annotations } = usePriceLevels(
     drawings?.drawings,
@@ -132,6 +133,13 @@ export function MarketCanvas() {
               {view === 'chart' ? 'Chart & drawings' : 'Research signals'}
             </button>
           ))}
+          {showEvidence && (['changes', 'all'] as const).map((mode) => (
+            <button key={mode} type="button" className={markerMode === mode ? 'chip chip--active' : 'chip'} aria-pressed={markerMode === mode}
+              onClick={() => { const next = new URLSearchParams(params); next.set('signals', mode); setParams(next, { replace: true }) }}
+              title={mode === 'changes' ? 'Only mark where the paper read changed side' : 'Also mark every candle that carried a call, as small dots'}>
+              {mode === 'changes' ? 'Side changes' : 'Every call'}
+            </button>
+          ))}
           <span className="metric-sub">Drawings stay visible in both views. Research signals are not executed positions.</span>
         </div>
         <CanvasToolbar
@@ -160,7 +168,7 @@ export function MarketCanvas() {
             }
             tone={windowChange == null ? undefined : windowChange >= 0 ? 'good' : 'bad'}
           />
-          <Stat label="Marked candles" value={String(markers.length)} />
+          <Stat label={markerMode === 'changes' ? 'Side changes' : 'Marked candles'} value={String(markers.length)} />
         </CanvasToolbar>
 
         {isError ? (

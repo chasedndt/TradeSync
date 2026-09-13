@@ -21,6 +21,7 @@ import {
   Agents,
   Fleet,
   Pipeline,
+  SignalLedger,
 } from './pages'
 
 export default function App() {
@@ -46,6 +47,7 @@ export default function App() {
         <Route path="/thesis" element={<Thesis />} />
         <Route path="/agents" element={<Agents />} />
         <Route path="/fleet" element={<Fleet />} />
+        <Route path="/signal-ledger" element={<SignalLedger />} />
         <Route path="/pipeline" element={<Pipeline />} />
         <Route path="/risk-policies" element={<RiskPolicies />} />
         <Route path="/settings" element={<Settings />} />

@@ -15,6 +15,8 @@ export interface EvidenceMarker {
   time: number
   direction: 'LONG' | 'SHORT' | 'NONE'
   label: string
+  /** A change of side is drawn as a labelled arrow; a held side as a small unlabelled dot. */
+  kind?: 'change' | 'continuation'
 }
 
 export interface PriceLevel {
@@ -229,13 +231,18 @@ export function PriceChart({
   useEffect(() => {
     if (!seriesRef.current) return
     seriesRef.current.setMarkers(
-      markers.map((m) => ({
-        time: m.time as never,
-        position: m.direction === 'SHORT' ? 'aboveBar' : 'belowBar',
-        color: m.direction === 'SHORT' ? '#e0574a' : '#3fb27f',
-        shape: m.direction === 'SHORT' ? 'arrowDown' : 'arrowUp',
-        text: m.label,
-      })),
+      markers.map((m) => {
+        const change = m.kind !== 'continuation'
+        const short = m.direction === 'SHORT'
+        return {
+          time: m.time as never,
+          position: short ? 'aboveBar' : 'belowBar',
+          color: short ? (change ? '#e0574a' : 'rgba(224,87,74,0.55)') : (change ? '#3fb27f' : 'rgba(63,178,127,0.55)'),
+          shape: change ? (short ? 'arrowDown' : 'arrowUp') : 'circle',
+          size: change ? 1 : 0.35,
+          text: change ? m.label : '',
+        }
+      }),
     )
   }, [markers])
 

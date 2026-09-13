@@ -57,7 +57,7 @@ from tradesync_core.strike_zone import (
     validate_receipt,
 )
 from tradesync_core.graph_snapshot import SnapshotRejected
-from app import agent_connector
+from app import agent_connector, background
 from app.graph_projection import (
     available_snapshots,
     current_snapshot,
@@ -409,9 +409,16 @@ async def lifespan(app: FastAPI):
         # feed answers, and a failure here is logged, not fatal.
         asyncio.create_task(_warm_macro_cache())
 
+        # Loops the routers registered: the Hermes heartbeat, event reactions,
+        # the edition schedule. FastAPI ignores on_event hooks under a lifespan,
+        # so they are started here; see app/background.py.
+        started = background.start_all()
+        print(f"Background loops started: {', '.join(started) or 'none'}")
+
         yield
     finally:
         # Shutdown
+        await background.stop_all()
         await macro_feed.close()
         await context_feed.close()
         if state.pool:
@@ -3711,6 +3718,34 @@ from app.fleet import register as register_fleet  # noqa: E402
 
 register_fleet(app, state)
 
+# The Hermes link: a continuous heartbeat on the gateway; see app/hermes_link.py.
+from app import hermes_link  # noqa: E402
+
+
+@app.get("/state/hermes/status", tags=["agents"])
+async def get_hermes_status():
+    """Hermes gateway link as of the last heartbeat, plus the gateway's own state file."""
+    return {
+        **hermes_link.status_now(),
+        "gateway": await hermes_link.gateway_state(state.pool),
+        "boundary": {"may_explain": True, "may_compare": True, "may_read_posts_for_claims": True,
+                     "may_score": False, "may_approve": False, "may_execute": False},
+    }
+
+
+background.add("hermes_link", hermes_link.run_forever)
+
+
+# Measured event reactions and recent coverage; see app/event_outlook.py.
+from app.event_outlook import register as register_outlook  # noqa: E402
+
+register_outlook(
+    app,
+    state,
+    market_data_url=MARKET_DATA_URL,
+    calendar=lambda: context_feed.fetch_overview(force_refresh=False),
+)
+
 # Thesis editions: the thesis for every symbol, frozen on the StrikeZone cadence.
 from app.editions import register as register_editions  # noqa: E402
 
@@ -3721,3 +3756,11 @@ register_editions(
     calendar=lambda: context_feed.fetch_overview(force_refresh=False),
     evidence=_regime_lab_evidence,
 )
+
+# The StrikeZone quant lab: forward-test ledger, outcomes, scorecards, health and
+# charts, posted by the host bridge; see app/strikezone_ingest.py and strikezone_lab.py.
+from app.strikezone_ingest import register as register_strikezone_ingest  # noqa: E402
+from app.strikezone_lab import register as register_strikezone_lab  # noqa: E402
+
+register_strikezone_ingest(app, state)
+register_strikezone_lab(app, state)

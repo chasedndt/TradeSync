@@ -53,11 +53,16 @@ html.sidebar-expanded .app-frame { margin-left: 236px; }
 .sidebar--expanded .sidebar-label { display: flex; flex-direction: column; min-width: 0; text-align: left; line-height: 1.2; }
 .sidebar-label-title { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sidebar-label-desc { font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
-.sidebar-toggle {
-  position: absolute; right: -11px; top: 76px; z-index: 41; width: 22px; height: 22px; border-radius: 50%;
-  border: 1px solid #32445a; background: #0d1a2a; color: #bac5d4; display: grid; place-items: center; cursor: pointer;
+/* Expand/collapse: a full-width bar at the foot of the rail, where the eye
+   lands after scanning the list, with a clear hover state. */
+.sidebar-expand {
+  flex: 0 0 auto; height: 44px; margin: 0; border: 0; border-top: 1px solid var(--border-soft);
+  background: transparent; color: #8a9bb0; display: flex; align-items: center; justify-content: center; gap: 10px;
+  cursor: pointer; font: 600 11px var(--font-sans); transition: background-color 120ms ease, color 120ms ease;
 }
-.sidebar-toggle:hover { color: #fff; background: #17273d; }
+.sidebar--expanded .sidebar-expand { justify-content: flex-start; padding: 0 22px; }
+.sidebar-expand:hover { background: #122136; color: #fff; }
+.sidebar-expand:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
 /* The nav scrolls on its own so a short window still reaches the last entry. */
 .sidebar-nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 20px 7px; display: flex; flex-direction: column; gap: 8px; scrollbar-width: thin; }
 .nav-link {

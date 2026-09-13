@@ -63,6 +63,8 @@ export function FleetJobRow({ job, presets }: { job: FleetJob; presets: Record<s
               <span>id {job.job_id} · script {job.script || '—'} · workdir {job.workdir || '—'} · state {job.state || '—'}</span>
               <span>next run {job.next_run_at ? new Date(job.next_run_at).toUTCString() : '—'} · snapshot {ago(job.snapshot_at)}</span>
               <span>{job.fires_7d} model calls in 7 days</span>
+              {job.last_error && <span className="tone-bad" style={{ whiteSpace: 'pre-wrap' }}>last error: {job.last_error.slice(0, 600)}</span>}
+              {job.last_delivery_error && <span className="tone-warn">last delivery error: {job.last_delivery_error.slice(0, 300)}</span>}
             </div>
           </td>
         </tr>

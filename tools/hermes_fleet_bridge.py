@@ -42,6 +42,11 @@ if sys.stdout is None or sys.stderr is None:
     _log.parent.mkdir(parents=True, exist_ok=True)
     sys.stdout = sys.stderr = open(_log, "a", encoding="utf-8", buffering=1)
 
+REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO / "libs" / "tradesync_core"))
+
+from tradesync_core.job_errors import redact  # noqa: E402
+
 HERMES_HOME = Path(os.getenv("HERMES_HOME_WINDOWS", r"\\wsl.localhost\Ubuntu\home\chaseos\runtimes\hermes-home"))
 CRON = HERMES_HOME / "cron"
 STATE_API = os.getenv("STATE_API_URL", "http://localhost:8000").rstrip("/")
@@ -85,6 +90,8 @@ def read_jobs() -> tuple[dict, list[dict]]:
             "no_agent": bool(j.get("no_agent", False)), "model": j.get("model"), "description": describe(j),
             "last_run_at": _iso(j.get("last_run_at")), "last_status": j.get("last_status"),
             "next_run_at": _iso(j.get("next_run_at")), "state": j.get("state"),
+            # A script's output can hold anything; token-, key- and webhook-shaped text is removed first.
+            "last_error": redact(j.get("last_error")), "last_delivery_error": redact(j.get("last_delivery_error")),
         })
     return data, jobs
 
@@ -137,6 +144,17 @@ def read_usage() -> list[dict]:
     return out
 
 
+def read_gateway() -> dict | None:
+    """Hermes's gateway_state.json: whether the API server and Discord platforms are up."""
+    try:
+        data = json.loads((HERMES_HOME / "gateway_state.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    keep = ("kind", "gateway_state", "pid", "code_version", "code_sha", "active_agents", "platforms",
+            "updated_at", "exit_reason", "restart_requested")
+    return {k: data.get(k) for k in keep if k in data}
+
+
 def apply_directive(data: dict, directive: dict) -> tuple[dict | None, str]:
     """Mutate the registry in memory. Returns (previous values, detail)."""
     job = next((j for j in data.get("jobs", []) if str(j.get("id")) == directive["job_id"]), None)
@@ -173,7 +191,7 @@ def write_registry(data: dict) -> Path:
 
 def run_pass(dry_run: bool = False) -> None:
     data, jobs = read_jobs()
-    snapshot = {"jobs": jobs, "runs": read_runs(), "usage": read_usage()}
+    snapshot = {"jobs": jobs, "runs": read_runs(), "usage": read_usage(), "gateway": read_gateway()}
     with httpx.Client(timeout=60.0, trust_env=False) as client:
         if dry_run:
             print(f"[FleetBridge] would post {len(jobs)} jobs, {len(snapshot['runs'])} runs, {len(snapshot['usage'])} usage rows")

@@ -297,6 +297,20 @@ This follows Codex's review order; slice 1 is accepted today.
   every Hermes job run, discord-reader on 65 channels with the existing
   Hermes bot (read-only), Agents page at `/agents`.
   `changes/2026-09-12_discord-reader-and-agents-page.md`.
+- **2026-09-13, operator reviews addressed**: fleet re-pointed to the canonical
+  vault; Fleet page with directives and token analytics; narrated editions;
+  honest pipeline nodes; Hermes heartbeat link; Market Thesis with breadth,
+  measured event reactions (FRED + Fed calendar on Hyperliquid candles),
+  articles and a Hermes briefing; one-screen Mission Control; Execution
+  Readiness gate checklist. `changes/2026-09-13_*.md`.
+- **2026-09-13, Signal Ledger**: the StrikeZone quant lab moved in from
+  Discord through a host bridge: forward-test matrix, the signal and outcome
+  ledger with charts, paper equity after costs, scorecards and regime cohorts,
+  lab health with each failing job's cause, and a Forward test readiness chip.
+  Background loops now start under the lifespan (the heartbeat had never run).
+  `changes/2026-09-13_signal-ledger-and-lab-health.md`. Fleet-side faults found
+  (CRLF scripts, WSL DNS, self-reviews writing to `chaseos_obsidian`) are
+  reported there for the fleet, not changed by TradeSync.
 
 ## 7. Where things stand at the end of 2026-09-11
 

@@ -25,6 +25,7 @@ export function useEvidenceMarkers(
   opportunities: Opportunity[] | undefined,
   symbol: string,
   interval: string,
+  mode: 'changes' | 'all' = 'changes',
 ): EvidenceMarker[] {
   return useMemo(() => {
     if (!opportunities) return []
@@ -47,15 +48,26 @@ export function useEvidenceMarkers(
       }
     }
 
-    return Array.from(perCandle.entries())
-      .map(([time, { latest, count }]) => ({
+    // One call per candle is still a wall of labels when a side is held for
+    // hours. Only a change of side is labelled; a held side is a small dot,
+    // and in "changes" mode it is not drawn at all.
+    const ordered = Array.from(perCandle.entries()).sort((a, b) => a[0] - b[0])
+    const out: EvidenceMarker[] = []
+    let previous: 'LONG' | 'SHORT' | null = null
+    for (const [time, { latest, count }] of ordered) {
+      const direction = (latest.dir === 'SHORT' ? 'SHORT' : 'LONG') as 'LONG' | 'SHORT'
+      const change = direction !== previous
+      previous = direction
+      if (!change && mode === 'changes') continue
+      out.push({
         time,
-        direction: (latest.dir === 'SHORT' ? 'SHORT' : 'LONG') as 'LONG' | 'SHORT',
-        label:
-          count > 1 ? `${latest.dir} · ${count} research calls` : `${latest.dir} · research`,
-      }))
-      .sort((a, b) => a.time - b.time)
-  }, [opportunities, symbol, interval])
+        direction,
+        kind: change ? 'change' : 'continuation',
+        label: change ? `${direction}${count > 1 ? ` ×${count}` : ''}` : '',
+      })
+    }
+    return out
+  }, [opportunities, symbol, interval, mode])
 }
 
 /**

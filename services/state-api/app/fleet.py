@@ -47,6 +47,9 @@ class JobSnapshot(BaseModel):
     last_status: str | None = None
     next_run_at: datetime | None = None
     state: str | None = None
+    # Redacted by the bridge (tradesync_core.job_errors) before it leaves the host.
+    last_error: str | None = None
+    last_delivery_error: str | None = None
 
 
 class RunSnapshot(BaseModel):
@@ -78,6 +81,18 @@ class FleetSnapshot(BaseModel):
     jobs: list[JobSnapshot] = Field(default_factory=list)
     runs: list[RunSnapshot] = Field(default_factory=list)
     usage: list[UsageSnapshot] = Field(default_factory=list)
+    # Hermes's own gateway_state.json (platform states, pid, version), as read by the bridge.
+    gateway: dict[str, Any] | None = None
+
+
+def _parse_ts(value: Any) -> datetime | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
 
 
 class DirectiveRequest(BaseModel):
@@ -101,16 +116,18 @@ async def _upsert_jobs(conn, jobs: list[JobSnapshot]) -> None:
         await conn.execute(
             """
             INSERT INTO fleet_jobs (job_id, name, enabled, schedule, schedule_display, deliver, workdir, script, no_agent, model,
-                                    description, last_run_at, last_status, next_run_at, state, snapshot_at)
-            VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, now())
+                                    description, last_run_at, last_status, next_run_at, state, last_error, last_delivery_error, snapshot_at)
+            VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, now())
             ON CONFLICT (job_id) DO UPDATE SET name = EXCLUDED.name, enabled = EXCLUDED.enabled, schedule = EXCLUDED.schedule,
                 schedule_display = EXCLUDED.schedule_display, deliver = EXCLUDED.deliver, workdir = EXCLUDED.workdir,
                 script = EXCLUDED.script, no_agent = EXCLUDED.no_agent, model = EXCLUDED.model, description = EXCLUDED.description,
                 last_run_at = EXCLUDED.last_run_at, last_status = EXCLUDED.last_status, next_run_at = EXCLUDED.next_run_at,
-                state = EXCLUDED.state, snapshot_at = now()
+                state = EXCLUDED.state, last_error = EXCLUDED.last_error, last_delivery_error = EXCLUDED.last_delivery_error,
+                snapshot_at = now()
             """,
             j.job_id, j.name, j.enabled, json.dumps(j.schedule), j.schedule_display, j.deliver, j.workdir, j.script,
             j.no_agent, j.model, j.description, j.last_run_at, j.last_status, j.next_run_at, j.state,
+            j.last_error, j.last_delivery_error,
         )
 
 
@@ -149,7 +166,17 @@ def register(app, state) -> None:
             await _upsert_jobs(conn, snapshot.jobs)
             await _upsert_runs(conn, snapshot.runs)
             await _upsert_usage(conn, snapshot.usage)
-        return {"jobs": len(snapshot.jobs), "runs": len(snapshot.runs), "usage": len(snapshot.usage)}
+            if snapshot.gateway:
+                await conn.execute(
+                    """
+                    INSERT INTO hermes_gateway_state (id, payload, source_updated_at, snapshot_at)
+                    VALUES (1, $1::jsonb, $2, now())
+                    ON CONFLICT (id) DO UPDATE SET payload = EXCLUDED.payload,
+                        source_updated_at = EXCLUDED.source_updated_at, snapshot_at = now()
+                    """,
+                    json.dumps(snapshot.gateway), _parse_ts(snapshot.gateway.get("updated_at")),
+                )
+        return {"jobs": len(snapshot.jobs), "runs": len(snapshot.runs), "usage": len(snapshot.usage), "gateway": bool(snapshot.gateway)}
 
     @router.get("/state/fleet/jobs")
     async def list_jobs():

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useAgentFeed, useHarnessStatus } from '../api/hooks/useAgentFeed'
 import { AgentFeedItem, kindOf } from './AgentsFeedItem'
 import { SourceCards } from '../components/SourceCards'
+import { HermesPanel } from '../components/agents/HermesPanel'
 import styles from './Agents.module.css'
 
 /**
@@ -49,6 +50,8 @@ export function Agents() {
           <span>may explain and compare · may not score, approve or execute</span>
         </div>
       </section>
+
+      <HermesPanel />
 
       <SourceCards />
 

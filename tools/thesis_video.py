@@ -93,8 +93,12 @@ def slides_for(edition: dict) -> list[tuple[str, list[str], str, str]]:
     """(title, bullets, narration, tone) per slide, from the stored theses and script."""
     theses = edition.get("theses") or {}
     parts = edition["narration"].split("\n")
-    out = [(f"{edition['edition'].replace('-', ' ').title()} edition", [edition["headline"]], "\n".join(parts[:2]), ACCENT)]
-    cursor = 2
+    # The title slide speaks everything before the first symbol: the opening and the outlook.
+    first = next((i for i, p in enumerate(parts) if p.rstrip(".") in _NAMES), len(parts))
+    outlook = edition.get("outlook") or {}
+    bullets = [edition["headline"]] + list((outlook.get("notes") or [])[:3])
+    out = [(f"{edition['edition'].replace('-', ' ').title()} edition", bullets, "\n".join(parts[:first]), ACCENT)]
+    cursor = first
     for symbol in edition["symbols"]:
         t = theses.get(symbol) or {}
         s, a, inv = t.get("structure") or {}, t.get("anchors") or {}, t.get("invalidation") or {}

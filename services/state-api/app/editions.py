@@ -1,12 +1,16 @@
-"""Thesis editions: the thesis for every tracked symbol, frozen on a schedule.
+"""Thesis editions: every tracked symbol's thesis plus the market outlook, frozen on a schedule.
 
-Three editions a day, on the StrikeZone cadence in London time (NY
-premarket 12:00, NY midday 17:30, session handoff 23:30), plus a manual
-edition on request. Each edition assembles the live thesis for every symbol
-through the same gatherer the Thesis page uses, composes the headline, the
-written text and the spoken script (``tradesync_core.thesis_edition``), and
-stores the lot. Media renderers (narration audio, video) attach to an
-edition afterwards; they never generate one.
+Three editions a day, on the StrikeZone cadence in London time (NY premarket
+12:00, NY midday 17:30, session handoff 23:30), plus a regeneration whenever
+the operator asks for one (a black-swan move, a mid-session reset), with the
+reason recorded. Building one takes minutes, so it runs as a background job;
+the list endpoint reports its stage.
+
+An edition holds the per-symbol theses, the outlook (breadth, lead reads,
+this week's events with their measured reaction and recent articles), the
+written text and spoken script, and an advisory briefing Hermes drafts
+through the harness boundary. Media renderers attach narration and video
+afterwards.
 """
 
 from __future__ import annotations
@@ -16,43 +20,51 @@ import json
 import os
 import time
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Awaitable, Callable
 from zoneinfo import ZoneInfo
 
 import httpx
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
-from pathlib import Path
 from pydantic import BaseModel
 
-from app.thesis import Evidence, _no_evidence, gather_inputs, execution_enabled, CANDLE_BUCKET_S
+from app import agent_connector, background
+from app.event_outlook import articles_for, ensure_profiles, events_from_context
+from app.thesis import CANDLE_BUCKET_S, Evidence, _no_evidence, execution_enabled, gather_inputs
+from tradesync_core.market_outlook import compose_outlook
+from tradesync_core.outlook_render import outlook_narration, outlook_text
 from tradesync_core.thesis import build_thesis
 from tradesync_core.thesis_edition import EDITIONS, compose
 
 router = APIRouter(tags=["thesis"])
 
-# Where the host renderer writes narration and video, mounted read-only.
 EDITIONS_DIR = Path(os.getenv("EDITIONS_DIR", "/editions"))
+SELF_URL = os.getenv("STATE_API_SELF_URL", "http://localhost:8000").rstrip("/")
+BRIEFING_TIMEOUT_S = float(os.getenv("THESIS_BRIEFING_TIMEOUT_S", "300"))
 
 
 class MediaAttach(BaseModel):
     kind: str
     filename: str
 
+
 def _edition_tz():
     """The edition clock. Falls back to UTC, loudly, where no IANA database is installed."""
     name = os.getenv("THESIS_EDITION_TZ", "Europe/London")
     try:
         return ZoneInfo(name)
-    except Exception:  # ZoneInfoNotFoundError on a host without tzdata
+    except Exception:
         print(f"[Editions] timezone {name!r} unavailable (no tzdata); editions run on UTC")
         return timezone.utc
 
 
 EDITION_TZ = _edition_tz()
-# "name=HH:MM,..." in EDITION_TZ. The StrikeZone fleet's three editions.
 EDITION_SCHEDULE = os.getenv("THESIS_EDITION_SCHEDULE", "ny-premarket=12:00,ny-midday=17:30,session-handoff=23:30")
 EDITIONS_ENABLED = os.getenv("THESIS_EDITIONS_ENABLED", "true").strip().lower() == "true"
+
+_job: dict[str, Any] = {"running": False, "stage": "", "edition": None, "reason": "", "trigger": None,
+                        "started_at": None, "finished_at": None, "last_error": None, "last_id": None}
 
 
 def parse_schedule(raw: str) -> list[tuple[str, int, int]]:
@@ -75,13 +87,48 @@ async def tracked_symbols(market_data_url: str) -> list[str]:
         return []
 
 
-async def build_edition(pool, market_data_url: str, calendar, evidence: Evidence, edition: str, trigger: str) -> dict[str, Any]:
+async def hermes_briefing(outlook: dict[str, Any]) -> dict[str, Any]:
+    """An advisory briefing drafted by Hermes from the measured outlook, filed in quarantine."""
+    if not agent_connector.configured():
+        return {"status": "not_configured"}
+    facts = {
+        "breadth": outlook["breadth"]["summary"],
+        "lead_reads": outlook["leads"],
+        "events": [{"title": e["title"], "when_minutes": e["minutes_until"], "impact": e["impact"], "measured": e["guidance"]}
+                   for e in outlook["key_events"]],
+        "notes": outlook["notes"],
+    }
+    prompt = (
+        "Write a private trader briefing from the measured facts below. Plain prose, at most 220 words, four short "
+        "paragraphs: the overall read of the market; what to watch this week and how each scheduled event has moved the "
+        "market before; how to handle risk around those events; and what would change the read. Use only these facts. "
+        "Do not invent prices, events or probabilities. Do not output JSON.\n\nFACTS:\n" + json.dumps(facts, default=str)[:12000]
+    )
+    started = time.monotonic()
+    try:
+        async with httpx.AsyncClient(timeout=BRIEFING_TIMEOUT_S, trust_env=False) as client:
+            r = await client.post(f"{SELF_URL}/state/agents/harness/ask", json={"intent": "summarise", "prompt": prompt})
+    except httpx.HTTPError as exc:
+        return {"status": "unavailable", "detail": type(exc).__name__}
+    if r.status_code == 422:
+        return {"status": "refused", "detail": str(r.json().get("detail", ""))[:300]}
+    if r.status_code != 200:
+        return {"status": "unavailable", "detail": f"HTTP {r.status_code}"}
+    body = r.json()
+    return {"status": "ok", "content": body.get("content", ""), "model": body.get("model"),
+            "elapsed_ms": int((time.monotonic() - started) * 1000), "receipt": body.get("receipt"),
+            "authority": "advisory_only", "source": "Hermes gateway via the harness boundary"}
+
+
+async def build_edition(pool, market_data_url: str, calendar, evidence: Evidence, edition: str, trigger: str, reason: str = "") -> dict[str, Any]:
+    stage = lambda s: _job.update(stage=s)  # noqa: E731
     symbols = await tracked_symbols(market_data_url)
     if not symbols:
-        raise HTTPException(status_code=503, detail="no tracked symbols from market-data")
+        raise RuntimeError("no tracked symbols from market-data")
     now = datetime.now(timezone.utc)
     theses: dict[str, dict[str, Any]] = {}
-    for symbol in symbols:
+    for i, symbol in enumerate(symbols, 1):
+        stage(f"assembling {symbol} ({i}/{len(symbols)})")
         inputs = await gather_inputs(pool, symbol, market_data_url, calendar, evidence)
         theses[symbol] = build_thesis(
             symbol=symbol, now_ms=int(time.time() * 1000), regime=inputs["regime"], signal=inputs["signal"],
@@ -90,30 +137,47 @@ async def build_edition(pool, market_data_url: str, calendar, evidence: Evidence
             cards=inputs["cards"], gate=inputs["gate"], events=inputs["events"],
             execution_enabled=execution_enabled(), feature_results=inputs["feature_results"], sources=inputs["sources"],
         )
+    stage("measuring event reactions")
+    events = events_from_context(await calendar())
+    profiles, window = await ensure_profiles(market_data_url)
+    stage("reading recent coverage")
+    articles = await articles_for(events)
+    outlook = compose_outlook(theses, events, profiles, articles, now, window)
     composed = compose(edition, now, theses, symbols)
+    text_lines = composed["text"].split("\n")
+    text = "\n".join(text_lines[:4] + outlook_text(outlook) + text_lines[4:])
+    spoken = composed["narration"].split("\n")
+    narration = "\n".join(spoken[:2] + outlook_narration(outlook) + spoken[2:])
+    headline = f"{outlook['breadth']['lean'].upper()} · " + composed["headline"]
+    stage("Hermes drafting the briefing")
+    briefing = await hermes_briefing(outlook)
+    stage("saving")
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
             """
-            INSERT INTO thesis_editions (edition, generated_at, symbols, theses, headline, text, narration, verdicts, trigger)
-            VALUES ($1, $2, $3::jsonb, $4::jsonb, $5, $6, $7, $8::jsonb, $9) RETURNING id
+            INSERT INTO thesis_editions (edition, generated_at, symbols, theses, headline, text, narration, verdicts, trigger,
+                                         outlook, briefing, reason)
+            VALUES ($1, $2, $3::jsonb, $4::jsonb, $5, $6, $7, $8::jsonb, $9, $10::jsonb, $11::jsonb, $12) RETURNING id
             """,
-            edition, now, json.dumps(composed["symbols"]), json.dumps(theses), composed["headline"],
-            composed["text"], composed["narration"], json.dumps(composed["verdicts"]), trigger,
+            edition, now, json.dumps(composed["symbols"]), json.dumps(theses), headline, text, narration,
+            json.dumps(composed["verdicts"]), trigger, json.dumps(outlook, default=str), json.dumps(briefing, default=str), reason,
         )
-    return {**composed, "id": str(row["id"]), "trigger": trigger}
+    return {"id": str(row["id"]), "edition": edition, "headline": headline}
+
+
+def _j(value: Any) -> Any:
+    return json.loads(value) if isinstance(value, str) else value
 
 
 def _row_to_edition(r, with_theses: bool) -> dict[str, Any]:
     out = {
         "id": str(r["id"]), "edition": r["edition"], "generated_at": r["generated_at"].isoformat(),
-        "symbols": r["symbols"] if not isinstance(r["symbols"], str) else json.loads(r["symbols"]),
-        "headline": r["headline"], "text": r["text"], "narration": r["narration"],
-        "verdicts": r["verdicts"] if not isinstance(r["verdicts"], str) else json.loads(r["verdicts"]),
-        "media": r["media"] if not isinstance(r["media"], str) else json.loads(r["media"]),
-        "trigger": r["trigger"], "schema_version": r["schema_version"],
+        "symbols": _j(r["symbols"]), "headline": r["headline"], "text": r["text"], "narration": r["narration"],
+        "verdicts": _j(r["verdicts"]), "media": _j(r["media"]), "trigger": r["trigger"], "schema_version": r["schema_version"],
+        "outlook": _j(r["outlook"]), "briefing": _j(r["briefing"]), "reason": r["reason"],
     }
     if with_theses:
-        out["theses"] = r["theses"] if not isinstance(r["theses"], str) else json.loads(r["theses"])
+        out["theses"] = _j(r["theses"])
     return out
 
 
@@ -130,14 +194,28 @@ def next_fire(now: datetime, schedule: list[tuple[str, int, int]]) -> tuple[str,
 
 
 def register(app, state, *, market_data_url: str, calendar: Callable[[], Awaitable[dict[str, Any]]], evidence: Evidence = _no_evidence) -> None:
+    async def run_job(edition: str, trigger: str, reason: str) -> None:
+        _job.update(running=True, stage="starting", edition=edition, reason=reason, trigger=trigger,
+                    started_at=datetime.now(timezone.utc).isoformat(), finished_at=None, last_error=None)
+        try:
+            result = await build_edition(state.pool, market_data_url, calendar, evidence, edition, trigger, reason)
+            _job["last_id"] = result["id"]
+        except Exception as exc:  # reported on the list endpoint; the next run still fires
+            _job["last_error"] = f"{type(exc).__name__}: {exc}"[:300]
+            print(f"[Editions] {edition} failed: {_job['last_error']}")
+        finally:
+            _job.update(running=False, stage="", finished_at=datetime.now(timezone.utc).isoformat())
+
     @router.get("/state/thesis/editions")
     async def list_editions(limit: int = Query(10, ge=1, le=50)):
         if not state.pool:
             raise HTTPException(status_code=503, detail="DB Pool not ready")
         async with state.pool.acquire() as conn:
             rows = await conn.fetch("SELECT * FROM thesis_editions ORDER BY generated_at DESC LIMIT $1", limit)
-        name, at = next_fire(datetime.now(timezone.utc), parse_schedule(EDITION_SCHEDULE)) if parse_schedule(EDITION_SCHEDULE) else (None, None)
-        return {"schema_version": "thesis_editions_v1", "editions": [_row_to_edition(r, False) for r in rows],
+        schedule = parse_schedule(EDITION_SCHEDULE)
+        name, at = next_fire(datetime.now(timezone.utc), schedule) if schedule else (None, None)
+        return {"schema_version": "thesis_editions_v2", "editions": [_row_to_edition(r, False) for r in rows],
+                "generation": dict(_job),
                 "schedule": {"timezone": str(EDITION_TZ), "entries": EDITION_SCHEDULE, "enabled": EDITIONS_ENABLED,
                              "next": {"edition": name, "at": at.isoformat() if at else None}}}
 
@@ -153,21 +231,14 @@ def register(app, state, *, market_data_url: str, calendar: Callable[[], Awaitab
 
     @router.post("/state/thesis/editions/{edition_id}/media")
     async def attach_media(edition_id: str, body: MediaAttach):
-        """The host renderer says which file it produced for an edition.
-
-        Files live under EDITIONS_DIR/<edition_id>/ on a read-only mount; only
-        a bare filename is recorded, so nothing outside that directory can be
-        referenced.
-        """
+        """The host renderer names the file it produced; only a bare filename is recorded."""
         if not state.pool:
             raise HTTPException(status_code=503, detail="DB Pool not ready")
         if body.kind not in ("audio", "video", "subtitles", "slides") or "/" in body.filename or "\\" in body.filename or ".." in body.filename:
             raise HTTPException(status_code=400, detail="kind must be audio|video|subtitles|slides and filename a bare name")
         async with state.pool.acquire() as conn:
-            n = await conn.execute(
-                "UPDATE thesis_editions SET media = media || $2::jsonb WHERE id = $1::uuid",
-                edition_id, json.dumps({body.kind: body.filename}),
-            )
+            n = await conn.execute("UPDATE thesis_editions SET media = media || $2::jsonb WHERE id = $1::uuid",
+                                   edition_id, json.dumps({body.kind: body.filename}))
         if not n.endswith("1"):
             raise HTTPException(status_code=404, detail="no such edition")
         return {"id": edition_id, "attached": {body.kind: body.filename}}
@@ -183,12 +254,17 @@ def register(app, state, *, market_data_url: str, calendar: Callable[[], Awaitab
         return FileResponse(str(path), media_type=media_type, filename=filename)
 
     @router.post("/state/thesis/editions/generate")
-    async def generate(edition: str = Query("manual")):
+    async def generate(edition: str = Query("manual"), reason: str = Query("", max_length=200)):
+        """Start a regeneration in the background; the list endpoint reports its stage."""
         if edition not in EDITIONS:
             raise HTTPException(status_code=400, detail=f"edition must be one of {', '.join(EDITIONS)}")
         if not state.pool:
             raise HTTPException(status_code=503, detail="DB Pool not ready")
-        return await build_edition(state.pool, market_data_url, calendar, evidence, edition, "operator")
+        if _job["running"]:
+            return {"status": "already_running", "generation": dict(_job)}
+        asyncio.create_task(run_job(edition, "operator", reason.strip()))
+        await asyncio.sleep(0)
+        return {"status": "started", "generation": dict(_job)}
 
     async def scheduler():
         schedule = parse_schedule(EDITION_SCHEDULE)
@@ -197,15 +273,10 @@ def register(app, state, *, market_data_url: str, calendar: Callable[[], Awaitab
         while True:
             name, at = next_fire(datetime.now(timezone.utc), schedule)
             await asyncio.sleep(max(1.0, (at - datetime.now(timezone.utc)).total_seconds()))
-            try:
-                if state.pool:
-                    await build_edition(state.pool, market_data_url, calendar, evidence, name, "schedule")
-            except Exception as exc:  # the next edition must still fire
-                print(f"[Editions] {name} failed: {type(exc).__name__}: {exc}")
+            if state.pool and not _job["running"]:
+                await run_job(name, "schedule", "")
             await asyncio.sleep(61)
 
-    @app.on_event("startup")
-    async def _start_editions():
-        asyncio.create_task(scheduler())
+    background.add("thesis_editions", scheduler)
 
     app.include_router(router)

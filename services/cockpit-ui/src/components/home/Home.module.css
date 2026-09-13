@@ -1,0 +1,50 @@
+/* Readiness: one thin line, not a hero row. */
+.readiness { display: flex; align-items: stretch; padding: 0; overflow: hidden; }
+.chip { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 9px; padding: 6px 14px; border-right: 1px solid var(--border); color: inherit; text-decoration: none; }
+.chip:last-child { border-right: 0; }
+.chip:hover { background: rgba(91, 169, 255, 0.05); }
+.chipLabel { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap; }
+.chipValue { font: 700 12px var(--font-mono); white-space: nowrap; }
+.chipDetail { color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+@media (max-width: 720px) { .readiness { flex-direction: column; } .chip { border-right: 0; border-bottom: 1px solid var(--border); } }
+
+.grid { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(300px, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 1100px) { .grid { grid-template-columns: 1fr; } }
+
+/* Market thesis card */
+.thesis { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); }
+@media (max-width: 900px) { .thesis { grid-template-columns: 1fr; } }
+.thesisMain { padding: 12px 17px 14px; display: grid; gap: 8px; align-content: start; border-right: 1px solid var(--border); min-width: 0; }
+.thesisSide { padding: 12px 17px 14px; display: grid; gap: 8px; align-content: start; min-width: 0; }
+.leanRow { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.lean { font: 700 11px/20px var(--font-mono); letter-spacing: 0.08em; padding: 0 8px; border-radius: 3px; white-space: nowrap; }
+.leanBearish { background: rgba(224, 87, 74, 0.16); color: var(--red); }
+.leanBullish { background: rgba(60, 200, 120, 0.16); color: var(--green); }
+.leanMixed, .leanNone { background: rgba(227, 178, 60, 0.14); color: var(--amber); }
+.readsBar { display: flex; height: 7px; border-radius: 4px; overflow: hidden; background: #1a2636; }
+.readsLong { background: var(--green); }
+.readsShort { background: var(--red); }
+.readsNone { background: #3a4a5a; }
+.notes { margin: 0; padding-left: 16px; display: grid; gap: 3px; font-size: 12px; line-height: 1.45; }
+.lead { display: grid; grid-template-columns: 44px auto minmax(0, 1fr); gap: 8px; align-items: baseline; font-size: 12px; }
+.sideTitle { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; }
+.nextEvent { font-size: 12px; line-height: 1.45; }
+.mono { font-family: var(--font-mono); white-space: nowrap; }
+
+/* Market pulse with inline charts */
+.pulseRow { cursor: pointer; }
+.pulseRow:hover td { background: rgba(91, 169, 255, 0.05); }
+.pulseRowOpen td { background: rgba(91, 169, 255, 0.09); }
+.caret { color: var(--muted); width: 18px; }
+.expandRow > td { padding: 0 !important; background: rgba(8, 19, 33, 0.65); }
+.inline { padding: 10px 14px 12px; }
+.inlineControls { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+.inlineReadout { margin-left: auto; display: flex; gap: 10px; align-items: baseline; }
+
+/* Opportunities, full width */
+.opps { width: 100%; border-collapse: collapse; font-size: 12px; }
+.opps th { text-align: left; padding: 8px 14px; color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.opps td { padding: 8px 14px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.opps tr:last-child td { border-bottom: 0; }
+.opps tr:hover td { background: rgba(91, 169, 255, 0.05); }
+.oppLink { color: inherit; text-decoration: none; }
