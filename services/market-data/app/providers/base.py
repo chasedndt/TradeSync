@@ -60,14 +60,16 @@ class BaseProvider(ABC):
     async def fetch_funding_history(
         self,
         symbol: str,
-        start_time: int
+        start_time: int,
+        end_time: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         """
-        Fetch historical funding rates.
+        Fetch historical funding rates across the whole window.
 
         Args:
             symbol: Canonical symbol
             start_time: Unix timestamp (ms) to start from
+            end_time: Unix timestamp (ms) to end at; now when omitted
 
         Returns:
             List of funding rate records

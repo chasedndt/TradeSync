@@ -936,7 +936,8 @@ async def get_canvas_context(
 
     # Funding is a flow: over a bucket wider than an hour the meaningful number
     # is the total paid, not one hour of it picked out of the middle.
-    funding_raw = await provider.fetch_funding_history(symbol, start_ms)
+    # Paged across the whole window (Hyperliquid returns 500 rows per request) and cached per market.
+    funding_raw = await provider.fetch_funding_history(symbol, start_ms, end_ms)
     funding = bucket_series(
         funding_raw,
         bucket_s,

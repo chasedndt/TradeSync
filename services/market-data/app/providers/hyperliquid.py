@@ -11,6 +11,7 @@ from typing import Dict, List, Any, Optional
 
 from .base import BaseProvider
 from ..rate_limiter import get_limiter
+from .funding_history import FundingHistoryCache
 
 logger = logging.getLogger(__name__)
 
@@ -271,40 +272,37 @@ class HyperliquidProvider(BaseProvider):
     async def fetch_funding_history(
         self,
         symbol: str,
-        start_time: int
+        start_time: int,
+        end_time: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         """
-        Fetch historical funding rates.
+        Fetch historical funding rates across the whole window.
+
+        Hyperliquid pages ``fundingHistory`` 500 rows at a time. The cache in
+        ``funding_history`` pages through a window once, then fetches only the
+        hours published since. Rows keep the premium.
 
         Args:
             symbol: Canonical symbol
             start_time: Unix timestamp (ms)
+            end_time: Unix timestamp (ms); now when omitted
         """
+        hl_symbol = self.denormalize_symbol(symbol)
+        cache = self._funding_cache()
         try:
-            hl_symbol = self.denormalize_symbol(symbol)
-            data = await self._request({
-                "type": "fundingHistory",
-                "coin": hl_symbol,
-                "startTime": start_time
-            })
-
-            result = []
-            for entry in data:
-                result.append({
-                    "venue": self.venue,
-                    "symbol": symbol,
-                    "rate": float(entry.get("fundingRate", 0)),
-                    "premium": float(entry.get("premium", 0)),
-                    "ts": int(entry.get("time", 0)),
-                    "source": "fundingHistory"
-                })
-
-            logger.debug(f"Fetched {len(result)} funding history entries for {symbol}")
+            result = await cache.history(symbol, hl_symbol, start_time, end_time)
+            logger.debug(f"Funding history for {symbol}: {len(result)} entries in the window")
             return result
-
         except Exception as e:
             logger.error(f"Error fetching Hyperliquid funding history: {e}")
-            return []
+            # What is already held for the window is still true; the missing pages are retried next time.
+            end = end_time if end_time is not None else int(time.time() * 1000)
+            return cache.cached(symbol, start_time, end)
+
+    def _funding_cache(self) -> FundingHistoryCache:
+        if getattr(self, "_funding_history_cache", None) is None:
+            self._funding_history_cache = FundingHistoryCache(self._request, self.venue)
+        return self._funding_history_cache
 
     async def fetch_predicted_funding(self) -> Dict[str, Any]:
         """Fetch predicted funding rates (cross-venue)."""
