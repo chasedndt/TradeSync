@@ -43,9 +43,14 @@ export function Timeframes() {
 
   useEffect(() => {
     if (!highlight) return
-    const scroll = window.setTimeout(() => document.getElementById(`feature-${highlight}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80)
+    const card = () => document.getElementById(`feature-${highlight}`)
+    const inView = (el: HTMLElement) => { const r = el.getBoundingClientRect(); return r.top < window.innerHeight && r.bottom > 0 }
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    const scroll = window.setTimeout(() => card()?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'center' }), 80)
+    // Smooth scrolling stalls where the page is not painting (a background tab); jump if it has not arrived.
+    const fallback = window.setTimeout(() => { const el = card(); if (el && !inView(el)) el.scrollIntoView({ behavior: 'auto', block: 'center' }) }, 900)
     const clear = window.setTimeout(() => setHighlight(null), 2400)
-    return () => { window.clearTimeout(scroll); window.clearTimeout(clear) }
+    return () => { window.clearTimeout(scroll); window.clearTimeout(fallback); window.clearTimeout(clear) }
   }, [highlight, horizon])
 
   const data = page.data
