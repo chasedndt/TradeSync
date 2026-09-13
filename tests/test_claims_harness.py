@@ -72,7 +72,7 @@ async def test_a_boundary_refusal_is_recorded_and_a_transport_failure_defers() -
          patch.object(_h, "HARNESS_CLAIMS_ENABLED", True):
         counts = await _h.run_harness_pass(MagicMock(), MagicMock())
     assert counts["refused"] == 1 and counts["deferred"] == 1
-    assert recorded == [("a", "harness answer refused at the boundary")]  # "b" left for a later pass
+    assert recorded[0][0] == "a" and recorded[0][1].startswith("harness answer refused at the boundary")  # "b" left for a later pass
 
 
 @pytest.mark.asyncio

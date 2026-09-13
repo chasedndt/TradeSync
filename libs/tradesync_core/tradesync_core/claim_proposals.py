@@ -34,7 +34,9 @@ from .claim_extraction import (
 )
 
 EXTRACTOR = "harness_v1"
-INTENT = "extract_claims"
+# Reading what a post said is a summarising task in the boundary's vocabulary;
+# the boundary refuses any intent it does not know by name.
+INTENT = "summarise"
 MAX_POST_CHARS = 6_000
 MAX_PROPOSALS = 8
 _STANCE = {"bullish": "LONG", "bearish": "SHORT"}

@@ -92,7 +92,8 @@ async def run_harness_pass(conn, client: httpx.AsyncClient) -> dict[str, int]:
         counts["asked"] += 1
         qid = str(row["id"])
         if answer.get("refused"):
-            await record_harness_extraction(conn, qid, EXTRACTOR, [], "harness answer refused at the boundary", None)
+            detail = str(answer.get("detail") or "")[:160]
+            await record_harness_extraction(conn, qid, EXTRACTOR, [], f"harness answer refused at the boundary: {detail}", None)
             counts["refused"] += 1
             continue
         claimed_at_ms = int((row["observed_at"] or row["received_at"]).timestamp() * 1000)
