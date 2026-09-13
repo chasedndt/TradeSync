@@ -3769,3 +3769,8 @@ register_strikezone_lab(app, state)
 from app.horizons import register as register_horizons  # noqa: E402
 
 register_horizons(app, state, market_data_url=MARKET_DATA_URL)
+
+# Feature histories for the per-feature charts on Regime Lab; see app/feature_history.py.
+from app.feature_history import register as register_feature_history  # noqa: E402
+
+register_feature_history(app, state, market_data_url=MARKET_DATA_URL)

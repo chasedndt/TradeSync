@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
+import { FeatureChartRow } from '../components/features/FeatureChartRow'
 import {
   useEvaluateRegimeLab,
   useRegimeLabExperiments,
@@ -61,6 +62,22 @@ export function RegimeLab() {
   const evaluate = useEvaluateRegimeLab('hyperliquid', symbol)
   const save = useSaveRegimeLab('hyperliquid', symbol)
   const history = useRegimeLabExperiments()
+  // Feature charts open under their rows; a link to #feature-<id> opens that one.
+  const [openCharts, setOpenCharts] = useState<Set<string>>(() => {
+    const hash = typeof window !== 'undefined' ? window.location.hash : ''
+    return new Set(hash.startsWith('#feature-') ? [hash.slice('#feature-'.length)] : [])
+  })
+  const toggleChart = (id: string) => setOpenCharts((prev) => {
+    const next = new Set(prev)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    return next
+  })
+  useEffect(() => {
+    const hash = window.location.hash
+    if (!overview.data || !hash.startsWith('#feature-')) return
+    document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [overview.data])
 
   useEffect(() => {
     if (overview.data && Object.keys(weights).length === 0) {
@@ -174,7 +191,11 @@ export function RegimeLab() {
           <section className="panel lab-section">
             <div className="lab-section-heading">
               <div><span>01</span><h3>Feature evidence</h3></div>
-              <p>Source values and normalization stay on the Python side of the API.</p>
+              <p>
+                Source values and normalization stay on the Python side of the API. Click a feature for its chart.{' '}
+                <button type="button" className="chip" onClick={() => setOpenCharts(new Set(data.feature_results.map((f) => f.feature_id)))}>show every chart</button>{' '}
+                {openCharts.size > 0 && <button type="button" className="chip" onClick={() => setOpenCharts(new Set())}>hide charts</button>}
+              </p>
             </div>
             <div className="lab-evidence-table-wrap">
               <table className="lab-evidence-table">
@@ -184,9 +205,16 @@ export function RegimeLab() {
                 </tr></thead>
                 <tbody>
                   {data.feature_results.map((feature) => (
-                    <tr key={feature.feature_id}>
+                    <Fragment key={feature.feature_id}>
+                    <tr
+                      id={`feature-${feature.feature_id}`}
+                      onClick={() => toggleChart(feature.feature_id)}
+                      style={{ cursor: 'pointer' }}
+                      aria-expanded={openCharts.has(feature.feature_id)}
+                      title={openCharts.has(feature.feature_id) ? 'Hide the chart' : 'Show seven days of readings on a chart'}
+                    >
                       <td>
-                        <strong>{feature.feature_id.replace(/^hl_/, '').replace(/_/g, ' ')}</strong>
+                        <strong>{openCharts.has(feature.feature_id) ? '▾ ' : '▸ '}{feature.feature_id.replace(/^hl_/, '').replace(/_/g, ' ')}</strong>
                         <span>{feature.provenance} · {feature.unit}</span>
                       </td>
                       <td>{BLOCK_LABELS[feature.block] || feature.block}</td>
@@ -205,6 +233,12 @@ export function RegimeLab() {
                         )}
                       </td>
                     </tr>
+                    {openCharts.has(feature.feature_id) && (
+                      <tr>
+                        <td colSpan={7}><FeatureChartRow feature={feature} symbol={symbol} /></td>
+                      </tr>
+                    )}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>

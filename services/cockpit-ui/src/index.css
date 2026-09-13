@@ -268,6 +268,9 @@ html.sidebar-expanded .app-frame { margin-left: 236px; }
 
 @media (max-width: 700px) {
   .app-frame { margin-left: 0; }
+  /* The expanded rail overlays the page on a phone; its desktop margin must not squeeze the content. */
+  html.sidebar-expanded .app-frame { margin-left: 0; }
+  .sidebar--expanded { width: 256px; }
   .app-main { padding: 10px; }
   .sidebar { width: 256px; transform: translateX(-100%); transition: transform 180ms ease; box-shadow: none; }
   .sidebar--open { transform: translateX(0); box-shadow: 18px 0 50px rgba(0,0,0,.42); }

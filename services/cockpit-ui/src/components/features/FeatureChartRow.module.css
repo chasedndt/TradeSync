@@ -1,0 +1,4 @@
+.row { display: grid; gap: 6px; padding: 8px 4px 10px; min-width: 0; }
+.expect { margin: 0; font-size: 12px; line-height: 1.5; white-space: normal; }
+.how { margin: 0; font-size: 10.5px; color: var(--muted); white-space: normal; }
+.empty { height: 120px; display: grid; place-items: center; color: var(--muted); font-size: 12px; border: 1px dashed var(--border); border-radius: 6px; }

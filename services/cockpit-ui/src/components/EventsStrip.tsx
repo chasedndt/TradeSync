@@ -70,11 +70,14 @@ export function EventsStrip({ context }: Props) {
         <ol className={styles.list}>
           {shown.map((e) => {
             const key = `${e.title}|${e.scheduled_at.slice(0, 10)}`
+            const k = byKey.get(key)
+            // Only a measured reaction (or coverage) opens: a key event with neither would open to "no history".
+            const reaction = k && (Object.keys(k.reaction).length > 0 || k.articles.length > 0) ? k : undefined
             return (
               <EventRow
                 key={`${e.source}:${e.scheduled_at}:${e.title}`}
                 event={e}
-                reaction={byKey.get(key)}
+                reaction={reaction}
                 open={detail === key}
                 countdown={formatCountdown(e.minutes_until, e.source)}
                 onToggle={() => setDetail(detail === key ? null : key)}

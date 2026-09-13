@@ -270,8 +270,26 @@ Operator: on the market features page, a graph for every feature showing what
 the feature expects, drawn differently per feature, clickable from rich text.
 
 The operator's "market features page" is **Regime Lab** (`/regime-lab`,
-`pages/RegimeLab.tsx`), whose Feature evidence table shows numbers only.
-**Not started.** Suggested build:
+`pages/RegimeLab.tsx`), whose Feature evidence table showed numbers only.
+
+**Built after the handover was first written (tests pass; build, deploy and
+browser check were in progress):**
+
+- state-api `app/feature_history.py`: `GET /state/regime-lab/feature-history?symbol=&feature_ids=&window=7d&points=`
+  proxies market-data's batched histories as `[seconds, value]` pairs, display only
+  (`services/state-api/tests/test_feature_history.py`).
+- Cockpit `components/features/`: `featureDrawing.ts` (how each feature is drawn,
+  and a sentence on what today's score says), `FeatureHistoryChart.tsx` (feature on
+  the right scale, price on the left, the normalisation centre and two spreads
+  either side, a zero line where the sign matters, the score marked at the latest
+  reading), `FeatureChartRow.tsx`. Regime Lab rows open their chart on click, a
+  "show every chart" button opens all, and `#feature-<id>` in the URL opens and
+  scrolls to one.
+- Still worth improving: a forward "what it expects" drawing (the intraday skill
+  measurements are at 15/60/240 minutes and none is earned), shared components
+  with the Timeframes charts, and links from thesis text to `#feature-<id>`.
+
+The original suggestion, kept for reference:
 
 - state-api has no feature-history route. Add a proxy to market-data
   `GET /feature-histories/{venue}/{symbol}?feature_ids=&window=1h|4h|24h|7d&points=`
