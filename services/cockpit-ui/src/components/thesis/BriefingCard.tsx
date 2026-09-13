@@ -14,7 +14,8 @@ export function BriefingCard({ b }: { b: HermesBriefing | null }) {
       </div>
       <div className={styles.briefing}>
         {!b && <p className="tone-dim">This edition predates the Hermes briefing.</p>}
-        {b?.status === 'ok' && <p>{b.content}</p>}
+        {b?.status === 'ok' && (b.content ?? '').split(/\n\s*\n/).map((paragraph) => paragraph.trim()).filter(Boolean)
+          .map((paragraph, i) => <p key={i}>{paragraph}</p>)}
         {b?.status === 'refused' && <p className="tone-bad">The answer was refused at the boundary: {b.detail}</p>}
         {b?.status === 'unavailable' && <p className="tone-warn">Hermes did not answer in time ({b.detail}); the rest of the edition stands.</p>}
         {b?.status === 'not_configured' && <p className="tone-dim">The Hermes connector is not configured.</p>}

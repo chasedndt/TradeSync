@@ -69,7 +69,7 @@ docker compose --env-file E:\Projects\TradeSync\dashboard-runtime\runtime.env `
 | cockpit with the Timeframes page | deployed and checked in the browser for BTC: three bands, six horizon cards, seven feature cards each with a drawn chart (RSI and participation with a lower pane), 61 linked feature names; clicking "Trend" in the 3-day card switched to 3 days and flashed the Trend card. Smooth scrolling did not move in the in-app browser pane (it was not painting); an instant scroll did, so a fallback jump was added. **Check the scroll in a real browser** |
 | Mission Control events panel | operator reported the reaction button overflowing and an opened reaction that could not be closed. Fixed in `components/EventRow.tsx` (two-line rows, whole-row toggle, Hide control, Escape, table scrolls inside the panel). Checked on desktop: every row inside the panel, no overflow, opened detail inside the panel with Hide visible, Hide and Escape both close it. Rows now open only with a measured reaction or coverage |
 | Phone layout | at 375 px the expanded sidebar's 236 px margin squeezed the page (events panel about 120 px wide). Fixed in `index.css` (the expanded margin is reset under 700 px); **deploy and recheck at 375 px** |
-| Regime Lab feature charts | `GET /state/regime-lab/feature-history` live (600 readings for `hl_return_1h_pct`, 168 for funding); cockpit build passed; **deploy and open a chart on `/regime-lab`** |
+| Regime Lab feature charts | deployed and checked in the browser: 21 feature rows; `hl_return_1h_pct` drew a line against zero and its band (600 readings, "Scored -0.76: this reading leans short … 2.0 spreads below its recent centre"); `hl_funding_hourly_rate` drew a histogram (168 readings, context for playbooks, 0.7 spreads above centre). "show every chart" opened all rows: 17 drew a chart, no errors, no page overflow; the 4 planned or unavailable features (liquidation proxy, direct liquidation flow, Bitcoin ETF flow, external event risk) say they have no recorded history |
 | Core horizon engine + features | written; `tests/test_horizon_outlook.py` and `tests/test_horizon_features.py`: 15 passed |
 | state-api gateway directives | written; state-api suite 107 passed including `test_fleet_gateway_directives.py` |
 | state-api horizon routes | written; `tests/test_horizons.py` **not yet run** |
@@ -317,8 +317,9 @@ The original suggestion, kept for reference:
 
 ## 5. Known defects to fix
 
-- Hermes briefing shows mojibake (`â€™`) and `BriefingCard` collapses paragraphs
-  into one `<p>`.
+- ~~Hermes briefing mojibake~~: not a defect. The stored briefing holds correct
+  U+2019 apostrophes and the page renders them; the garbling was a console encoding.
+  `BriefingCard` collapsing paragraphs into one `<p>` is fixed (split on blank lines).
 - `GET /state/market/context` funding history returns the **oldest** 500 hours of
   the window (Hyperliquid caps a call at 500 rows): paginate newest-first; the
   premium field is dropped.
