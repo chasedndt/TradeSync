@@ -194,8 +194,17 @@ A `run_now` directive for `6a1fdf7894c7` was also applied through the gateway
      under `set -e`. The CRLF restore may fix the tests; find the failing test if not.
    - `88f6827ea0f4` closeout smoke: needs a Hermes closeout note newer than 14 days
      (a governance artifact; operator decision, do not fabricate).
-   - `0c42e5b6b468` graph hygiene: 3600 s script timeout, most likely because the
-     fleet now works on the 27k-note canonical vault. Split or raise the timeout.
+   - `0c42e5b6b468` graph hygiene: 3600 s script timeout. The wrapper
+     `scripts/chaseos_os_hygiene_graph.sh` runs `chaseos_os_hygiene_graph_runner.py`,
+     which calls `run_os_hygiene_graph({}, VAULT)` over the whole canonical vault at
+     `/mnt/c/Users/chaseos/Documents/chaseos_chaseintech` (27k notes across the slow
+     Windows mount) since the re-point. Hermes has one script timeout for every
+     script job (`cron/scheduler.py` `_DEFAULT_SCRIPT_TIMEOUT = 3600`, overridable
+     only globally by env `HERMES_CRON_SCRIPT_TIMEOUT` or config
+     `cron.script_timeout_seconds`), so there is no per-job override. Options:
+     make the runner incremental (only notes changed since its last run) or split it
+     across runs; or raise the global timeout, which lets every hung script run
+     longer. Not changed: an operator decision.
    - `32fc6f83e99f` publication audit: CDP browser profile `strikezone_tv_cron:9223`
      unhealthy (external browser).
    - "Interrupted by shutdown" rows are fire-claim loss, written by
