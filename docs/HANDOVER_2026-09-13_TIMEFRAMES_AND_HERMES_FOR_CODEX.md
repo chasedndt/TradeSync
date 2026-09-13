@@ -69,7 +69,9 @@ docker compose --env-file E:\Projects\TradeSync\dashboard-runtime\runtime.env `
 | cockpit with the Timeframes page | deployed and checked in the browser for BTC: three bands, six horizon cards, seven feature cards each with a drawn chart (RSI and participation with a lower pane), 61 linked feature names; clicking "Trend" in the 3-day card switched to 3 days and flashed the Trend card. Smooth scrolling did not move in the in-app browser pane (it was not painting); an instant scroll did, so a fallback jump was added. **Check the scroll in a real browser** |
 | Mission Control events panel | operator reported the reaction button overflowing and an opened reaction that could not be closed. Fixed in `components/EventRow.tsx` (two-line rows, whole-row toggle, Hide control, Escape, table scrolls inside the panel). Checked on desktop: every row inside the panel, no overflow, opened detail inside the panel with Hide visible, Hide and Escape both close it. Rows now open only with a measured reaction or coverage |
 | Phone layout | at 375 px the expanded sidebar's 236 px margin squeezed the page (events panel about 120 px wide). Fixed in `index.css` (the expanded margin is reset under 700 px). Deployed and rechecked at 375 px: page margin 0, events panel 355 px with no overflow, an opened reaction stays inside the panel and Hide closes it |
-| Funding history paging | market-data `fetch_funding_history` returned only the oldest 500 hours of a window (Hyperliquid's page size). New `app/providers/funding_history.py` pages through the window and caches rows per market, so repeats cost no request and new hours one; the premium is kept. `tests/test_funding_history_paging.py` added; **redeploy market-data and check `/context` funding coverage** |
+| Funding history paging | market-data `fetch_funding_history` returned only the oldest 500 hours of a window (Hyperliquid's page size). New `app/providers/funding_history.py` pages through the window and caches rows per market, so repeats cost no request and new hours one; the premium is kept. `tests/test_funding_history_paging.py` added. Deployed and checked on `/context/hyperliquid/BTC-PERP`: 1h × 1000 now has 1,000 funding points at 99.9% coverage through today (before: 50%, ending 2026-08-22); 1d × 1000 has 1,001 points at 100% from 2023-12-18 to today (before: 22 buckets) |
+| Timeframes performance | volatility and momentum recomputed a window per day; now one-pass rolling volatility and rank, cached per series (`tests/test_horizon_rolling.py` proves identical numbers). Evaluating all horizons on 2,217 days: 36.7 s to 1.8 s locally. A live cold-request timing was running at the time of writing |
+| Candle off-by-one | left as is: `limit=1000` returns 1,001 candles because the window includes the current partial candle, and `/context` builds its time grid around the same extra slot; changing it would need both changed together |
 | Regime Lab feature charts | deployed and checked in the browser: 21 feature rows; `hl_return_1h_pct` drew a line against zero and its band (600 readings, "Scored -0.76: this reading leans short … 2.0 spreads below its recent centre"); `hl_funding_hourly_rate` drew a histogram (168 readings, context for playbooks, 0.7 spreads above centre). "show every chart" opened all rows: 17 drew a chart, no errors, no page overflow; the 4 planned or unavailable features (liquidation proxy, direct liquidation flow, Bitcoin ETF flow, external event risk) say they have no recorded history |
 | Core horizon engine + features | written; `tests/test_horizon_outlook.py` and `tests/test_horizon_features.py`: 15 passed |
 | state-api gateway directives | written; state-api suite 107 passed including `test_fleet_gateway_directives.py` |
@@ -339,9 +341,9 @@ The original suggestion, kept for reference:
    (`tradesync_core/edge_evidence.py`), and hold-out checks before any lean is
    shown as meaningful. Six-month records have about 12 independent windows at
    most: make that impossible to miss.
-2. **Performance.** Volatility ranking and momentum loop over lookbacks per day
-   (roughly n × 365 per horizon). Vectorise or cache; measure how long a cold
-   `/state/market/horizons` takes for BTC.
+2. **Performance.** Done in part: rolling volatility and rank now run in one pass
+   and are cached (36.7 s to 1.8 s for all horizons locally). Check the live cold
+   `/state/market/horizons` time, and whether the chart route should also be cached.
 3. **UI.** Hold it to section 7. Check the Timeframes page reads as an overview
    first, and that charts are legible on a laptop and a phone.
 4. **Hermes wiring.** Consider surfacing each job's live state from `GET /api/jobs`
