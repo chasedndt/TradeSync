@@ -65,8 +65,9 @@ docker compose --env-file E:\Projects\TradeSync\dashboard-runtime\runtime.env `
 |---|---|
 | Migration `020_hermes_jobs_api.sql` | applied (schema-init log: "Applied migrations: 020") |
 | state-api with gateway job control | deployed and healthy; `GET /state/fleet/jobs` reports `control.gateway_api: true`, status `live`; a `run_now` directive returned `applied` via channel `api` |
-| state-api with the timeframe routes | the first image predated the route registration (route returned 404); a second redeploy was started at handover time: **confirm `/state/market/horizons` answers** |
-| cockpit with the Timeframes page | build started at handover time; **build, redeploy and open `/timeframes`** |
+| state-api with the timeframe routes | redeployed and live: `GET /state/market/horizons?symbol=BTC-PERP` measured 2,217 daily candles (2020-08-19 to 2026-09-13) across all six horizons; a cold request took 55 s (see 6.2) |
+| cockpit with the Timeframes page | `npm run build` passed; a redeploy was started at handover time: **open `/timeframes` and check it in the browser** |
+| Mission Control events panel | operator reported the reaction button overflowing and an opened reaction that could not be closed. Fixed in `components/EventRow.tsx` (two-line rows, whole-row toggle, Hide control, Escape, table scrolls inside the panel); **check it in the browser** |
 | Core horizon engine + features | written; `tests/test_horizon_outlook.py` and `tests/test_horizon_features.py`: 15 passed |
 | state-api gateway directives | written; state-api suite 107 passed including `test_fleet_gateway_directives.py` |
 | state-api horizon routes | written; `tests/test_horizons.py` **not yet run** |
