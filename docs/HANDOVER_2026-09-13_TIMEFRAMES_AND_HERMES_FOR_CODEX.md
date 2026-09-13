@@ -63,6 +63,7 @@ docker compose --env-file E:\Projects\TradeSync\dashboard-runtime\runtime.env `
 
 | Item | State |
 |---|---|
+| Full test run (`tools/run_tests.py`, after all fixes below) | root 615 passed, state-api 114, market-data 119, exec-hl-svc 3, signer-svc 10 |
 | Migration `020_hermes_jobs_api.sql` | applied (schema-init log: "Applied migrations: 020") |
 | state-api with gateway job control | deployed and healthy; `GET /state/fleet/jobs` reports `control.gateway_api: true`, status `live`; a `run_now` directive returned `applied` via channel `api` |
 | state-api with the timeframe routes | redeployed and live: `GET /state/market/horizons?symbol=BTC-PERP` measured 2,217 daily candles (2020-08-19 to 2026-09-13) across all six horizons; a cold request took 55 s (see 6.2) |
