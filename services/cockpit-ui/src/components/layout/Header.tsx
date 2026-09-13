@@ -21,6 +21,7 @@ export function Header({ onMenu }: { onMenu: () => void }) {
     '/regime-lab': 'Regime Lab',
     '/thesis': 'Thesis',
     '/agents': 'Agents',
+    '/fleet': 'Fleet',
     '/pipeline': 'Integration Pipeline',
     '/sources': 'Sources',
     '/logs': 'Evidence Ledger',

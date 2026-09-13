@@ -1547,12 +1547,16 @@ async def list_quarantine(
         async with state.pool.acquire() as conn:
             rows = await conn.fetch(
                 """
-                SELECT id, source, accepted, content_digest, payload, reasons,
-                       observed_at, received_at, reviewed_by, reviewed_at, promoted_to
-                FROM quarantine_intake
-                WHERE ($1::text IS NULL OR source = $1)
-                  AND ($2::boolean IS FALSE OR reviewed_at IS NULL)
-                ORDER BY received_at DESC
+                SELECT q.id, q.source, q.accepted, q.content_digest, q.payload, q.reasons,
+                       q.observed_at, q.received_at, q.reviewed_by, q.reviewed_at, q.promoted_to,
+                       x.claims AS rule_claims, x.reason AS rule_reason,
+                       h.claims AS harness_claims, h.reason AS harness_reason
+                FROM quarantine_intake q
+                LEFT JOIN quarantine_extractions x ON x.quarantine_id = q.id
+                LEFT JOIN quarantine_harness_extractions h ON h.quarantine_id = q.id
+                WHERE ($1::text IS NULL OR q.source = $1)
+                  AND ($2::boolean IS FALSE OR q.reviewed_at IS NULL)
+                ORDER BY q.received_at DESC
                 LIMIT $3
                 """,
                 source,
@@ -1577,6 +1581,11 @@ async def list_quarantine(
                 "received_at": r["received_at"].isoformat(),
                 "reviewed_by": r["reviewed_by"],
                 "promoted_to": r["promoted_to"],
+                # What extraction made of it: rule pass first, harness pass if asked.
+                "extraction": {
+                    "rule": None if r["rule_claims"] is None else {"claims": int(r["rule_claims"]), "reason": r["rule_reason"] or ""},
+                    "harness": None if r["harness_claims"] is None else {"claims": int(r["harness_claims"]), "reason": r["harness_reason"] or ""},
+                },
             }
             for r in rows
         ],
@@ -3690,6 +3699,22 @@ register_source_cards(app, state)
 from app.thesis import register as register_thesis  # noqa: E402
 
 register_thesis(
+    app,
+    state,
+    market_data_url=MARKET_DATA_URL,
+    calendar=lambda: context_feed.fetch_overview(force_refresh=False),
+    evidence=_regime_lab_evidence,
+)
+
+# The Hermes fleet read model and directives; fed by the host bridge. See app/fleet.py.
+from app.fleet import register as register_fleet  # noqa: E402
+
+register_fleet(app, state)
+
+# Thesis editions: the thesis for every symbol, frozen on the StrikeZone cadence.
+from app.editions import register as register_editions  # noqa: E402
+
+register_editions(
     app,
     state,
     market_data_url=MARKET_DATA_URL,

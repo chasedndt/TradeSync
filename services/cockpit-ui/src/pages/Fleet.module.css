@@ -1,0 +1,23 @@
+.page { width: 100%; max-width: 1680px; margin: 0 auto; display: grid; gap: 16px; }
+.hero { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; padding: 22px 26px; flex-wrap: wrap; }
+.kicker { color: var(--cyan); font: 600 9px/1 var(--font-mono); letter-spacing: .13em; text-transform: uppercase; margin-bottom: 8px; }
+.hero h2 { margin: 0 0 6px; color: #f5f7fb; font-size: 22px; }
+.hero p { margin: 0; color: var(--muted); font-size: 12px; max-width: 760px; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }
+.stat { background: var(--panel); padding: 12px 14px; display: grid; gap: 4px; }
+.stat span { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+.stat strong { font: 600 16px var(--font-mono); }
+.toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 12px 17px; border-bottom: 1px solid var(--border); }
+.toolbar input { background: #0d1a2a; color: var(--text); border: 1px solid #32445a; border-radius: 4px; padding: 6px 8px; font: 12px var(--font-mono); min-width: 200px; margin-left: auto; }
+.table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.table th { padding: 10px 12px; color: #d8e0eb; text-align: left; font-weight: 500; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.table td { padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.name { font-weight: 600; }
+.desc { color: var(--muted); font-size: 11px; line-height: 1.45; max-width: 520px; }
+.mono { font-family: var(--font-mono); white-space: nowrap; }
+.select { background: #0d1a2a; color: var(--text); border: 1px solid #32445a; border-radius: 4px; padding: 4px 6px; font: 11px var(--font-mono); }
+.pending { color: var(--amber); font-size: 10px; font-family: var(--font-mono); }
+.bars { display: grid; grid-template-columns: repeat(auto-fit, minmax(40px, 1fr)); gap: 4px; align-items: end; height: 90px; padding: 12px 17px 6px; }
+.bar { background: rgba(80, 160, 255, 0.35); border-top: 2px solid #9cc8ff; min-height: 2px; position: relative; }
+.bar span { position: absolute; bottom: -16px; left: 0; right: 0; text-align: center; font: 9px var(--font-mono); color: var(--muted); }
+.foot { padding: 0 17px 14px; color: var(--dim); font-size: 10px; margin: 0; }

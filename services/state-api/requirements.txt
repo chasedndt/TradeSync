@@ -5,3 +5,5 @@ pydantic==2.9.2
 python-dotenv==1.0.1
 redis==5.0.0
 httpx==0.27.2
+# zoneinfo needs the IANA database; the slim image ships none.
+tzdata==2024.1

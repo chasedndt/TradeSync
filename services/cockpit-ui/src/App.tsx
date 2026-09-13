@@ -19,6 +19,7 @@ import {
   RegimeLab,
   Thesis,
   Agents,
+  Fleet,
   Pipeline,
 } from './pages'
 
@@ -44,6 +45,7 @@ export default function App() {
         <Route path="/regime-lab" element={<RegimeLab />} />
         <Route path="/thesis" element={<Thesis />} />
         <Route path="/agents" element={<Agents />} />
+        <Route path="/fleet" element={<Fleet />} />
         <Route path="/pipeline" element={<Pipeline />} />
         <Route path="/risk-policies" element={<RiskPolicies />} />
         <Route path="/settings" element={<Settings />} />

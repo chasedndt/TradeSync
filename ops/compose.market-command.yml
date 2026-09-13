@@ -126,10 +126,16 @@ services:
       # enable it; the mount below is :ro, so nothing here can write canonical
       # knowledge even if the code tried to.
       CHASEOS_GRAPH_DIR: ${CHASEOS_GRAPH_DIR:-}
+      # Where the host renderer writes edition narration and video; mounted
+      # read-only below. Served only by name under /state/thesis/editions.
+      EDITIONS_DIR: /editions
+      THESIS_EDITION_TZ: ${THESIS_EDITION_TZ:-Europe/London}
+      THESIS_EDITION_SCHEDULE: ${THESIS_EDITION_SCHEDULE:-ny-premarket=12:00,ny-midday=17:30,session-handoff=23:30}
     volumes:
       # Bound to a harmless default so the compose file is valid whether or not
       # the connector is configured. Read-only in every case.
       - ${CHASEOS_GRAPH_HOST_DIR:-./sql}:/knowledge/chaseos-graph:ro
+      - ${EDITIONS_HOST_DIR:-./sql}:/editions:ro
     extra_hosts:
       # Docker Desktop resolves this already; declaring it keeps the same
       # compose file working against a Linux engine, where it does not.

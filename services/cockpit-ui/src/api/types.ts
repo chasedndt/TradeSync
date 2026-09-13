@@ -1023,6 +1023,89 @@ export interface SourceCardsResponse {
   note: string
 }
 
+// === Hermes fleet (read model fed by the host bridge) ===
+
+export interface FleetSchedule { kind?: 'interval' | 'cron'; minutes?: number; expr?: string; display?: string }
+
+export interface FleetJob {
+  job_id: string
+  name: string
+  enabled: boolean
+  schedule: FleetSchedule
+  schedule_display: string
+  deliver: string
+  workdir: string | null
+  script: string | null
+  no_agent: boolean
+  model: string | null
+  description: string
+  last_run_at: string | null
+  last_status: string | null
+  next_run_at: string | null
+  state: string | null
+  snapshot_at: string
+  runs_24h: number
+  failed_24h: number
+  tokens_24h: number
+  tokens_7d: number
+  fires_7d: number
+  pending_directives: { kind: string; payload: Record<string, unknown>; requested_at: string }[]
+}
+
+export interface FleetJobsResponse {
+  schema_version: 'fleet_jobs_v1'
+  jobs: FleetJob[]
+  snapshot_at: string | null
+  presets: Record<string, FleetSchedule>
+  note: string
+}
+
+export interface FleetUsageResponse {
+  schema_version: 'fleet_usage_v1'
+  days: number
+  daily: { day: string; fires: number; prompt_tokens: number; completion_tokens: number; total_tokens: number }[]
+  by_job: { job_id: string; name: string; fires: number; total_tokens: number; avg_tokens: number; avg_duration_ms: number }[]
+  runs: { runs?: number; failed?: number; completed?: number }
+  note: string
+}
+
+export interface FleetDirective {
+  id: string
+  job_id: string
+  name?: string | null
+  kind: 'set_schedule' | 'set_enabled' | 'set_workdir'
+  payload: Record<string, unknown>
+  requested_by: string
+  requested_at: string
+  status: 'pending' | 'applied' | 'failed'
+  applied_at: string | null
+  previous: Record<string, unknown> | null
+  detail: string
+}
+
+// === Thesis editions ===
+
+export interface ThesisEdition {
+  id: string
+  edition: 'ny-premarket' | 'ny-midday' | 'session-handoff' | 'manual'
+  generated_at: string
+  symbols: string[]
+  headline: string
+  text: string
+  narration: string
+  verdicts: Record<string, string>
+  media: Record<string, string>
+  trigger: string
+  schema_version: string
+  theses?: Record<string, ThesisResponse>
+}
+
+export interface ThesisEditionsResponse {
+  schema_version: 'thesis_editions_v1'
+  editions: ThesisEdition[]
+  schedule: { timezone: string; entries: string; enabled: boolean; next: { edition: string | null; at: string | null } }
+}
+
 // === Paper rehearsal ===
 
 export interface RehearseRequest {
@@ -1093,6 +1176,11 @@ export interface QuarantineItem {
   reviewed_by: string | null
   /** Null until an operator promotes it. Promotion is never automatic. */
   promoted_to: string | null
+  /** What extraction made of it: the rule pass, and the harness pass if it was asked. */
+  extraction?: {
+    rule: { claims: number; reason: string } | null
+    harness: { claims: number; reason: string } | null
+  }
 }
 
 export interface QuarantineList {

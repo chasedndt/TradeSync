@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useTrackedSymbols } from '../api/hooks/useTrackedSymbols'
 import { useThesis } from '../api/hooks/useThesis'
 import { Anchors, Conditions, Confidence, Derivatives, Stack, Structure, ThesisText } from './ThesisParts'
+import { EditionPanel } from '../components/EditionPanel'
 import styles from './Thesis.module.css'
 
 /**
@@ -44,6 +45,8 @@ export function Thesis() {
           )}
         </div>
       </section>
+
+      <EditionPanel />
 
       {isError && <section className={`panel ${styles.err}`}>Thesis unavailable. Nothing is inferred.</section>}
       {isLoading && !data && <section className="panel"><p className="tone-dim" style={{ padding: 16 }}>Assembling thesis from measured evidence…</p></section>}
