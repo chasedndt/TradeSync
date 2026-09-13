@@ -6,7 +6,7 @@ import math
 from typing import Any
 
 from ..horizon_outlook import Horizon
-from ..horizon_stats import daily_volatility
+from ..horizon_stats import rolling_rank, rolling_volatility
 from .base import Bars, Reading, series
 
 YEAR = 365
@@ -20,16 +20,11 @@ class Volatility:
     measures = "Realised volatility over the horizon's lookback, ranked against the past year: compressed, normal or elevated."
 
     def daily(self, bars: Bars, h: Horizon) -> list[float | None]:
-        closes = bars.closes
-        return [daily_volatility(closes[t - h.vol_lookback:t + 1], h.vol_lookback) if t >= h.vol_lookback else None
-                for t in range(len(closes))]
+        return rolling_volatility(bars.closes, h.vol_lookback)
 
     def ranks(self, bars: Bars, h: Horizon) -> list[float | None]:
-        vols, out = self.daily(bars, h), []
-        for t, v in enumerate(vols):
-            past = [x for x in vols[max(0, t - YEAR):t + 1] if x is not None]
-            out.append(None if v is None or len(past) < MIN_RANKED else sum(1 for x in past if x <= v) / len(past))
-        return out
+        # Today's volatility against the past year, today included (YEAR + 1 values).
+        return rolling_rank(self.daily(bars, h), YEAR + 1, MIN_RANKED)
 
     def states(self, bars: Bars, h: Horizon) -> list[str | None]:
         return [None if r is None else "compressed" if r <= 0.25 else "elevated" if r >= 0.75 else "normal" for r in self.ranks(bars, h)]

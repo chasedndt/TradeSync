@@ -6,7 +6,7 @@ import math
 from typing import Any
 
 from ..horizon_outlook import Horizon
-from ..horizon_stats import daily_volatility
+from ..horizon_stats import rolling_volatility
 from .base import Bars, Reading, series
 
 
@@ -18,11 +18,9 @@ class Momentum:
 
     def scores(self, bars: Bars, h: Horizon) -> list[float | None]:
         closes, out = bars.closes, []
+        sigmas = rolling_volatility(closes, h.vol_lookback)
         for t in range(len(closes)):
-            if t < max(h.days, h.vol_lookback):
-                out.append(None)
-                continue
-            sigma = daily_volatility(closes[t - h.vol_lookback:t + 1], h.vol_lookback)
+            sigma = sigmas[t] if t >= max(h.days, h.vol_lookback) else None
             out.append(math.log(closes[t] / closes[t - h.days]) / (sigma * math.sqrt(h.days)) if sigma else None)
         return out
 

@@ -9,6 +9,8 @@ days, says how far a figure can be trusted.
 from __future__ import annotations
 
 import math
+from bisect import bisect_left, bisect_right, insort
+from functools import lru_cache
 from typing import Sequence
 
 
@@ -94,6 +96,50 @@ def rolling_extreme(values: Sequence[float], window: int, largest: bool = True) 
             kept.popleft()
         out.append(values[kept[0]] if i >= window - 1 else None)
     return out
+
+
+@lru_cache(maxsize=64)
+def _rolling_volatility(closes: tuple[float, ...], lookback: int) -> tuple[float | None, ...]:
+    out: list[float | None] = [None] * len(closes)
+    returns = [0.0] + [math.log(b / a) if a > 0 and b > 0 else 0.0 for a, b in zip(closes, closes[1:])]
+    total = squares = 0.0
+    for t in range(1, len(closes)):
+        r = returns[t]
+        total += r
+        squares += r * r
+        if t > lookback:
+            old = returns[t - lookback]
+            total -= old
+            squares -= old * old
+        if t >= lookback:
+            mean = total / lookback
+            out[t] = math.sqrt(max(0.0, (squares - lookback * mean * mean) / (lookback - 1)))
+    return tuple(out)
+
+
+def rolling_volatility(closes: Sequence[float], lookback: int) -> list[float | None]:
+    """``daily_volatility`` of the window ending on every day, in one pass (running sums); cached per series."""
+    return list(_rolling_volatility(tuple(closes), lookback))
+
+
+@lru_cache(maxsize=64)
+def _rolling_rank(values: tuple[float | None, ...], window: int, min_count: int) -> tuple[float | None, ...]:
+    kept: list[float] = []
+    out: list[float | None] = []
+    for t, value in enumerate(values):
+        if value is not None:
+            insort(kept, value)
+        if t >= window:
+            old = values[t - window]
+            if old is not None:
+                del kept[bisect_left(kept, old)]
+        out.append(None if value is None or len(kept) < min_count else bisect_right(kept, value) / len(kept))
+    return tuple(out)
+
+
+def rolling_rank(values: Sequence[float | None], window: int, min_count: int) -> list[float | None]:
+    """Share of the last ``window`` values (today included) at or below today's, once ``min_count`` exist; cached."""
+    return list(_rolling_rank(tuple(values), window, min_count))
 
 
 def daily_volatility(closes: Sequence[float], lookback: int) -> float | None:
