@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useEventReactions } from '../api/hooks/useHermes'
 import type { CalendarEvent, ContextOverviewResponse, OutlookKeyEvent } from '../api/types'
+import { EventRow } from './EventRow'
 import { CaretDown, CaretUp } from './icons'
-import { ReactionTable } from './thesis/KeyEvents'
 import styles from './EventsStrip.module.css'
 
 interface Props {
@@ -14,8 +14,9 @@ const OPEN_KEY = 'tradesync.events.open'
 /**
  * The week's scheduled economic events. Collapsible, and remembered. Each
  * market-moving event opens to show how the market measurably reacted to its
- * past releases, what that means for a trader, and recent coverage. Context
- * only: nothing here changes what the scorer does.
+ * past releases, what that means for a trader, and recent coverage; it closes
+ * from the row, its hide control, or Escape. Context only: nothing here changes
+ * what the scorer does.
  */
 export function EventsStrip({ context }: Props) {
   const provider = context?.providers.calendar
@@ -29,10 +30,16 @@ export function EventsStrip({ context }: Props) {
   useEffect(() => {
     try { localStorage.setItem(OPEN_KEY, open ? '1' : '0') } catch { /* private window */ }
   }, [open])
+  useEffect(() => {
+    if (!detail) return
+    const onKey = (ev: KeyboardEvent) => { if (ev.key === 'Escape') setDetail(null) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [detail])
 
   if (!provider || provider.status === 'disabled') return null
 
-  // A key event stands for every variant of its release (CPI m/m, Core CPI m/m…), so each variant row gets its chip.
+  // A key event stands for every variant of its release (CPI m/m, Core CPI m/m…), so each variant row gets its reaction.
   const byKey = new Map<string, OutlookKeyEvent>(
     (reactions.data?.key_events ?? []).flatMap((k) =>
       [k.title, ...(k.related_titles ?? [])].map((title): [string, OutlookKeyEvent] => [`${title}|${k.scheduled_at?.slice(0, 10)}`, k]),
@@ -47,12 +54,12 @@ export function EventsStrip({ context }: Props) {
         <span id="events-title" className={styles.title}>
           This week <span className={styles.sub}>scheduled events · measured reactions</span>
         </span>
+        <span className={styles.caret}>{open ? <CaretUp size={14} /> : <CaretDown size={14} />}</span>
         {next && (
           <span className={styles.next}>
             Next market-moving: <strong>{next.title}</strong> {formatCountdown(next.minutes_until, next.source)}
           </span>
         )}
-        <span className={styles.caret}>{open ? <CaretUp size={14} /> : <CaretDown size={14} />}</span>
       </button>
 
       {open && (provider.status === 'unavailable' ? (
@@ -63,48 +70,15 @@ export function EventsStrip({ context }: Props) {
         <ol className={styles.list}>
           {shown.map((e) => {
             const key = `${e.title}|${e.scheduled_at.slice(0, 10)}`
-            const k = byKey.get(key)
-            const isOpen = detail === key
-            const lead = k?.reaction['BTC-PERP']?.['4h']
             return (
-              <li key={`${e.source}:${e.scheduled_at}:${e.title}`} className={[styles.item, e.minutes_until < 0 ? styles.past : ''].join(' ')}>
-                <div className={[styles.event, e.market_moving ? styles.moving : ''].join(' ')}>
-                  <span className={`${styles.impact} ${styles[`impact${e.impact}`]}`} title={`${e.impact} impact (feed rating)`}>
-                    {e.impact === 'Holiday' ? 'HOL' : e.impact[0]}
-                  </span>
-                  <span className={styles.country}>{e.country}</span>
-                  {e.url ? (
-                    <a className={styles.name} href={e.url} target="_blank" rel="noopener noreferrer" title={`Open ${e.source} for this event`}>{e.title} ↗</a>
-                  ) : (
-                    <span className={styles.name}>{e.title}</span>
-                  )}
-                  <span className={styles.when}>{formatCountdown(e.minutes_until, e.source)}</span>
-                  {k ? (
-                    <button type="button" className={styles.reactionChip} onClick={() => setDetail(isOpen ? null : key)} aria-expanded={isOpen}
-                      title="How the market reacted to past releases">
-                      {lead?.median_abs_move_pct != null ? `BTC ${lead.median_abs_move_pct.toFixed(2)}% · ${lead.volatility_ratio?.toFixed(1) ?? '—'}×` : 'reaction'}
-                      {isOpen ? ' ▴' : ' ▾'}
-                    </button>
-                  ) : (
-                    <span className={styles.figures}>
-                      {e.forecast && <>f {e.forecast}</>}{e.forecast && e.previous && ' · '}{e.previous && <>p {e.previous}</>}
-                    </span>
-                  )}
-                </div>
-                {isOpen && k && (
-                  <div className={styles.detail}>
-                    <ReactionTable reaction={k.reaction} />
-                    {k.guidance.map((g, i) => <p key={i} className={styles.guidance}>{g}</p>)}
-                    {k.articles.length > 0 && (
-                      <ul className={styles.articles}>
-                        {k.articles.slice(0, 4).map((a) => (
-                          <li key={a.url}><a href={a.url} target="_blank" rel="noopener noreferrer">{a.title || a.url}</a> <span>{a.domain}</span></li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                )}
-              </li>
+              <EventRow
+                key={`${e.source}:${e.scheduled_at}:${e.title}`}
+                event={e}
+                reaction={byKey.get(key)}
+                open={detail === key}
+                countdown={formatCountdown(e.minutes_until, e.source)}
+                onToggle={() => setDetail(detail === key ? null : key)}
+              />
             )
           })}
         </ol>
