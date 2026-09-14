@@ -251,6 +251,8 @@ class OpportunityResponse(BaseModel):
     direction: str = Field(alias="dir")
     status: str
     snapshot_ts: datetime
+    # When the opportunity stops being live; status reads expired after it.
+    expires_at: Optional[datetime] = None
     links: Dict[str, Any]
     # Phase 3C: Enhanced scoring data
     confluence: Optional[Dict[str, Any]] = None
