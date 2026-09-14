@@ -5,27 +5,25 @@ import { DirectionBadge } from './DirectionBadge'
 import { calculateBiasStrength } from '../utils/metrics'
 import { Clock, AlertTriangle } from 'lucide-react'
 
-const OPPORTUNITY_TTL_SECONDS = 300 // 5 minutes
-
 interface OpportunityCardProps {
   opportunity: Opportunity
 }
 
+/** Status and expiry come from the API, which applies the opportunity's own TTL. */
 export function OpportunityCard({ opportunity }: OpportunityCardProps) {
-  const { id, symbol, timeframe, bias, quality, dir, status, snapshot_ts } = opportunity
+  const { id, symbol, timeframe, bias, quality, dir, status, snapshot_ts, expires_at } = opportunity
 
   const biasStrength = calculateBiasStrength(bias)
-  const ageMs = Date.now() - new Date(snapshot_ts).getTime()
-  const ageSec = Math.floor(ageMs / 1000)
+  const ageSec = Math.floor((Date.now() - new Date(snapshot_ts).getTime()) / 1000)
   const ageMin = Math.floor(ageSec / 60)
 
-  // Derive display status from timestamps
-  const isExpired = ageSec > OPPORTUNITY_TTL_SECONDS
-  const displayStatus = isExpired ? 'expired' : status
-
-  // Freshness indicator
+  const isExpired = status === 'expired'
+  const leftSec = status === 'new' && expires_at
+    ? Math.max(0, Math.floor((Date.parse(expires_at) - Date.now()) / 1000))
+    : null
+  const closingSoon = leftSec != null && leftSec < 180
   const isFresh = ageSec < 60
-  const isStale = ageSec > 180 // 3+ minutes
+  const expiry = leftSec == null ? '' : leftSec < 60 ? ' · expires within 1m' : ` · expires in ${Math.floor(leftSec / 60)}m`
 
   return (
     <Link
@@ -37,7 +35,7 @@ export function OpportunityCard({ opportunity }: OpportunityCardProps) {
           <span className="font-bold">{symbol}</span>
           <span className="text-xs bg-gray-800 px-1.5 py-0.5 rounded text-gray-400">{timeframe}</span>
         </div>
-        <StatusBadge status={displayStatus} />
+        <StatusBadge status={status} />
       </div>
 
       <div className="grid grid-cols-3 gap-4 text-sm">
@@ -49,13 +47,10 @@ export function OpportunityCard({ opportunity }: OpportunityCardProps) {
           <div className="text-gray-500 text-xs">Strength</div>
           <div className="font-medium">{biasStrength.toFixed(0)}%</div>
           <div className="h-1 bg-gray-800 rounded-full overflow-hidden mt-1">
-            <div
-              className="h-full bg-blue-500 transition-all"
-              style={{ width: `${Math.min(biasStrength, 100)}%` }}
-            />
+            <div className="h-full bg-blue-500 transition-all" style={{ width: `${Math.min(biasStrength, 100)}%` }} />
           </div>
         </div>
-        <div title="Model confidence score">
+        <div title="Evidence coverage, not a win probability">
           <div className="text-gray-500 text-xs">Quality</div>
           <div className="font-medium">{quality.toFixed(0)}%</div>
           <div className="h-1 bg-gray-800 rounded-full overflow-hidden mt-1">
@@ -69,10 +64,9 @@ export function OpportunityCard({ opportunity }: OpportunityCardProps) {
 
       <div className="mt-3 flex items-center justify-between text-xs">
         <span className="text-gray-500">{new Date(snapshot_ts).toLocaleTimeString()}</span>
-        <span className={`flex items-center gap-1 ${isFresh ? 'text-green-500' : isStale ? 'text-yellow-500' : 'text-gray-500'}`}>
-          {isStale && <AlertTriangle size={10} />}
-          {!isStale && <Clock size={10} />}
-          {ageMin > 0 ? `${ageMin}m ago` : 'just now'}
+        <span className={`flex items-center gap-1 ${isFresh ? 'text-green-500' : closingSoon ? 'text-yellow-500' : 'text-gray-500'}`}>
+          {closingSoon ? <AlertTriangle size={10} /> : <Clock size={10} />}
+          {ageMin > 0 ? `${ageMin}m ago` : 'just now'}{expiry}
         </span>
       </div>
     </Link>

@@ -1,0 +1,4 @@
+.page { display: grid; gap: 16px; min-width: 0; }
+.header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.title { margin: 0; font-size: 20px; font-weight: 700; }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; }
