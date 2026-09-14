@@ -74,14 +74,45 @@ def _finite(value: Any) -> float | None:
     return number if math.isfinite(number) else None
 
 
+# The snapshot metric each feature is read from. A feature carries the time that
+# metric was actually read, not the time the snapshot was assembled, so a slow
+# or stalled poll can never present an old value as a fresh observation. Derived
+# features keep the snapshot time: they are computed when the snapshot is built.
+FEATURE_METRIC: dict[str, str] = {
+    "hl_mark_price_usd": "price",
+    "hl_oracle_premium_bps": "price",
+    "hl_spread_bps": "orderbook",
+    "hl_orderbook_imbalance_1pct": "orderbook",
+    "hl_depth_25bp_usd": "microstructure",
+    "hl_buy_impact_5k_bps": "microstructure",
+    "hl_funding_hourly_rate": "funding",
+    "hl_funding_apr_24h": "funding",
+    "hl_open_interest_4h_pct": "oi",
+    "hl_volume_24h_usd": "volume",
+    "hl_liquidation_total_proxy_usd": "liquidations",
+}
+
+
+def metric_read_times(snapshot: Mapping[str, Any]) -> dict[str, int]:
+    """``{metric: last_updated_ms}`` from the snapshot's ``available_metrics``."""
+    times: dict[str, int] = {}
+    for metric in snapshot.get("available_metrics") or []:
+        if isinstance(metric, Mapping) and isinstance(metric.get("metric"), str):
+            read_at = _finite(metric.get("last_updated"))
+            if read_at is not None and read_at > 0:
+                times[metric["metric"]] = int(read_at)
+    return times
+
+
 def extract_feature_observations(snapshot: Mapping[str, Any]) -> list[dict[str, Any]]:
-    """Return finite feature observations already present in one snapshot."""
+    """Return finite feature observations already present in one snapshot, each at its metric's read time."""
 
     venue = str(snapshot.get("venue") or "")
     symbol = str(snapshot.get("symbol") or "")
-    observed_at_ms = int(snapshot.get("ts") or 0)
-    if venue != "hyperliquid" or not symbol or observed_at_ms <= 0:
+    snapshot_ms = int(snapshot.get("ts") or 0)
+    if venue != "hyperliquid" or not symbol or snapshot_ms <= 0:
         return []
+    read_times = metric_read_times(snapshot)
 
     candidates = {
         "hl_mark_price_usd": _path(snapshot, "price", "mark_price_usd"),
@@ -127,6 +158,7 @@ def extract_feature_observations(snapshot: Mapping[str, Any]) -> list[dict[str, 
         value = _finite(raw_value)
         if value is None:
             continue
+        observed_at_ms = min(snapshot_ms, read_times.get(FEATURE_METRIC.get(feature_id, ""), snapshot_ms))
         observations.append(
             {
                 "feature_id": feature_id,

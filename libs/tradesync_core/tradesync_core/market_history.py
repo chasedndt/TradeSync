@@ -64,7 +64,11 @@ def open_interest_row(snapshot: Mapping[str, Any]) -> tuple[Any, ...] | None:
     oi = snapshot.get("oi") or {}
     funding = (snapshot.get("funding") or {}).get("horizons") or {}
     volume = (snapshot.get("volume") or {}).get("horizons") or {}
-    ts, oi_usd, mark = _finite(snapshot.get("ts")), _finite(oi.get("current_usd")), _finite(price.get("mark_price_usd"))
+    # Stamp the row with when open interest was read, not when the snapshot was
+    # assembled: a slow poll must not record an old value as fresh.
+    oi_read = next((m.get("last_updated") for m in snapshot.get("available_metrics") or []
+                    if isinstance(m, dict) and m.get("metric") == "oi"), None)
+    ts, oi_usd, mark = _finite(oi_read), _finite(oi.get("current_usd")), _finite(price.get("mark_price_usd"))
     if not snapshot.get("symbol") or ts is None or oi_usd is None or oi_usd < 0 or not mark or mark <= 0:
         return None
     return (str(snapshot["symbol"]), minute(ts), oi_usd, mark, _finite(price.get("oracle_price_usd")),

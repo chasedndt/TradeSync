@@ -50,7 +50,7 @@ def handler(request: httpx.Request) -> httpx.Response:
                                                     "notional_usd": 77100.0, "price_kind": "bankruptcy"}]})
     if path == "/snapshots":
         return httpx.Response(200, json={"snapshots": [
-            {"symbol": "BTC-PERP", "ts": T, "price": {"mark_price_usd": 77743.0}, "oi": {"current_usd": 2.9e9}},
+            {"symbol": "BTC-PERP", "ts": T, "available_metrics": [{"metric": "oi", "last_updated": T - 5000}], "price": {"mark_price_usd": 77743.0}, "oi": {"current_usd": 2.9e9}},
             {"symbol": "DOGE-PERP", "ts": T, "price": {"mark_price_usd": 0.1}, "oi": {"current_usd": 1e6}},
         ]})
     return httpx.Response(404)

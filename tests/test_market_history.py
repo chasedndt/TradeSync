@@ -29,10 +29,13 @@ def test_depth_rows_floor_to_the_minute_and_skip_stale_or_one_sided_books() -> N
     assert bids == [[77000.0, 1794.08]] and asks == [[78000.0, 1.81]]
 
 
-def test_open_interest_row_reads_the_snapshot_shape() -> None:
+def test_open_interest_row_reads_the_snapshot_shape_at_the_metric_time() -> None:
+    read_at = T - 120_000  # open interest was read two minutes before the snapshot was assembled
     snapshot = {"symbol": "BTC-PERP", "ts": T, "price": {"mark_price_usd": 77743.0, "oracle_price_usd": 77775.0, "oracle_premium_bps": -4.1},
+                "available_metrics": [{"metric": "orderbook", "last_updated": T}, {"metric": "oi", "last_updated": read_at}],
                 "oi": {"current_usd": 2.89e9}, "funding": {"horizons": {"now": 1.25e-05}}, "volume": {"horizons": {"24h": 1.7e9}}}
-    assert open_interest_row(snapshot) == ("BTC-PERP", minute(T), 2.89e9, 77743.0, 77775.0, 1.25e-05, -4.1, 1.7e9)
+    assert open_interest_row(snapshot) == ("BTC-PERP", minute(read_at), 2.89e9, 77743.0, 77775.0, 1.25e-05, -4.1, 1.7e9)
+    assert open_interest_row({**snapshot, "available_metrics": []}) is None  # no read time, no row
     assert open_interest_row({**snapshot, "oi": {}}) is None
     assert open_interest_row({**snapshot, "price": {"mark_price_usd": 0}}) is None
 
