@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import type { DepthResponse, Drawing, Opportunity } from '../../api/types'
 import type { Shape } from './DrawingOverlay'
-import type { EvidenceMarker, PriceLevel } from './PriceChart'
+import type { EvidenceMarker, PriceLevel } from './chartTypes'
 
 /** Candle duration in seconds, used to snap a signal time to its candle open. */
 export const INTERVAL_SECONDS: Record<string, number> = {

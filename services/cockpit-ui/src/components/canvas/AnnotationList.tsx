@@ -1,5 +1,5 @@
 import type { Shape } from './DrawingOverlay'
-import type { PriceLevel } from './PriceChart'
+import type { PriceLevel } from './chartTypes'
 
 interface Props {
   levels: PriceLevel[]

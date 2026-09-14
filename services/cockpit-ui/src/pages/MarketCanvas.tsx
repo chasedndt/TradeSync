@@ -8,14 +8,17 @@ import { useCreateDrawing, useDeleteDrawing, useDrawings } from '../api/hooks/us
 import { PriceChart } from '../components/canvas/PriceChart'
 import { AnnotationList } from '../components/canvas/AnnotationList'
 import { CanvasToolbar, type PlacingKind } from '../components/canvas/CanvasToolbar'
+import { CanvasViewChips } from '../components/canvas/CanvasViewChips'
+import { Stat } from '../components/canvas/CanvasStat'
 import { ContextPanes } from '../components/canvas/ContextPanes'
-import { DepthLadder } from '../components/canvas/DepthLadder'
+import { EvidencePanel } from '../components/canvas/EvidencePanel'
+import { formatPrice } from '../components/canvas/format'
+import { OrderBookPanel } from '../components/canvas/OrderBookPanel'
 import {
   useEvidenceMarkers,
   usePriceLevels,
   useShapes,
 } from '../components/canvas/useCanvasLayers'
-import { EvidenceTimeline } from '../components/canvas/EvidenceTimeline'
 import { useTrackedSymbols } from '../api/hooks/useTrackedSymbols'
 
 const INTERVALS = ['1m', '5m', '15m', '1h', '4h', '1d']
@@ -125,23 +128,12 @@ export function MarketCanvas() {
       </header>
 
       <section className="panel" style={{ padding: 16 }}>
-        <div role="group" aria-label="Chart view" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
-          {(['chart', 'evidence'] as const).map((view) => (
-            <button key={view} type="button" className={(showEvidence === (view === 'evidence')) ? 'chip chip--active' : 'chip'}
-              aria-pressed={showEvidence === (view === 'evidence')}
-              onClick={() => { const next = new URLSearchParams(params); next.set('view', view); setParams(next, { replace: true }) }}>
-              {view === 'chart' ? 'Chart & drawings' : 'Research signals'}
-            </button>
-          ))}
-          {showEvidence && (['changes', 'all'] as const).map((mode) => (
-            <button key={mode} type="button" className={markerMode === mode ? 'chip chip--active' : 'chip'} aria-pressed={markerMode === mode}
-              onClick={() => { const next = new URLSearchParams(params); next.set('signals', mode); setParams(next, { replace: true }) }}
-              title={mode === 'changes' ? 'Only mark where the paper read changed side' : 'Also mark every candle that carried a call, as small dots'}>
-              {mode === 'changes' ? 'Side changes' : 'Every call'}
-            </button>
-          ))}
-          <span className="metric-sub">Drawings stay visible in both views. Research signals are not executed positions.</span>
-        </div>
+        <CanvasViewChips
+          params={params}
+          setParams={setParams}
+          showEvidence={showEvidence}
+          markerMode={markerMode}
+        />
         <CanvasToolbar
           symbols={SYMBOLS}
           intervals={INTERVALS}
@@ -222,55 +214,14 @@ export function MarketCanvas() {
       </section>
 
       {showDepth && (
-        <section className="panel" style={{ padding: 16, marginTop: 16 }}>
-          <div className="panel-heading" style={{ marginBottom: 10 }}>
-            <div>
-              <h2 style={{ fontSize: 17 }}>Order book</h2>
-              <p>
-                Resting size right now. Not a series — the book is replaced on
-                every poll, so it is shown beside the chart rather than drawn
-                across candles it was never present for.
-              </p>
-            </div>
-          </div>
-          <DepthLadder
-            depth={depth.data}
-            isLoading={depth.isLoading}
-            isError={depth.isError}
-          />
-        </section>
+        <OrderBookPanel
+          depth={depth.data}
+          isLoading={depth.isLoading}
+          isError={depth.isError}
+        />
       )}
 
-      <section className="panel" style={{ padding: 16, marginTop: 16 }}>
-        <div className="panel-heading" style={{ marginBottom: 10 }}>
-          <div>
-            <h2 style={{ fontSize: 17 }}>Paper outcomes & evidence</h2>
-            <p>
-              Compare each recorded call at fixed horizons. Returns are hypothetical,
-              before fees, funding and slippage — not realized account P&amp;L.
-            </p>
-          </div>
-        </div>
-        <EvidenceTimeline symbol={symbol} />
-      </section>
+      <EvidencePanel symbol={symbol} />
     </div>
   )
-}
-
-function Stat({ label, value, tone }: { label: string; value: string; tone?: 'good' | 'bad' }) {
-  return (
-    <div>
-      <span className="metric-sub" style={{ display: 'block' }}>
-        {label}
-      </span>
-      <span className={`metric-main ${tone ? `tone-${tone}` : ''}`}>{value}</span>
-    </div>
-  )
-}
-
-function formatPrice(value: number): string {
-  return `$${value.toLocaleString('en-US', {
-    minimumFractionDigits: value < 1000 ? 2 : 1,
-    maximumFractionDigits: value < 1000 ? 2 : 1,
-  })}`
 }

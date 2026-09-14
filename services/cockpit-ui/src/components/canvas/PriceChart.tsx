@@ -1,37 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
-import {
-  createChart,
-  ColorType,
-  LineStyle,
-  type IChartApi,
-  type IPriceLine,
-  type ISeriesApi,
-} from 'lightweight-charts'
+import { createChart, type IChartApi, type ISeriesApi } from 'lightweight-charts'
 import type { Candle } from '../../api/types'
 import { DrawingOverlay, type Shape } from './DrawingOverlay'
-
-export interface EvidenceMarker {
-  /** UNIX seconds, aligned to a candle open. */
-  time: number
-  direction: 'LONG' | 'SHORT' | 'NONE'
-  label: string
-  /** A change of side is drawn as a labelled arrow; a held side as a small unlabelled dot. */
-  kind?: 'change' | 'continuation'
-}
-
-export interface PriceLevel {
-  drawingId: string
-  price: number
-  label: string
-  colour?: string
-  /**
-   * Dashed is an operator annotation; dotted is derived from venue data and is
-   * not something the operator drew. Keeping them visually distinct matters —
-   * a resting wall disappears the moment the order is pulled, while a level the
-   * operator placed is theirs until they remove it.
-   */
-  style?: 'dashed' | 'dotted'
-}
+import type { EvidenceMarker, PriceLevel } from './chartTypes'
+import {
+  CANDLE_SERIES_OPTIONS,
+  priceChartOptions,
+  VOLUME_SCALE_MARGINS,
+  VOLUME_SERIES_OPTIONS,
+} from './chartOptions'
+import { usePriceLines } from './usePriceLines'
+import { useSeriesMarkers } from './useSeriesMarkers'
 
 interface Props {
   candles: Candle[]
@@ -74,7 +53,6 @@ export function PriceChart({
   const fittedRef = useRef(false)
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
   const volumeRef = useRef<ISeriesApi<'Histogram'> | null>(null)
-  const priceLinesRef = useRef<Map<string, IPriceLine>>(new Map())
   // Kept in a ref so the chart's click handler, registered once, always
   // sees the current callback rather than the one from first render.
   const onPickPriceRef = useRef(onPickPrice)
@@ -93,42 +71,15 @@ export function PriceChart({
     if (!el) return
     fittedRef.current = false
 
-    const chart = createChart(el, {
-      height,
-      layout: {
-        background: { type: ColorType.Solid, color: 'transparent' },
-        textColor: '#8397aa',
-        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-      },
-      grid: {
-        vertLines: { color: 'rgba(131,151,170,0.10)' },
-        horzLines: { color: 'rgba(131,151,170,0.10)' },
-      },
-      // Pinned width shared with the context panes below, so their plot areas
-      // start at the same x and a funding spike lines up with its candle.
-      rightPriceScale: { borderColor: 'rgba(131,151,170,0.25)', minimumWidth: 100 },
-      timeScale: { borderColor: 'rgba(131,151,170,0.25)', timeVisible: true },
-      crosshair: { mode: 0 },
-    })
+    const chart = createChart(el, priceChartOptions(height))
 
-    seriesRef.current = chart.addCandlestickSeries({
-      upColor: '#3fb27f',
-      downColor: '#e0574a',
-      borderUpColor: '#3fb27f',
-      borderDownColor: '#e0574a',
-      wickUpColor: '#3fb27f',
-      wickDownColor: '#e0574a',
-    })
+    seriesRef.current = chart.addCandlestickSeries(CANDLE_SERIES_OPTIONS)
 
     setSeriesApi(seriesRef.current)
 
-    volumeRef.current = chart.addHistogramSeries({
-      priceFormat: { type: 'volume' },
-      priceScaleId: 'volume',
-      color: 'rgba(131,151,170,0.35)',
-    })
+    volumeRef.current = chart.addHistogramSeries(VOLUME_SERIES_OPTIONS)
     chart.priceScale('volume').applyOptions({
-      scaleMargins: { top: 0.82, bottom: 0 },
+      scaleMargins: VOLUME_SCALE_MARGINS,
     })
 
     chartRef.current = chart
@@ -163,7 +114,6 @@ export function PriceChart({
       observer.disconnect()
       onChartReadyRef.current?.(null)
       chart.remove()
-      priceLinesRef.current.clear()
       setChartApi(null)
       setSeriesApi(null)
       chartRef.current = null
@@ -197,54 +147,8 @@ export function PriceChart({
     setRevision((r) => r + 1)
   }, [candles])
 
-  useEffect(() => {
-    const series = seriesRef.current
-    if (!series) return
-    const existing = priceLinesRef.current
-    const wanted = new Set(levels.map((l) => l.drawingId))
-
-    // Remove lines whose drawing is gone, so a deleted level leaves the chart.
-    for (const [id, line] of existing) {
-      if (!wanted.has(id)) {
-        series.removePriceLine(line)
-        existing.delete(id)
-      }
-    }
-    // Recreate changed ones: the library has no update for a price line.
-    for (const level of levels) {
-      const previous = existing.get(level.drawingId)
-      if (previous) series.removePriceLine(previous)
-      existing.set(
-        level.drawingId,
-        series.createPriceLine({
-          price: level.price,
-          color: level.colour || '#e3b23c',
-          lineWidth: 1,
-          lineStyle: level.style === 'dotted' ? LineStyle.Dotted : LineStyle.Dashed,
-          axisLabelVisible: true,
-          title: level.label || '',
-        }),
-      )
-    }
-  }, [levels])
-
-  useEffect(() => {
-    if (!seriesRef.current) return
-    seriesRef.current.setMarkers(
-      markers.map((m) => {
-        const change = m.kind !== 'continuation'
-        const short = m.direction === 'SHORT'
-        return {
-          time: m.time as never,
-          position: short ? 'aboveBar' : 'belowBar',
-          color: short ? (change ? '#e0574a' : 'rgba(224,87,74,0.55)') : (change ? '#3fb27f' : 'rgba(63,178,127,0.55)'),
-          shape: change ? (short ? 'arrowDown' : 'arrowUp') : 'circle',
-          size: change ? 1 : 0.35,
-          text: change ? m.label : '',
-        }
-      }),
-    )
-  }, [markers])
+  usePriceLines(seriesApi, levels)
+  useSeriesMarkers(seriesApi, markers)
 
   return (
     <div ref={containerRef} style={{ width: '100%', position: 'relative' }}>
