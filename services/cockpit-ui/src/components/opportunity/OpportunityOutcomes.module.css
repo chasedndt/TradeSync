@@ -1,0 +1,10 @@
+.title { margin: 0 0 8px; font-size: 14px; font-weight: 700; }
+.message { margin: 0 0 8px; color: var(--muted); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.scroll { overflow-x: auto; }
+.table { width: 100%; min-width: 580px; border-collapse: collapse; font-size: 12px; }
+.table th, .table td { padding: 6px 8px; border-bottom: 1px solid var(--border-soft); text-align: left; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.table thead th { color: var(--muted); font: 600 10px/1.2 var(--font-mono); text-transform: uppercase; letter-spacing: 0.06em; }
+.result { white-space: normal; min-width: 140px; }
+.attribution { display: grid; gap: 6px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-soft); }
+.subtitle { margin: 0; color: var(--text); font-size: 12px; font-weight: 600; }
+.reason { margin: 0; color: var(--text); font-size: 12px; line-height: 1.55; overflow-wrap: anywhere; }

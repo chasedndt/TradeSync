@@ -9,6 +9,7 @@ import { ExecuteResultCard } from '../components/opportunity/ExecuteResultCard'
 import { ExecutionRiskBox } from '../components/opportunity/ExecutionRiskBox'
 import { MarketContextCard } from '../components/opportunity/MarketContextCard'
 import { OpportunityHeader } from '../components/opportunity/OpportunityHeader'
+import { OpportunityOutcomes } from '../components/opportunity/OpportunityOutcomes'
 import { PreviewForm } from '../components/opportunity/PreviewForm'
 import { TradePlanSkeleton } from '../components/opportunity/TradePlanSkeleton'
 import { TradeSummary } from '../components/opportunity/TradeSummary'
@@ -95,6 +96,8 @@ export function OpportunityDetail() {
         {/* Left 3/5: Evidence and Insights */}
         <div className="lg:col-span-3 space-y-6">
           <TradeSummary opportunity={opportunity} biasStrength={biasStrength} ageSec={ageSec} />
+
+          <OpportunityOutcomes opportunityId={opportunity.id} />
 
           <section>
             <h3 className="text-lg font-medium mb-3">Evidence Trail</h3>
