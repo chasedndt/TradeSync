@@ -10,6 +10,11 @@ def force_order(side="SELL", symbol="BTCUSDT", ts=1_000_000, ap="77000", z="0.5"
     return {"e": "forceOrder", "E": ts, "o": {"s": symbol, "S": side, "q": z, "p": "76900", "ap": ap, "X": "FILLED", "z": z, "T": ts}}
 
 
+def test_the_stream_uses_binances_market_route() -> None:
+    # The legacy /ws path accepts the connection and then sends nothing at all.
+    assert binance_liquidations.URL == "wss://fstream.binance.com/market/ws/!forceOrder@arr"
+
+
 def test_a_sell_liquidation_closes_a_long_and_notional_uses_the_average_fill() -> None:
     [event] = binance_liquidations.normalize(force_order(), received_at=1_000.5, markets=MARKETS)
     assert event["position_side"] == "long" and event["symbol"] == "BTC-PERP"

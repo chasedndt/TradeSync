@@ -1,6 +1,8 @@
 """Binance USDT-M received liquidations, context only; never Hyperliquid and never authority.
 
-Stream: ``wss://fstream.binance.com/ws/!forceOrder@arr`` (public, no key).
+Stream: ``wss://fstream.binance.com/market/ws/!forceOrder@arr`` (public, no key).
+Binance moved USDⓈ-M market streams to the ``/market`` route: the legacy ``/ws``
+path still accepts a connection but delivers nothing (checked 2026-09-14).
 Binance pushes at most the latest liquidation order per symbol each second, so
 the received events undercount bursts. ``S`` is the liquidation ORDER side:
 SELL closes a long, BUY closes a short. Notional is average fill price times
@@ -20,7 +22,7 @@ import websockets
 
 from .liquidation_context import STORE_RECEIPT
 
-URL = "wss://fstream.binance.com/ws/!forceOrder@arr"
+URL = "wss://fstream.binance.com/market/ws/!forceOrder@arr"
 STATUS = "market:binance-liquidations:status"
 PREFIX = "market:binance-liquidations:received-v1:"
 
