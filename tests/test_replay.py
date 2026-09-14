@@ -135,6 +135,18 @@ class ReplayDeterminismTests(unittest.TestCase):
         if decision.admitted:
             self.assertEqual(decision.direction, "LONG")
 
+    def test_a_held_side_replays_at_the_hold_threshold(self):
+        """A continuation admitted at the hold threshold is not re-judged as a fresh entry."""
+        stored = _stored(directional_score=0.1)  # between the 0.05 hold and 0.15 entry
+        fresh = case_from_stored_evidence("sig", "BTC-PERP", stored)
+        self.assertFalse(replay_case(fresh, _rulebook(), AdmissionPolicy(), CATALOG).admitted)
+        stored["evidence"]["previous_direction"] = "LONG"
+        held = case_from_stored_evidence("sig", "BTC-PERP", stored)
+        self.assertEqual(held.previous_direction, "LONG")
+        decision = replay_case(held, _rulebook(), AdmissionPolicy(), CATALOG)
+        self.assertTrue(decision.admitted)
+        self.assertEqual(decision.direction, "LONG")
+
     def test_evidence_age_is_judged_against_its_own_evaluation_time(self):
         """Otherwise every historical case would be rejected as stale."""
         case = _case()

@@ -52,6 +52,8 @@ class ReplayCase:
     directional: dict[str, Any]
     outcome_signed_return_pct: float | None = None
     market_move_pct: float | None = None
+    # The side held at decision time; a held side clears only the hold threshold.
+    previous_direction: str | None = None
 
 
 def case_from_stored_evidence(
@@ -86,6 +88,7 @@ def case_from_stored_evidence(
         block_scores[block] = float(score)
         block_qualities[block] = float(quality)
 
+    held = evidence.get("previous_direction")
     return ReplayCase(
         signal_id=signal_id,
         symbol=symbol,
@@ -95,6 +98,7 @@ def case_from_stored_evidence(
         directional=dict(evidence.get("directional") or {}),
         outcome_signed_return_pct=outcome_signed_return_pct,
         market_move_pct=market_move_pct,
+        previous_direction=held if held in ("LONG", "SHORT") else None,
     )
 
 
@@ -120,6 +124,7 @@ def replay_case(
         evaluated_at_ms=case.evaluated_at_ms,
         policy=policy,
         directional=case.directional or None,
+        previous_direction=case.previous_direction,
     )
 
 
