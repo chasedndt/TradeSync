@@ -18,7 +18,7 @@ import re
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from app import hermes_jobs, hermes_link
+from app import hermes_jobs, hermes_link, fleet_live
 
 router = APIRouter(tags=["fleet"])
 
@@ -292,12 +292,14 @@ def register(app, state) -> None:
                 "restorable_deliver": restore_by.get(j["job_id"]) if j["deliver"] == "local" else None,
             })
         newest = max((j["snapshot_at"] for j in jobs), default=None)
+        out, live_state = await fleet_live.overlay(out)
         return {"schema_version": "fleet_jobs_v1", "jobs": out, "snapshot_at": newest.isoformat() if newest else None,
+                "live_state": live_state,
                 "presets": SCHEDULE_PRESETS,
                 "control": {"gateway_api": hermes_jobs.available(), "gateway_status": hermes_link.status_now()["status"],
                             "note": "Changes go through the Hermes gateway's jobs API on its port and apply at once; "
                                     "the host bridge edits jobs.json only for the working directory or when the gateway is down."},
-                "note": "Read model of the Hermes fleet, posted by the host bridge. Directives are requests until the bridge applies them."}
+                "note": "Job state is read from the gateway (15-second cache), falling back explicitly to the bridge. Run counts and token usage remain bridge snapshots. Gateway acceptance of run now is not completed execution."}
 
     @router.get("/state/fleet/usage")
     async def usage_analytics(days: int = Query(7, ge=1, le=90)):
@@ -351,8 +353,12 @@ def register(app, state) -> None:
         if req.kind in GATEWAY_KINDS and hermes_jobs.available():
             try:
                 previous, detail, after = await apply_via_gateway(req.job_id, req.kind, payload)
+                fleet_live.invalidate()
                 status, channel = "applied", "api"
             except hermes_jobs.HermesJobsError as exc:
+                # A rejected request is not an outage: never bypass an API denial through file editing.
+                if 400 <= exc.status_code < 500:
+                    raise HTTPException(status_code=exc.status_code, detail="Hermes gateway rejected the directive; no bridge fallback") from None
                 if req.kind not in BRIDGE_KINDS:
                     code = exc.status_code if 400 <= exc.status_code < 500 else 502
                     raise HTTPException(status_code=code, detail=f"Hermes gateway: {exc.detail}") from None

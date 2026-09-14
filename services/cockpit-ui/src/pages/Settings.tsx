@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { MobileAlerts } from '../components/MobileAlerts'
 import { Key, Trash2, AlertTriangle, Check, Info, Wallet, CheckCircle2, XCircle, Loader2 } from 'lucide-react'
 import { useExecutionStatus } from '../api/hooks'
 import { useExecution } from '../context'
@@ -61,6 +62,8 @@ export function Settings() {
   return (
     <div className="space-y-6 max-w-2xl">
       <h2 className="text-xl font-bold">Settings</h2>
+
+      <MobileAlerts />
 
       {/* API Configuration */}
       <div className="card">

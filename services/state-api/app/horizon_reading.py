@@ -43,7 +43,7 @@ def job_state(symbol: str) -> dict[str, Any]:
 def _record(stats: Mapping[str, Any] | None) -> str:
     if not stats or not stats.get("days"):
         return "no comparable days"
-    return (f"{stats['days']} comparable days, {stats['independent_windows']} independent windows, "
+    return (f"{stats['days']} comparable days, {stats['independent_windows']} non-overlapping windows (not proof of independence), "
             f"higher {round(float(stats['share_up']) * 100)}% of the time, median {float(stats['median_pct']):+.1f}%, "
             f"middle half {float(stats['p25_pct']):+.1f}% to {float(stats['p75_pct']):+.1f}%")
 

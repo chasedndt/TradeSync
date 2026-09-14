@@ -1716,24 +1716,22 @@ async def get_wallet_preview(address: Optional[str] = None):
             )
             response.raise_for_status()
             state_payload = response.json()
-    except Exception as exc:
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                f"venue did not answer: {type(exc).__name__}"
-                + (f": {exc}" if str(exc) else "")
-            ),
-        )
+    except Exception:
+        raise HTTPException(status_code=503, detail="Venue account read unavailable")
 
     if not isinstance(state_payload, dict) or not isinstance(state_payload.get("marginSummary"), dict) or not isinstance(state_payload.get("assetPositions"), list):
         raise HTTPException(status_code=503, detail="Venue account response is incomplete; no balance is inferred")
     margin = state_payload["marginSummary"]
     positions = []
     for entry in state_payload.get("assetPositions") or []:
+        if not isinstance(entry, dict) or not isinstance(entry.get("position"), dict):
+            raise HTTPException(status_code=503, detail="Venue position response malformed")
         position = entry.get("position") or {}
-        if not position.get("szi"):
+        size = _as_float(position.get("szi"))
+        if size is None or not math.isfinite(size):
+            raise HTTPException(status_code=503, detail="Venue position size unavailable")
+        if size == 0:
             continue
-        size = float(position.get("szi") or 0)
         positions.append({
             "symbol": f"{position.get('coin')}-PERP",
             "size": size,
@@ -1779,9 +1777,19 @@ async def get_wallet_preview(address: Optional[str] = None):
 
 def _as_float(value):
     try:
-        return float(value)
+        result = float(value)
+        return result if math.isfinite(result) else None
     except (TypeError, ValueError):
         return None
+
+
+@app.get("/state/execution/wallet-activity", tags=["execution"])
+async def get_wallet_activity(address: str):
+    from .wallet_activity import read_activity
+    address = address.strip()
+    if not re.fullmatch(r"0x[0-9a-fA-F]{40}", address):
+        raise HTTPException(status_code=422, detail="Expected a public EVM address; never enter a private key")
+    return await read_activity(HYPERLIQUID_INFO_URL, address)
 
 
 @app.get("/state/execution/signer-status", tags=["execution"])
@@ -2720,17 +2728,24 @@ async def get_market_candles(
     venue: str = "hyperliquid",
     symbol: str = "BTC-PERP",
     interval: str = "15m",
-    limit: int = Query(300, le=1000),
+    limit: int = Query(300, ge=1, le=1000),
+    start_ms: int | None = Query(None, ge=0),
+    end_ms: int | None = Query(None, ge=0),
 ):
     """Proxy venue OHLCV candles for the Market Canvas.
 
     Display only. Candles are not catalog features and carry no scoring
     authority; the upstream response states that explicitly.
     """
-    path = (
-        f"/candles/{venue}/{symbol}"
-        f"?interval={interval}&limit={limit}"
-    )
+    from urllib.parse import quote, urlencode
+    if start_ms is not None and end_ms is not None and start_ms >= end_ms:
+        raise HTTPException(status_code=400, detail="start_ms must be before end_ms")
+    params = {"interval": interval, "limit": limit}
+    if start_ms is not None:
+        params["start_ms"] = start_ms
+    if end_ms is not None:
+        params["end_ms"] = end_ms
+    path = f"/candles/{quote(venue, safe='')}/{quote(symbol, safe='')}?{urlencode(params)}"
     try:
         resp = await asyncio.to_thread(_market_data_get, path)
     except Exception as e:
@@ -3266,6 +3281,38 @@ async def get_market_depth(
     return resp.json()
 
 
+@app.get("/state/market/book-history")
+async def get_market_book_history(symbol: str = "BTC-PERP"):
+    if not re.fullmatch(r"[A-Z0-9]{1,20}-PERP", symbol):
+        raise HTTPException(status_code=400, detail="Invalid symbol")
+    try:
+        resp = await asyncio.to_thread(_market_data_get, f"/book-history/{symbol}")
+        if resp.status_code == 404:
+            raise HTTPException(status_code=404, detail="Unsupported symbol")
+        resp.raise_for_status()
+        return resp.json()
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=503, detail="Order-book history unavailable")
+
+
+@app.get("/state/market/liquidation-context")
+async def get_market_liquidation_context(symbol: str = "BTC-PERP"):
+    if not re.fullmatch(r"[A-Z0-9]{1,20}-PERP", symbol):
+        raise HTTPException(status_code=400, detail="Invalid symbol")
+    try:
+        resp = await asyncio.to_thread(_market_data_get, f"/liquidation-context/{symbol}")
+        if resp.status_code == 404:
+            raise HTTPException(status_code=404, detail="Unsupported symbol")
+        resp.raise_for_status()
+        return resp.json()
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=503, detail="Liquidation context unavailable")
+
+
 @app.get("/state/market/timeseries")
 async def get_market_timeseries(
     venue: str,
@@ -3765,6 +3812,9 @@ from app.strikezone_lab import register as register_strikezone_lab  # noqa: E402
 register_strikezone_ingest(app, state)
 register_strikezone_lab(app, state)
 
+from app.trade_research import register as register_trade_research  # noqa: E402
+register_trade_research(app, state, market_data_url=MARKET_DATA_URL)
+
 # The timeframe outlook: three days to six months, from daily candles; see app/horizons.py.
 from app.horizons import register as register_horizons  # noqa: E402
 
@@ -3774,3 +3824,9 @@ register_horizons(app, state, market_data_url=MARKET_DATA_URL)
 from app.feature_history import register as register_feature_history  # noqa: E402
 
 register_feature_history(app, state, market_data_url=MARKET_DATA_URL)
+
+from app.mobile_alerts import register as register_mobile_alerts  # noqa: E402
+register_mobile_alerts(app, state)
+
+from app.managed_paper import register as register_managed_paper  # noqa: E402
+register_managed_paper(app, state, market_data_url=MARKET_DATA_URL)

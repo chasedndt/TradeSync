@@ -39,9 +39,9 @@ class FeeSchedule:
 # and volume tiers lower these; the base tier is the conservative choice.
 HYPERLIQUID_BASE_FEES = FeeSchedule(
     taker_fee=0.00045,
-    maker_fee=-0.00015,
+    maker_fee=0.00015,
     source="https://hyperliquid.gitbook.io/hyperliquid-docs/trading/fees",
-    read_on="2026-09-12",
+    read_on="2026-09-14",
 )
 
 

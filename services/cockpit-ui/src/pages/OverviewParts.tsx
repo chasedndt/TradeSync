@@ -2,6 +2,7 @@ import { Fragment } from 'react'
 import { Bank, GlobeHemisphereWest, Waves } from '../components/icons'
 import { formatAge, formatCompactUsd, formatPercent, formatUsd } from '../components/home/format'
 import type { useContextOverview } from '../api/hooks'
+import styles from './ContextPanel.module.css'
 
 export function ContextPanel({ context }: { context: ReturnType<typeof useContextOverview>['data'] }) {
   const coin = context?.providers.coingecko
@@ -9,7 +10,7 @@ export function ContextPanel({ context }: { context: ReturnType<typeof useContex
   const fred = context?.providers.fred
   const assets = coin?.data.assets || {}
   return (
-    <section className="panel context-panel" aria-labelledby="context-title">
+    <section className={`panel context-panel ${styles.panel}`} aria-labelledby="context-title">
       <div id="context-title" className="context-title">Context only <span>(non-authoritative)</span></div>
       <div className="context-grid">
         <div className="context-block">

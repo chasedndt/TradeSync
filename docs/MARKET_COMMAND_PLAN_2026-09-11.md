@@ -1,5 +1,9 @@
 # Market Command — the plan, and how everything you already have fits it
 
+13 September continuation: [current capabilities, measured strategy failures and remaining gates](ROADMAP_RECONCILIATION_2026-09-13.md).
+Pine acceptance is complete; live Fleet management and separate scalp/swing
+research are available. Neither the old nor new strategy has earned live authority.
+
 Date: 2026-09-11. Written for the operator, in one place, so the direction
 survives sessions. Every claim about an existing system was checked against the
 running stack or the canonical vault (`C:\Users\chaseos\Documents\chaseos_chaseintech`)

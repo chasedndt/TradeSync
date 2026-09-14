@@ -9,7 +9,7 @@ from .base import Bars, Reading, series
 
 
 def period_days(h: Horizon) -> int:
-    """14 daily bars up to one month ahead; about 14 weekly bars (98 days) for three and six months."""
+    """14 daily bars up to one month ahead; 98 daily bars for longer horizons, not weekly RSI."""
     return 14 if h.days <= 30 else 98
 
 
@@ -24,7 +24,8 @@ def wilder_rsi(closes: tuple[float, ...], period: int) -> list[float | None]:
         if t > period:
             avg_gain = (avg_gain * (period - 1) + gains[t - 1]) / period
             avg_loss = (avg_loss * (period - 1) + losses[t - 1]) / period
-        out[t] = 100.0 if avg_loss == 0 else 100 - 100 / (1 + avg_gain / avg_loss)
+        # Define the zero-gain/zero-loss case as neutral, not overbought.
+        out[t] = (50.0 if avg_gain == 0 else 100.0) if avg_loss == 0 else 100 - 100 / (1 + avg_gain / avg_loss)
     return out
 
 
@@ -32,7 +33,7 @@ class Rsi:
     key = "rsi"
     label = "RSI"
     kind = "context"
-    measures = "Wilder's relative strength: 14 daily bars up to one month ahead, about 14 weekly bars for three and six months. Above 70 is overbought, below 30 oversold."
+    measures = "Wilder's relative strength: 14 daily bars up to one month ahead, 98 daily bars for three and six months. This is not RSI calculated from weekly candles. Flat prices read neutral at 50. Above 70 is overbought, below 30 oversold."
 
     def values(self, bars: Bars, h: Horizon) -> list[float | None]:
         return wilder_rsi(bars.closes, period_days(h))
@@ -46,7 +47,7 @@ class Rsi:
         if value is None:
             return Reading(None, "context", None, f"Needs {period_days(h) + 1} daily closes.")
         state = self.states(bars, h)[-1]
-        scale = "daily" if period_days(h) == 14 else "weekly-scale"
+        scale = f"{period_days(h)}-day"
         return Reading(state, "context", round(value, 1), f"The {scale} RSI is {value:.0f}, {str(state).replace('_', ' ')}.")
 
     def overlays(self, bars: Bars, h: Horizon, start: int) -> list[dict[str, Any]]:

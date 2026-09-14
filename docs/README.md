@@ -4,6 +4,37 @@ This folder is the documentation system of record for the Hyperliquid-only Trade
 
 ## Start here
 
+14 September paper safety: [Persistent entry-pause foundation — source only pending SQL/UI acceptance](changes/2026-09-14_paper-control.md).
+
+Consolidated current handover: [14 September integration state, verification limits and next safety work](HANDOVER_2026-09-14_INTEGRATION_STATE.md).
+
+14 September research registration: [Deployed fixed specifications, fingerprints, immutable registry and evaluation API](changes/2026-09-14_research-registration.md).
+
+14 September source comparison: [Deployed cohort API/UI, experimental liquidity filter, mathematics and remaining evaluation gates](research/2026-09-14_source-comparison-v1.md). Empty current cohort is not a measured source benefit.
+
+14 September entry context: [Frozen Bybit receipts and Hyperliquid book history, causal tests and remaining source evaluation](changes/2026-09-14_entry-liquidation-context.md).
+
+14 September liquidation provenance: [First-received timestamps, replay dedupe and remaining durable-entry work](changes/2026-09-14_first-received-liquidations.md).
+
+14 September mobile lifecycle continuation: [Deployed opt-in, quiet hours, budget policy and remaining phone acceptance](changes/2026-09-14_mobile-lifecycle-policy.md).
+
+14 September real-market API acceptance: [Isolated open/close and unchanged evidence](changes/2026-09-14_paper-api-live-market-acceptance.md), [trading-day readiness checklist](runbooks/TRADING_DAY_READINESS.md).
+
+14 September managed-paper dashboard: [Controls, frozen evidence, desktop/mobile QA and remaining acceptance](changes/2026-09-14_managed-paper-dashboard.md).
+
+14 September managed-paper backend: [Implementation/verification](changes/2026-09-14_managed-paper-backend.md), [research protocol and learning exercises](research/2026-09-14_managed-paper-protocol.md).
+
+14 September mobile foundation: [Outbox, enrollment and verification](changes/2026-09-14_mobile-alert-outbox.md), [Android/iPhone setup and acceptance](runbooks/MOBILE_ALERTS.md).
+
+14 September wallet continuation: [Watch-only positions, orders, fills and remaining acceptance](changes/2026-09-14_watch-only-activity.md).
+
+14 September active-goal continuation: [Liquidity feeds, intraday horizons, verification and remaining integration work](changes/2026-09-14_liquidity-intraday-and-integration-goal.md).
+
+Current status: [13 September roadmap reconciliation and handover closure register](ROADMAP_RECONCILIATION_2026-09-13.md).
+Development evidence: [Fleet controls and cost-aware trading research](changes/2026-09-13_fleet-and-trade-research.md).
+
+13 September continuation: [Context-card fit, RSI correctness and handover review](changes/2026-09-13_context-fit-and-handover-review.md).
+
 Pairing acceptance follow-up: [Build, dependency audit and setup-screen QA](changes/2026-09-09_walletconnect-build-acceptance.md).
 
 Optional pairing: [WalletConnect address-only implementation and setup gates](changes/2026-09-09_walletconnect-address-only.md).

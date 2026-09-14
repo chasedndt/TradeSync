@@ -81,7 +81,16 @@ def test_run_now_and_delivery_need_the_gateway() -> None:
     with patch.object(state, "pool", fake_pool(FakeConn())), patch.object(hermes_jobs, "available", return_value=True), \
             patch.object(hermes_jobs, "get_job", failing):
         missing = client.post("/state/fleet/directives", json={"job_id": JOB, "kind": "pause"})
-    assert missing.status_code == 404 and "Job not found" in missing.json()["detail"]
+    assert missing.status_code == 404 and "no bridge fallback" in missing.json()["detail"]
+
+
+def test_gateway_permission_denial_never_falls_back_to_host_file_edit():
+    conn = FakeConn()
+    with patch.object(state, 'pool', fake_pool(conn)), patch.object(hermes_jobs, 'available', return_value=True), \
+            patch.object(hermes_jobs, 'get_job', AsyncMock(side_effect=hermes_jobs.HermesJobsError(403, 'denied'))):
+        response = client.post('/state/fleet/directives', json={'job_id': JOB, 'kind': 'set_enabled', 'enabled': False})
+    assert response.status_code == 403
+    conn.fetchrow.assert_not_awaited()
 
 
 def test_delivery_targets_are_validated() -> None:

@@ -7,6 +7,7 @@ import { FeatureCard } from '../components/horizons/FeatureCard'
 import { HorizonBands } from '../components/horizons/HorizonBands'
 import { LinkedText, type LinkTarget } from '../components/horizons/LinkedText'
 import { ReadingPanel } from '../components/horizons/ReadingPanel'
+import { IntradayHorizons } from '../components/horizons/IntradayHorizons'
 import { price, since } from '../components/ledger/format'
 import styles from './Timeframes.module.css'
 
@@ -85,7 +86,8 @@ export function Timeframes() {
         </div>
       </section>
 
-      {page.isLoading && <section className="panel"><p className={styles.message}>Measuring {symbol} across six horizons…</p></section>}
+      <IntradayHorizons symbol={symbol} />
+      {page.isLoading && <section className="panel"><p className={styles.message}>Measuring {symbol} across six daily-history horizons…</p></section>}
       {page.isError && <section className="panel"><p className={styles.error}>Timeframes unavailable: {(page.error as Error).message}</p></section>}
       {data && !outlook?.available && <section className="panel"><p className={styles.message}>{outlook?.reason}</p></section>}
 

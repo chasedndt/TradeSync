@@ -43,8 +43,8 @@ def test_malformed_inputs_are_refused() -> None:
 
 def test_fee_schedule_names_its_source_and_date() -> None:
     assert HYPERLIQUID_BASE_FEES.taker_fee == 0.00045
-    assert HYPERLIQUID_BASE_FEES.maker_fee == -0.00015
-    assert HYPERLIQUID_BASE_FEES.read_on == "2026-09-12"
+    assert HYPERLIQUID_BASE_FEES.maker_fee == 0.00015
+    assert HYPERLIQUID_BASE_FEES.read_on == "2026-09-14"
 
 
 def test_rehearsal_skips_only_the_global_gate_and_keeps_every_symbol_rule(monkeypatch) -> None:

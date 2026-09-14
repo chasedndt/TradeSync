@@ -34,6 +34,7 @@ export function FleetJobRow({ job, presets }: { job: FleetJob; presets: Record<s
         <td className={styles.mono}>{job.deliver.startsWith('discord:') ? 'discord' : job.deliver === 'local' ? 'TradeSync only' : job.deliver}</td>
         <td className={`${styles.mono} ${statusTone}`} title={job.next_run_at ? `next ${new Date(job.next_run_at).toUTCString()}` : ''}>
           {job.last_status || '—'} · {ago(job.last_run_at)}
+          <div className="tone-dim">{job.state_source ?? 'bridge'}{job.gateway_missing ? ' · absent from gateway' : ''}</div>
         </td>
         <td className={styles.mono}>{job.runs_24h}{job.failed_24h > 0 ? <span className="tone-bad"> ({job.failed_24h} failed)</span> : ''}</td>
         <td className={styles.mono}>{fmtTokens(job.tokens_24h)} / {fmtTokens(job.tokens_7d)}</td>

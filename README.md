@@ -10,6 +10,16 @@ It becomes more capable when connected to ChaseOS, Strike Zone Crypto, local AI 
 
 ## Product contract
 
+Trading-day preparation: [readiness checklist and remaining gates](docs/runbooks/TRADING_DAY_READINESS.md).
+Managed-paper open/close/evidence controls are locally deployed; a rolled-back
+integration check passed with live market observations, not a validated strategy.
+
+Latest development: [14 September liquidity/intraday integration and remaining gates](docs/changes/2026-09-14_liquidity-intraday-and-integration-goal.md).
+
+Wallet visibility: [public-address positions, open orders and recent fills](docs/changes/2026-09-14_watch-only-activity.md), without signing or live execution.
+
+Mobile: [Android/iPhone notification foundation and setup gates](docs/changes/2026-09-14_mobile-alert-outbox.md). Physical-device delivery is not yet verified.
+
 TradeSync has three explicit capability tiers:
 
 | Tier | Name | Works when | Capability |
@@ -20,7 +30,15 @@ TradeSync has three explicit capability tiers:
 
 Tier A must continue when any Tier B connector is unavailable. Tier C always fails closed when ChaseOS approval authority, signer state, risk state, or reconciliation is unavailable.
 
-## Current truth — 2026-09-02
+## Current truth — 2026-09-13
+
+Start with the [current capability and remaining-gate register](docs/ROADMAP_RECONCILIATION_2026-09-13.md).
+Fleet now has live gateway state and confirmed controls; Signal Ledger has
+cost-aware diagnostics and persisted scalp/swing research. The legacy strategy
+is loss-making; a saved replay is not proof of profitability. Execution remains
+disabled. [Build, runtime and QA evidence](docs/changes/2026-09-13_fleet-and-trade-research.md).
+
+### Historical snapshot — 2026-09-02 (superseded where noted above)
 
 - Hyperliquid is the only venue and authoritative market source.
 - The local operator runtime is paper-only: `EXECUTION_ENABLED=false`, `DRY_RUN=true`.

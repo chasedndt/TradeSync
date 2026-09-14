@@ -1,0 +1,16 @@
+.panel { padding: 16px; min-width: 0; }
+.panel h3, .panel h4 { margin: 0 0 10px; }
+.panel h4 { margin-top: 24px; }
+.panel p { color: var(--muted); font-size: 12px; line-height: 1.55; overflow-wrap: anywhere; }
+.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 16px 0; }
+.metrics span { font-size: 11px; color: var(--muted); }
+.metrics strong { display: block; font: 600 18px/1.6 var(--font-mono); color: var(--text); }
+.scroll { max-width: 100%; overflow-x: auto; }
+.panel table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.panel th, .panel td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
+.controls label { display: grid; gap: 6px; font-size: 11px; color: var(--muted); }
+.controls input, .controls select { width: 140px; padding: 8px; background: var(--bg); color: inherit; border: 1px solid var(--border); border-radius: 4px; }
+.run { border-top: 1px solid var(--border); padding: 12px 0; font-size: 12px; }
+.run summary { cursor: pointer; line-height: 1.6; overflow-wrap: anywhere; }
+.note { font-size: 11px !important; }

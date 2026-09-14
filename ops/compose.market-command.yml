@@ -90,6 +90,9 @@ services:
       TRADINGVIEW_WEBHOOK_SECRET: ${TRADINGVIEW_WEBHOOK_SECRET:-}
       # The public address the tunnel exposes; shown on the pipeline, never used to send.
       TRADINGVIEW_PUBLIC_URL: ${TRADINGVIEW_PUBLIC_URL:-}
+      # Separate control authorization for mobile enrollment/test sends.
+      # Empty means disabled. Never use a wallet key here.
+      MOBILE_ALERTS_CONTROL_KEY: ${MOBILE_ALERTS_CONTROL_KEY:-}
       # FRED (free key from https://fredaccount.stlouisfed.org/apikeys). Set both
       # in runtime.env; the key is read here only, never printed. Enables the
       # macro-reference provider and adds official release dates to the

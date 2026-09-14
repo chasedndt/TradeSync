@@ -16,7 +16,7 @@ export function useFleetJobs() {
   return useQuery({
     queryKey: ['fleet-jobs'],
     queryFn: () => apiGet<FleetJobsResponse>('/state/fleet/jobs'),
-    refetchInterval: 60_000,
+    refetchInterval: 15_000,
     retry: 1,
   })
 }

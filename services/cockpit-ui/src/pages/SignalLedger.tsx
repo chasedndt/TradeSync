@@ -2,6 +2,10 @@ import { useForwardTest, useLabHealth } from '../api/hooks/useStrikeZone'
 import { EquityCurve } from '../components/ledger/EquityCurve'
 import { ForwardMatrix } from '../components/ledger/ForwardMatrix'
 import { LabHealth } from '../components/ledger/LabHealth'
+import { TradeResearch } from '../components/ledger/TradeResearch'
+import { ManagedPaper } from '../components/ledger/ManagedPaper'
+import { SourceComparison } from '../components/ledger/SourceComparison'
+import { ResearchTrials } from '../components/ledger/ResearchTrials'
 import { LedgerTable } from '../components/ledger/LedgerTable'
 import { Scorecards } from '../components/ledger/Scorecards'
 import { minutesAgo } from '../components/ledger/format'
@@ -49,6 +53,10 @@ export function SignalLedger() {
       )}
       {f && f.cells.length > 0 && <ForwardMatrix data={f} />}
       {f && f.equity.trades > 0 && <EquityCurve equity={f.equity} notional={f.paper_notional_usdc} />}
+      <ManagedPaper />
+      <SourceComparison />
+      <ResearchTrials />
+      <TradeResearch />
       <LedgerTable assets={f?.assets ?? []} timeframes={f?.timeframes ?? []} />
       <Scorecards />
       {h && <LabHealth data={h} />}

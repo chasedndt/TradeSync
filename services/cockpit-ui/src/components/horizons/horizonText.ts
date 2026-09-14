@@ -25,6 +25,6 @@ export const horizonAdjective = (label: string): string => label.replace(/^(\d+)
 export function recordLine(stats: RecordStats | undefined, horizonLabel: string): string {
   if (!stats || !stats.days) return 'No comparable days in the record.'
   const share = Math.round((stats.share_up ?? 0) * 100)
-  return `${stats.days.toLocaleString()} comparable days (${stats.independent_windows} independent ${horizonAdjective(horizonLabel)} windows): ` +
+  return `${stats.days.toLocaleString()} comparable days (${stats.independent_windows} non-overlapping ${horizonAdjective(horizonLabel)} windows): ` +
     `higher ${share}% of the time, median ${signedPct(stats.median_pct)}, middle half ${signedPct(stats.p25_pct)} to ${signedPct(stats.p75_pct)}.`
 }

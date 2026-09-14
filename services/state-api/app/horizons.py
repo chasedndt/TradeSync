@@ -27,6 +27,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app import background, horizon_reading
 from tradesync_core.horizon_chart import chart_payload
+from tradesync_core.intraday_horizons import measure as measure_intraday
 from tradesync_core.horizon_evaluation import evaluate_all
 from tradesync_core.horizon_features import FEATURES, Bars
 from tradesync_core.horizon_outlook import BANDS, HORIZONS, MIN_HISTORY_DAYS, compose_horizons
@@ -121,6 +122,29 @@ async def _entry_or_502(market_data_url: str, symbol: str) -> dict[str, Any]:
 
 
 def register(app, state, *, market_data_url: str) -> None:
+    intraday_cache: dict[str, dict] = {}
+    intraday_lock = asyncio.Lock()
+
+    @router.get('/state/market/intraday-horizons')
+    async def intraday_horizons(symbol: str = Query('BTC-PERP', max_length=24)):
+        symbol = checked_symbol(symbol)
+        async with intraday_lock:
+            entry = intraday_cache.get(symbol)
+            if entry and time.time() - entry['at'] < 60:
+                return entry['data']
+            try:
+                async with httpx.AsyncClient(trust_env=False, timeout=30) as client:
+                    response = await client.get(f'{market_data_url}/candles/hyperliquid/{symbol}', params={'interval': '1h', 'limit': 1000})
+                    response.raise_for_status()
+                    data = await asyncio.to_thread(measure_intraday, response.json()['candles'], time.time())
+            except (httpx.HTTPError, ValueError, KeyError, TypeError):
+                raise HTTPException(502, 'Intraday history unavailable, incomplete or stale; no inferred replacement') from None
+            data.update(symbol=symbol, computed_at=datetime.now(timezone.utc).isoformat())
+            if len(intraday_cache) >= 32:
+                intraday_cache.pop(next(iter(intraday_cache)))
+            intraday_cache[symbol] = {'at': time.time(), 'data': data}
+            return data
+
     @router.get("/state/market/horizons")
     async def horizons(symbol: str = Query("BTC-PERP", max_length=24)):
         symbol = checked_symbol(symbol)

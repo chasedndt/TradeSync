@@ -42,3 +42,16 @@ def test_incomplete_response_not_zero_balance(payload):
         factory.return_value.__aenter__.return_value = transport
         result = client.get('/state/execution/wallet-preview', params={'address': ADDRESS})
     assert result.status_code == 503
+
+
+@pytest.mark.parametrize('size,expected', [('0', 200), ('NaN', 503), ('bad', 503)])
+def test_zero_position_is_not_short_and_invalid_size_fails_closed(size, expected):
+    response = MagicMock()
+    response.json.return_value = {'marginSummary': {'accountValue': '100', 'totalMarginUsed': '0'},
+                                  'assetPositions': [{'position': {'coin': 'BTC', 'szi': size}}]}
+    with patch('app.main.httpx.AsyncClient') as factory:
+        factory.return_value.__aenter__.return_value = MagicMock(post=AsyncMock(return_value=response))
+        result = client.get('/state/execution/wallet-preview', params={'address': ADDRESS})
+    assert result.status_code == expected
+    if expected == 200:
+        assert result.json()['open_positions'] == []

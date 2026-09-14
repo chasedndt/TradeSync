@@ -31,6 +31,8 @@ from .spot_premium import (
 )
 from .context_series import bucket_series, describe_coverage
 from .depth import summarise_book
+from . import book_history
+from . import liquidation_context
 from .cross_venue import (
     BINANCE_OPEN_INTEREST_URL,
     BINANCE_PREMIUM_INDEX_URL,
@@ -418,6 +420,10 @@ async def poll_orderbook_loop():
             orderbook = await provider.fetch_orderbook(symbol)
             if not orderbook:
                 return
+            try:
+                await book_history.capture(redis_client.client, symbol, orderbook)
+            except Exception as exc:
+                logger.warning('Book history capture unavailable (%s)', type(exc).__name__)
             event = normalizer.normalize_orderbook(provider.venue, orderbook)
             if event:
                 await redis_client.push_normalized(event.model_dump())
@@ -519,6 +525,7 @@ async def lifespan(app: FastAPI):
     background_tasks.append(asyncio.create_task(poll_spot_reference_loop()))
     background_tasks.append(asyncio.create_task(poll_news_tone_loop()))
     background_tasks.append(asyncio.create_task(poll_cross_venue_loop()))
+    background_tasks.append(asyncio.create_task(liquidation_context.run(redis_client.client)))
     background_tasks.append(
         asyncio.create_task(
             run_trade_stream(trade_flow, [s.replace('-PERP', '') for s in SYMBOLS])
@@ -1011,6 +1018,20 @@ async def get_depth(venue: str, symbol: str):
             },
         )
     return book
+
+
+@app.get("/book-history/{symbol}")
+async def get_book_history(symbol: str):
+    if symbol not in SYMBOLS:
+        return JSONResponse(status_code=404, content={"error": "unsupported_symbol"})
+    return await book_history.history(redis_client.client, symbol)
+
+
+@app.get("/liquidation-context/{symbol}")
+async def get_liquidation_context(symbol: str):
+    if symbol not in SYMBOLS:
+        return JSONResponse(status_code=404, content={"error": "unsupported_symbol"})
+    return await liquidation_context.history(redis_client.client, symbol)
 
 
 @app.get("/timeseries/{venue}/{symbol}/{metric}")

@@ -1,5 +1,11 @@
 # Implementation Sequence
 
+14 September priority update: [active integration goal, new observed feeds and next safe actions](changes/2026-09-14_liquidity-intraday-and-integration-goal.md).
+
+Current status overlay (13 September): [roadmap reconciliation](ROADMAP_RECONCILIATION_2026-09-13.md).
+The historical slot log below remains useful evidence, but is not a claim that
+all earlier open items are still open or all deployed services are still absent.
+
 Last updated: 2026-09-08
 
 This document exists because "we'll do it later" was said too many times without

@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { LiquidityHistory } from '../components/market/LiquidityHistory'
+import { LiquidationContext } from '../components/market/LiquidationContext'
 import {
   TrendingUp,
   Percent,
@@ -173,7 +175,7 @@ function LiquidationsPanel({ snapshot }: { snapshot: MarketSnapshot }) {
     return (
       <div className="bg-gray-900 rounded-lg p-6 border border-gray-800 border-dashed flex flex-col items-center justify-center text-center">
         <AlertCircle size={24} className="text-gray-700 mb-2" />
-        <p className="text-xs text-gray-600">Liquidation feed unavailable</p>
+        <p className="text-xs text-gray-400">Direct Hyperliquid liquidation feed unavailable</p>
         <MetricStatusBadge status="UNAVAILABLE" />
       </div>
     )
@@ -726,6 +728,7 @@ export function Market() {
                 </div>
               </div>
               <LiquidationsPanel snapshot={activeSnapshot} />
+              <LiquidationContext symbol={activeSnapshot.symbol} />
             </div>
 
             {/* Volume Profile */}
@@ -784,6 +787,8 @@ export function Market() {
               <LiquidityPanel snapshot={activeSnapshot as MarketSnapshotWithMicrostructure} />
             </div>
           </div>
+
+          <LiquidityHistory symbol={activeSnapshot.symbol} />
 
           {/* Source Attribution */}
           <div className="card bg-gray-900/30 text-xs text-gray-500">

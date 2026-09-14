@@ -8,7 +8,7 @@ export function OpportunitiesPanel({ opps, loading }: { opps: Opportunity[]; loa
   return (
     <section className="panel" aria-labelledby="paper-opps-title">
       <div className="panel-heading">
-        <div><h2 id="paper-opps-title">Paper Opportunities</h2><p>{loading ? 'checking…' : `${opps.length} open · paper only · newest first`}</p></div>
+        <div><h2 id="paper-opps-title">Paper Opportunities</h2><p>{loading ? 'checking…' : `${opps.length} observations · not managed positions · newest first`}</p></div>
         <NavLink to="/opportunities" className="panel-action">All opportunities →</NavLink>
       </div>
       {opps.length === 0 ? (

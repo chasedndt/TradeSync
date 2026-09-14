@@ -31,14 +31,14 @@ export function FleetJobControls({ job, presets }: { job: FleetJob; presets: Rec
           <option value="">schedule…</option>
           {Object.entries(presets).map(([k, v]) => <option key={k} value={k}>{v.display}</option>)}
         </select>
-        <button type="button" className="chip" disabled={!preset || busy} onClick={() => { send({ kind: 'set_schedule', preset }); setPreset('') }}>set</button>
-        <button type="button" className="chip" disabled={busy || pendingEnabled} onClick={() => send({ kind: 'set_enabled', enabled: !job.enabled })}>
+        <button type="button" className="chip" disabled={!preset || busy} onClick={() => { send({ kind: 'set_schedule', preset }, `Change the schedule of "${job.name}" to ${presets[preset]?.display}?`); setPreset('') }}>set</button>
+        <button type="button" className="chip" disabled={busy || pendingEnabled} onClick={() => send({ kind: 'set_enabled', enabled: !job.enabled }, `${job.enabled ? 'Disable' : 'Enable'} "${job.name}"?${discord ? ' This job delivers to Discord.' : ''}`)}>
           {pendingEnabled ? 'pending' : job.enabled ? 'disable' : 'enable'}
         </button>
         <button type="button" className="chip" disabled={busy || !job.enabled} onClick={() => send({ kind: paused ? 'resume' : 'pause' })}>
           {paused ? 'resume' : 'pause'}
         </button>
-        <button type="button" className="chip" disabled={busy || !job.enabled}
+        <button type="button" className="chip" disabled={busy || !job.enabled || paused || job.gateway_missing}
           onClick={() => send({ kind: 'run_now' }, `Run "${job.name}" now?${discord ? ' It delivers to Discord.' : ''}`)}>
           run now
         </button>

@@ -1030,6 +1030,9 @@ export interface SourceCardsResponse {
 export interface FleetSchedule { kind?: 'interval' | 'cron'; minutes?: number; expr?: string; display?: string }
 
 export interface FleetJob {
+  state_source?: 'gateway' | 'bridge'
+  gateway_missing?: boolean
+  failure_streak?: number
   job_id: string
   name: string
   enabled: boolean
@@ -1059,6 +1062,7 @@ export interface FleetJob {
 }
 
 export interface FleetJobsResponse {
+  live_state?: { source: 'gateway' | 'bridge'; status: string; observed_at: string | null; cache_seconds: number }
   schema_version: 'fleet_jobs_v1'
   jobs: FleetJob[]
   snapshot_at: string | null

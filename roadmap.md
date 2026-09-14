@@ -1,5 +1,67 @@
 # TradeSync Roadmap
 
+## Active integration goal — 2026-09-14
+
+[Persistent paper-entry pause](docs/changes/2026-09-14_paper-control.md) is source-only;
+isolated SQL and paused-entry/close acceptance pass. Concurrency checks, UI,
+migration and deployment remain. It is not yet
+portfolio capital/drawdown/exposure management.
+
+[Consolidated integration handover](docs/HANDOVER_2026-09-14_INTEGRATION_STATE.md)
+reconciles completed slices with remaining portfolio safety, onboarding, evidence
+and security work. Next priority: persistent paper risk controls and reconciliation.
+
+[Immutable research registration foundation](docs/changes/2026-09-14_research-registration.md)
+and evaluation API are locally deployed after isolated SQL/API acceptance; migration
+025 applied. Explicit UI registration and populated forward evaluation passed
+fixture acceptance; real registered observations and elapsed outcomes remain.
+
+[Source-comparison calculation v1](docs/research/2026-09-14_source-comparison-v1.md)
+and its read-only cohort API/UI are locally deployed. Immutable trial registration
+and actual forward evidence remain; no source weight changed.
+
+[Bybit entry-context snapshots](docs/changes/2026-09-14_entry-liquidation-context.md)
+and Hyperliquid book-history snapshots now persist receipts and cutoffs without scoring influence. Other source joins and
+registered source-contribution evaluation remain incomplete.
+
+[First-received liquidation provenance](docs/changes/2026-09-14_first-received-liquidations.md)
+is deployed and Redis-tested. Durable entry snapshots and source evaluation remain.
+
+[Mobile lifecycle preferences/producer](docs/changes/2026-09-14_mobile-lifecycle-policy.md)
+are locally deployed with migration 024, isolated SQL acceptance and desktop/mobile
+UI QA. Private setup, real phone receipts and sustained delivery remain open.
+
+[Live-market paper API integration passed in rolled-back QA tables](docs/changes/2026-09-14_paper-api-live-market-acceptance.md).
+The [trading-day checklist](docs/runbooks/TRADING_DAY_READINESS.md) distinguishes
+supervised paper testing from incomplete mobile, strategy and live-execution gates.
+
+[Managed-paper backend and frozen research protocol](docs/changes/2026-09-14_managed-paper-backend.md)
+are implemented/tested. [Dashboard controls and desktop/mobile QA](docs/changes/2026-09-14_managed-paper-dashboard.md)
+are now locally deployed. Live-data forward acceptance, direct external entry joins
+and settled-funding evidence remain open; no strategy promotion.
+
+[Mobile notification foundation](docs/changes/2026-09-14_mobile-alert-outbox.md)
+is implemented; real control setup, device receipt, event producers and preferences
+remain open. Native ntfy compatibility does not claim a completed TradeSync PWA.
+
+[Watch-only wallet activity is implemented and locally deployed](docs/changes/2026-09-14_watch-only-activity.md);
+operator-account/device acceptance and signing/execution gates remain separate.
+
+[Current change record and next-action register](docs/changes/2026-09-14_liquidity-intraday-and-integration-goal.md):
+observed Hyperliquid book history, separate Bybit liquidation context and 1h/4h/8h/1d
+analysis implemented. Durable entry evidence, managed paper trading, Android **and**
+iPhone alerts, expanded watch-only wallets and evaluated strategy improvements
+remain open. No automated weight promotion or live-execution readiness claimed.
+
+## Current status — 2026-09-13
+
+The [reconciled roadmap and handover register](docs/ROADMAP_RECONCILIATION_2026-09-13.md)
+is the current status index, including implemented Fleet/research work, measured
+trading losses, scheduled-job acceptance and every remaining programme area.
+Earlier dated status paragraphs below are historical; capability tiers and
+execution gates still apply. Next: immutable entry evidence and managed paper
+positions; wallet visibility may proceed separately from live-trading authority.
+
 ## Operator usability follow-up — 2026-09-09
 
 WalletConnect address-only QR pairing is implemented in source, pending the operator's public project ID, dependency-security triage and live acceptance. See [scope and gates](docs/changes/2026-09-09_walletconnect-address-only.md). This is not a signing or execution connector.

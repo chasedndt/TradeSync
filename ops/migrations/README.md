@@ -16,6 +16,29 @@ Examples:
 
 Current repository migrations:
 
+`026_paper_control.sql` proposes default-paused persistent paper entry control and
+an audit trail. Not yet applied; no current runtime control changed.
+
+`025_research_trials.sql` proposes immutable research specifications and registration
+timestamps. Applied locally 14 September after isolated SQL/API acceptance;
+it creates no trial registrations automatically.
+
+`024_mobile_preferences.sql` adds opt-in notification preferences and activation
+timestamp. Applied locally 14 September after isolated UP/DOWN verification;
+defaults enable no delivery.
+
+`023_managed_paper_positions.sql` adds frozen managed-paper entry/plan storage,
+separate lifecycle state/events and update protection. Creates no positions.
+
+`022_mobile_alerts.sql` adds device enrollment and the durable notification outbox;
+it creates no devices and enables no external sends by itself.
+
+The numbered SQL files are the complete inventory; the older examples below
+are not exhaustive. Latest: `021_trade_research.sql` stores paper research
+candles, versioned assumptions and results separately from orders/approvals.
+Applied locally on 13 September; see
+[verification](../../docs/changes/2026-09-13_fleet-and-trade-research.md).
+
 - `001_initial_schema.sql` — legacy initial operational schema.
 - `002_regime_rulebooks.sql` — versioned paper rulebooks, activations, experiments, and replayable score events.
 - `003_market_features.sql` — versioned feature catalogs, time-ordered observations, and replayable ordinary/robust normalization evidence.

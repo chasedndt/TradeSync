@@ -18,11 +18,12 @@ export function Fleet() {
   const directives = useFleetDirectives(20)
   const [query, setQuery] = useState('')
   const [onlyEnabled, setOnlyEnabled] = useState(true)
+  const [onlyFailed, setOnlyFailed] = useState(false)
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return (jobs.data?.jobs ?? []).filter((j) => (!onlyEnabled || j.enabled) && (!q || `${j.name} ${j.description} ${j.job_id}`.toLowerCase().includes(q)))
-  }, [jobs.data, query, onlyEnabled])
+    return (jobs.data?.jobs ?? []).filter((j) => (!onlyEnabled || j.enabled) && (!onlyFailed || ['error', 'failed'].includes(j.last_status ?? '')) && (!q || `${j.name} ${j.description} ${j.job_id}`.toLowerCase().includes(q)))
+  }, [jobs.data, query, onlyEnabled, onlyFailed])
 
   const totals = useMemo(() => {
     const all = jobs.data?.jobs ?? []
@@ -40,7 +41,7 @@ export function Fleet() {
     <div className={styles.page}>
       <section className={`panel ${styles.hero}`}>
         <div>
-          <div className={styles.kicker}>Hermes fleet · controls through the gateway's jobs API · read model from the host bridge</div>
+          <div className={styles.kicker}>Hermes fleet · live gateway state · usage and history from the host bridge</div>
           <h2>Every job, its cadence, and what it costs.</h2>
           <p>
             Schedule, enable, pause, run now and delivery changes go to the Hermes gateway's jobs API on its port and apply at once. The host bridge
@@ -52,7 +53,8 @@ export function Fleet() {
           <span className={jobs.data?.control?.gateway_api && jobs.data.control.gateway_status === 'live' ? 'tone-good' : 'tone-warn'} style={{ fontSize: 11 }}>
             {jobs.data?.control ? (jobs.data.control.gateway_api ? `gateway jobs API · ${jobs.data.control.gateway_status}` : 'gateway jobs API not configured · bridge only') : '—'}
           </span>
-          <span className="metric-sub">snapshot {jobs.data?.snapshot_at ? new Date(jobs.data.snapshot_at).toUTCString().slice(17, 25) : '—'} UTC</span>
+          <span className="metric-sub">Job state: {jobs.data?.live_state?.source ?? 'bridge'} · {jobs.data?.live_state?.observed_at ? new Date(jobs.data.live_state.observed_at).toLocaleTimeString() : 'live read unavailable'}</span>
+          <span className="metric-sub">Usage snapshot {jobs.data?.snapshot_at ? new Date(jobs.data.snapshot_at).toUTCString().slice(17, 25) : '—'} UTC</span>
         </div>
       </section>
 
@@ -88,6 +90,8 @@ export function Fleet() {
 
       <section className="panel">
         <div className={styles.toolbar}>
+          <button type="button" className="chip" disabled={jobs.isFetching} onClick={() => jobs.refetch()}>{jobs.isFetching ? 'refreshing…' : 'refresh state'}</button>
+          <button type="button" className={onlyFailed ? 'chip chip--active' : 'chip'} aria-pressed={onlyFailed} onClick={() => setOnlyFailed(!onlyFailed)}>failed jobs only</button>
           <button type="button" className={onlyEnabled ? 'chip chip--active' : 'chip'} onClick={() => setOnlyEnabled(!onlyEnabled)} aria-pressed={onlyEnabled}>enabled only</button>
           <span className="metric-sub">{rows.length} shown</span>
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="filter jobs…" aria-label="Filter jobs" />
