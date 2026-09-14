@@ -14,7 +14,10 @@ const DIMENSIONS: { id: Dimension; label: string }[] = [
 ]
 const ORDER = { hurting: 0, helping: 1, no_evidence: 2 } as const
 
-/** Which readings mislead more often than chance, and which calls lost, by group. */
+/**
+ * Which readings mislead more often than chance, and which calls lost, by group.
+ * The verdict follows the name so it stays in view when the table scrolls sideways.
+ */
 export function VerdictTable({ horizon, days }: { horizon: number; days: number }) {
   const [dimension, setDimension] = useState<Dimension>('feature')
   const { data, isLoading, error } = useLearningVerdicts(horizon, days)
@@ -48,6 +51,7 @@ export function VerdictTable({ horizon, days }: { horizon: number; days: number 
             <thead>
               <tr>
                 <th scope="col">{perReading ? 'Reading' : 'Group'}</th>
+                <th scope="col">Verdict</th>
                 {perReading && <th scope="col">Role</th>}
                 <th scope="col">Decisive</th>
                 <th scope="col">{perReading ? 'Misled' : 'Lost'} (95%)</th>
@@ -55,7 +59,6 @@ export function VerdictTable({ horizon, days }: { horizon: number; days: number 
                 <th scope="col">Eff. sample</th>
                 {perReading ? <th scope="col">Net when it agreed</th> : <th scope="col">Mean net</th>}
                 {perReading && <th scope="col">Net when it disagreed</th>}
-                <th scope="col">Verdict</th>
               </tr>
             </thead>
             <tbody>
@@ -73,6 +76,7 @@ function VerdictRow({ group, perReading }: { group: GroupEvidence; perReading: b
   return (
     <tr>
       <th scope="row" className={styles.name}>{group.label}</th>
+      <td className={verdictTone(group.verdict)}>{VERDICT_LABELS[group.verdict]}</td>
       {perReading && <td>{group.role ?? '—'}</td>}
       <td className={styles.num}>{group.decided.toLocaleString()}</td>
       <td className={styles.num}>
@@ -93,7 +97,6 @@ function VerdictRow({ group, perReading }: { group: GroupEvidence; perReading: b
           {signedPct(group.mean_net_disagreed_pct, 3)} <span className={styles.count}>({group.disagreed})</span>
         </td>
       )}
-      <td className={verdictTone(group.verdict)}>{VERDICT_LABELS[group.verdict]}</td>
     </tr>
   )
 }

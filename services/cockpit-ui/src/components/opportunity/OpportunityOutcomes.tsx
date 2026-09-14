@@ -31,12 +31,11 @@ export function OpportunityOutcomes({ opportunityId }: { opportunityId: string }
               <thead>
                 <tr>
                   <th scope="col">Horizon</th>
-                  <th scope="col">Status</th>
-                  <th scope="col">Move for the call</th>
+                  <th scope="col">Result</th>
                   <th scope="col">Net after costs</th>
+                  <th scope="col">Move for the call</th>
                   <th scope="col">Best</th>
                   <th scope="col">Worst</th>
-                  <th scope="col">Result</th>
                 </tr>
               </thead>
               <tbody>
@@ -53,19 +52,25 @@ export function OpportunityOutcomes({ opportunityId }: { opportunityId: string }
   )
 }
 
+/** The result leads the row: the classification once attributed, otherwise the measurement status and its reason. */
+function resultText(outcome: OutcomeRow, attribution?: Attribution): string {
+  if (attribution) return CLASSIFICATION_LABELS[attribution.classification]
+  if (outcome.status === 'measured') return 'Measured, not attributed yet'
+  const status = outcome.status.replace(/_/g, ' ')
+  const label = status.charAt(0).toUpperCase() + status.slice(1)
+  return outcome.reason ? `${label} · ${outcome.reason}` : label
+}
+
 function OutcomeLine({ outcome, attribution }: { outcome: OutcomeRow; attribution?: Attribution }) {
   const measured = outcome.status === 'measured'
   return (
     <tr>
       <th scope="row">{horizonLabel(outcome.horizon_minutes)}</th>
-      <td>{outcome.status.replace(/_/g, ' ')}</td>
-      <td className={measured ? netTone(outcome.signed_return_pct) : undefined}>{measured ? signedPct(outcome.signed_return_pct, 3) : '—'}</td>
+      <td className={styles.result}>{resultText(outcome, attribution)}</td>
       <td className={attribution ? netTone(attribution.net_return_pct) : undefined}>{attribution ? signedPct(attribution.net_return_pct, 3) : '—'}</td>
+      <td className={measured ? netTone(outcome.signed_return_pct) : undefined}>{measured ? signedPct(outcome.signed_return_pct, 3) : '—'}</td>
       <td>{measured ? signedPct(outcome.max_favourable_pct, 3) : '—'}</td>
       <td>{measured && outcome.max_adverse_pct != null ? signedPct(-outcome.max_adverse_pct, 3) : '—'}</td>
-      <td className={styles.result}>
-        {attribution ? CLASSIFICATION_LABELS[attribution.classification] : measured ? 'not attributed yet' : outcome.reason || '—'}
-      </td>
     </tr>
   )
 }

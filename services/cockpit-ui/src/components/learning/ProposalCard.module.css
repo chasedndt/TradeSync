@@ -4,17 +4,14 @@
 .meta { color: var(--muted); font-size: 11px; }
 .hypothesis { margin: 0; color: var(--text); font-size: 12px; line-height: 1.55; overflow-wrap: anywhere; }
 .changes { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 12px; }
-.changes li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: baseline; gap: 12px; }
-.mono { font-family: var(--font-mono); overflow-wrap: anywhere; }
+.changes li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 12px; }
+.changeName { min-width: 0; overflow-wrap: anywhere; }
+.mono { font-family: var(--font-mono); }
 .weights { color: var(--text); font-family: var(--font-mono); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.because { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.because { color: var(--muted); font-size: 11px; }
 .actions { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }
 .note { display: grid; flex: 1 1 240px; gap: 4px; min-width: 0; color: var(--muted); font-size: 11px; }
 .note input { width: 100%; padding: 7px 9px; border: 1px solid var(--border); border-radius: 4px; background: var(--panel-muted); color: var(--text); font-size: 12px; }
 .hint { color: var(--muted); font-size: 11px; }
 .decided { margin: 0; color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
-@media (max-width: 480px) {
-  .card { padding: 12px; }
-  .changes li { grid-template-columns: minmax(0, 1fr) auto; }
-  .because { grid-column: 1 / -1; }
-}
+@media (max-width: 480px) { .card { padding: 12px; } }

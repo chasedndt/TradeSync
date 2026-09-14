@@ -8,3 +8,4 @@
 .table th:first-child { text-align: left; }
 .table tbody th { color: var(--text); font-weight: 500; }
 .range { display: block; color: var(--dim); font-size: 10px; }
+.version { display: block; color: var(--dim); font: 400 10px var(--font-mono); }

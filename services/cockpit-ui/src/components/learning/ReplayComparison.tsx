@@ -40,8 +40,8 @@ export function ReplayComparison({ proposal }: { proposal: Proposal }) {
             </tr>
           </thead>
           <tbody>
-            <MetricsRow name={`Current · ${baseline.rulebook_version}`} metrics={baseline} />
-            <MetricsRow name={`Proposal · ${challenger.rulebook_version}`} metrics={challenger} />
+            <MetricsRow name="Current" metrics={baseline} />
+            <MetricsRow name="Proposal" metrics={challenger} />
           </tbody>
         </table>
       </div>
@@ -56,7 +56,10 @@ export function ReplayComparison({ proposal }: { proposal: Proposal }) {
 function MetricsRow({ name, metrics }: { name: string; metrics: ReplayMetrics }) {
   return (
     <tr>
-      <th scope="row">{name}</th>
+      <th scope="row">
+        {name}
+        <span className={styles.version}>{metrics.rulebook_version}</span>
+      </th>
       <td>{metrics.decisions.toLocaleString()}</td>
       <td>{metrics.admitted.toLocaleString()}</td>
       <td>{metrics.refused.toLocaleString()}</td>

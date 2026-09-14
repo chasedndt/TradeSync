@@ -87,12 +87,14 @@ export function ProposalCard({ proposal, operator }: { proposal: Proposal; opera
 function ChangeRow({ name, change, digits, mono = false }: { name: string; change: WeightChange; digits: number; mono?: boolean }) {
   return (
     <li>
-      <span className={mono ? styles.mono : undefined}>{name}</span>
+      <span className={styles.changeName}>
+        <span className={mono ? styles.mono : undefined}>{name}</span>
+        <span className={styles.because}> · {VERDICT_LABELS[change.verdict].toLowerCase()}</span>
+      </span>
       <span className={styles.weights}>
         {change.before.toFixed(digits)} → {change.after.toFixed(digits)}
         <span className="sr-only">{change.after > change.before ? ' raised' : ' lowered'}</span>
       </span>
-      <span className={styles.because}>{VERDICT_LABELS[change.verdict].toLowerCase()}</span>
     </li>
   )
 }

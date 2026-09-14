@@ -19,14 +19,14 @@ export function ProposalList({ operator, horizon }: { operator: string; horizon:
 
   return (
     <section className="panel" aria-labelledby="learning-proposals-title">
-      <div className="panel-heading">
+      <div className={`panel-heading ${styles.heading}`}>
         <div>
           <h3 id="learning-proposals-title">Weight proposals</h3>
           <p>learned on older decisions, replayed on the newest · adopted only by an operator</p>
         </div>
         <button
           type="button"
-          className="chip"
+          className={`chip ${styles.runButton}`}
           disabled={name.length < 2 || generate.isPending}
           title={name.length < 2 ? 'Enter your name above first' : undefined}
           onClick={() => generate.mutate({ requestedBy: name, horizon })}
