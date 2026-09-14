@@ -19,14 +19,49 @@ function getHeaders(): HeadersInit {
   return headers
 }
 
-async function responseError(res: Response): Promise<Error> {
-  try {
-    const payload = await res.json()
-    const detail = typeof payload?.detail === 'string' ? payload.detail : res.statusText
-    return new Error(`${res.status} ${detail}`)
-  } catch {
-    return new Error(`${res.status} ${res.statusText}`)
+/** A failed request: the server's own explanation as the message, and the HTTP status. */
+export class ApiError extends Error {
+  readonly status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
   }
+}
+
+/**
+ * FastAPI's `detail` as a sentence: a string as it is, a validation list as
+ * "field: problem" pairs, anything else as JSON. Null when there is nothing to say.
+ */
+export function describeDetail(detail: unknown): string | null {
+  if (typeof detail === 'string') return detail.trim() || null
+  if (Array.isArray(detail)) {
+    const parts = detail
+      .map((issue) => {
+        if (typeof issue === 'string') return issue
+        if (!issue || typeof issue.msg !== 'string') return null
+        const path = Array.isArray(issue.loc)
+          ? issue.loc.filter((part: unknown) => part !== 'body' && part !== 'query').join('.')
+          : ''
+        return path ? `${path}: ${issue.msg}` : issue.msg
+      })
+      .filter((part): part is string => Boolean(part))
+    return parts.length ? parts.join('; ') : null
+  }
+  if (detail && typeof detail === 'object') return JSON.stringify(detail)
+  return null
+}
+
+async function responseError(res: Response): Promise<ApiError> {
+  let detail: string | null = null
+  try {
+    detail = describeDetail((await res.json())?.detail)
+  } catch {
+    // Not JSON: the status line is all there is.
+  }
+  const status = `${res.status}${res.statusText ? ` ${res.statusText}` : ''}`
+  return new ApiError(detail ? `${detail} (HTTP ${res.status})` : `The server answered ${status} without a reason`, res.status)
 }
 
 export async function apiGet<T>(path: string): Promise<T> {
