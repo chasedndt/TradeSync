@@ -20,7 +20,6 @@ from tradesync_core.regime_lab import (
     RegimeLabValidationError,
     aggregate_directional_evidence,
     aggregate_feature_evidence,
-    assess_learning_gate,
     build_challenger_rulebook,
     compare_experiment,
 )
@@ -99,15 +98,6 @@ class RegimeLabEngine:
                 "version": self.catalog.version,
                 "digest": self.catalog.digest,
                 "feature_count": len(self.catalog.features),
-            },
-            "learning": {
-                "module": "Year 2 Probability and Statistics",
-                "class": "Regime Lab 02 - weights, coverage, and challenger controls",
-                "arithmetic_prompt": "What must all block weights add to?",
-                "interpretation_prompt": (
-                    "Explain why data coverage describes evidence availability, not the "
-                    "probability that a trade wins."
-                ),
             },
         }
 
@@ -217,10 +207,6 @@ class RegimeLabEngine:
             "block_evidence": evidence.blocks,
             "baseline_evaluation": baseline_evaluation,
             "directional_evidence": directional.to_dict(),
-            "operator_action_required": (
-                "Enter a testable hypothesis, a complete five-block weight set, "
-                "the arithmetic answer, and your own coverage explanation."
-            ),
         }
 
     def evaluate_request(
@@ -237,9 +223,6 @@ class RegimeLabEngine:
             str(payload.get("version", "")),
             str(payload.get("hypothesis", "")),
         )
-        learning = assess_learning_gate(
-            payload.get("arithmetic_answer"), payload.get("reflection")
-        )
         comparison = compare_experiment(
             self.baseline, challenger, evidence, payload.get("risk_flags", [])
         )
@@ -253,12 +236,10 @@ class RegimeLabEngine:
             ),
             "expected_effect": payload.get("expected_effect", "uncertain"),
             "weight_sum": round(sum(challenger.weights.values()), 12),
-            "learning_gate": learning,
             "block_evidence": evidence.blocks,
             "comparison": comparison,
             "challenger_config": challenger.data,
             "challenger_digest": challenger.digest,
-            "persistable": learning["complete"],
             "activation_available": False,
         }
 
@@ -389,8 +370,6 @@ async def persist_experiment(
             {
                 "evaluation_window": evaluation["evaluation_window"],
                 "expected_effect": evaluation["expected_effect"],
-                "learning_gate": evaluation["learning_gate"],
-                "operator_reflection": payload.get("reflection", ""),
                 "mode": "paper_shadow",
             }
         ),

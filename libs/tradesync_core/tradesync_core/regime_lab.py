@@ -240,36 +240,6 @@ def build_challenger_rulebook(
         raise RegimeLabValidationError(str(exc)) from exc
 
 
-def assess_learning_gate(
-    arithmetic_answer: Any,
-    reflection: Any,
-) -> dict[str, Any]:
-    """Assess only deterministic gates; do not pretend to understand prose."""
-
-    arithmetic_passed = False
-    if isinstance(arithmetic_answer, (int, float)) and not isinstance(
-        arithmetic_answer, bool
-    ):
-        arithmetic_passed = math.isfinite(float(arithmetic_answer)) and math.isclose(
-            float(arithmetic_answer), 1.0, abs_tol=1e-9, rel_tol=0
-        )
-    reflection_recorded = isinstance(reflection, str) and len(reflection.strip()) >= 20
-    return {
-        "question": "What must all block weights add to?",
-        "expected_answer": 1.0,
-        "arithmetic_passed": arithmetic_passed,
-        "reflection_recorded": reflection_recorded,
-        "reflection_review": "operator_review_required"
-        if reflection_recorded
-        else "not_recorded",
-        "complete": arithmetic_passed and reflection_recorded,
-        "note": (
-            "The arithmetic is checked deterministically. The written explanation is "
-            "stored for human review and is never auto-declared correct."
-        ),
-    }
-
-
 def compare_experiment(
     baseline: RegimeRulebook,
     challenger: RegimeRulebook,

@@ -2,10 +2,10 @@ import unittest
 from pathlib import Path
 
 from tradesync_core.market_features import load_catalog
+from tradesync_core import regime_lab
 from tradesync_core.regime_lab import (
     RegimeLabValidationError,
     aggregate_feature_evidence,
-    assess_learning_gate,
     build_challenger_rulebook,
     compare_experiment,
 )
@@ -78,14 +78,8 @@ class RegimeLabTests(unittest.TestCase):
                 "This hypothesis is long enough but its weights are invalid.",
             )
 
-    def test_learning_gate_checks_math_but_not_prose_correctness(self):
-        gate = assess_learning_gate(
-            1.0,
-            "Coverage measures available evidence, not the chance a trade wins.",
-        )
-        self.assertTrue(gate["complete"])
-        self.assertEqual(gate["reflection_review"], "operator_review_required")
-        self.assertFalse(assess_learning_gate(100, "long enough reflection text")["complete"])
+    def test_there_is_no_learning_gate(self):
+        self.assertFalse(hasattr(regime_lab, "assess_learning_gate"))
 
     def test_comparison_uses_same_evidence_and_has_no_activation_authority(self):
         challenger = build_challenger_rulebook(

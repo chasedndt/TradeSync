@@ -40,8 +40,6 @@ REQUEST = {
         "spot_premium": 0.10,
         "macro_flows": 0.10,
     },
-    "arithmetic_answer": 1.0,
-    "reflection": "Coverage measures available evidence and is not a win probability.",
     "risk_flags": [],
 }
 
@@ -50,14 +48,25 @@ REQUEST = {
     "app.regime_lab_routes._regime_lab_evidence",
     new=AsyncMock(return_value=(FEATURE_RESULTS, SOURCE_STATUS)),
 )
-def test_evaluate_is_paper_only_and_persistable_after_learning_gate():
+def test_evaluate_is_paper_only_and_asks_no_learning_questions():
     response = client.post("/state/regime-lab/evaluate", json=REQUEST)
     assert response.status_code == 200
     data = response.json()
     assert data["mode"] == "paper_shadow"
     assert data["execution_authority"] is False
-    assert data["persistable"] is True
     assert data["activation_available"] is False
+    assert "learning_gate" not in data and "persistable" not in data
+
+
+@patch(
+    "app.regime_lab_routes._regime_lab_evidence",
+    new=AsyncMock(return_value=(FEATURE_RESULTS, SOURCE_STATUS)),
+)
+def test_overview_carries_no_learning_questions():
+    response = client.get("/state/regime-lab/overview")
+    assert response.status_code == 200
+    body = response.json()
+    assert "learning" not in body and "operator_action_required" not in body
 
 
 @patch(

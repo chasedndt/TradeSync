@@ -30,8 +30,6 @@ class RegimeLabExperimentRequest(BaseModel):
     )
     expected_effect: str = Field(default="uncertain", max_length=80)
     weights: Dict[str, float]
-    arithmetic_answer: float
-    reflection: str = Field(min_length=1, max_length=1200)
     risk_flags: List[str] = Field(default_factory=list)
 
 
@@ -39,7 +37,7 @@ async def get_regime_lab_overview(
     venue: str = Query("hyperliquid"),
     symbol: str = Query("BTC-PERP"),
 ):
-    """Return source evidence, baseline math, and the current learning gate."""
+    """Return source evidence, feature normalization and the baseline evaluation."""
     feature_results, source_status = await _regime_lab_evidence(venue, symbol)
     return regime_lab_engine.build_overview(feature_results, source_status)
 
@@ -66,7 +64,7 @@ async def save_regime_lab_experiment(
     venue: str = Query("hyperliquid"),
     symbol: str = Query("BTC-PERP"),
 ):
-    """Persist a draft experiment after the deterministic learning gates pass."""
+    """Persist a draft experiment; nothing here can activate it."""
     feature_results, source_status = await _regime_lab_evidence(venue, symbol)
     try:
         evaluation = regime_lab_engine.evaluate_request(
@@ -74,14 +72,6 @@ async def save_regime_lab_experiment(
         )
     except RegimeLabValidationError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    if not evaluation["learning_gate"]["complete"]:
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                "Complete the weight-sum answer and write at least 20 characters "
-                "explaining coverage before saving."
-            ),
-        )
     if not state.pool:
         raise HTTPException(
             status_code=503,
