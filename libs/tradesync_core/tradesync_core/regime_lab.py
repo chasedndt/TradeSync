@@ -199,20 +199,20 @@ def aggregate_feature_evidence(
     )
 
 
-def build_challenger_rulebook(
+def challenger_rulebook(
     baseline: RegimeRulebook,
     weights: Mapping[str, Any],
     version: str,
-    hypothesis: str,
+    purpose: str | None = None,
 ) -> RegimeRulebook:
-    """Create a validated draft without mutating the baseline configuration."""
+    """A validated paper draft of ``baseline`` with new block weights.
+
+    The baseline configuration is never mutated. A replay needs only this; a
+    saved experiment also records its hypothesis as the draft's purpose.
+    """
 
     if not isinstance(version, str) or not version.strip():
         raise RegimeLabValidationError("challenger version is required")
-    if not isinstance(hypothesis, str) or len(hypothesis.strip()) < 20:
-        raise RegimeLabValidationError(
-            "hypothesis must contain at least 20 characters"
-        )
     if not isinstance(weights, Mapping):
         raise RegimeLabValidationError("weights must be an object")
     expected = set(baseline.weights)
@@ -230,7 +230,8 @@ def build_challenger_rulebook(
     draft["version"] = version.strip()
     draft["status"] = "draft"
     draft["environment"] = "paper"
-    draft["purpose"] = hypothesis.strip()
+    if purpose:
+        draft["purpose"] = purpose.strip()
     for block, raw_weight in weights.items():
         draft["blocks"][block]["weight"] = raw_weight
 
@@ -238,6 +239,21 @@ def build_challenger_rulebook(
         return validate_rulebook(draft)
     except RulebookValidationError as exc:
         raise RegimeLabValidationError(str(exc)) from exc
+
+
+def build_challenger_rulebook(
+    baseline: RegimeRulebook,
+    weights: Mapping[str, Any],
+    version: str,
+    hypothesis: str,
+) -> RegimeRulebook:
+    """The draft a saved experiment stores: a hypothesis of at least 20 characters is its purpose."""
+
+    if not isinstance(hypothesis, str) or len(hypothesis.strip()) < 20:
+        raise RegimeLabValidationError(
+            "hypothesis must contain at least 20 characters"
+        )
+    return challenger_rulebook(baseline, weights, version, hypothesis)
 
 
 def compare_experiment(

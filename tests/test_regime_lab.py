@@ -7,12 +7,20 @@ from tradesync_core.regime_lab import (
     RegimeLabValidationError,
     aggregate_feature_evidence,
     build_challenger_rulebook,
+    challenger_rulebook,
     compare_experiment,
 )
 from tradesync_core.regime_weights import load_rulebook
 
 
 ROOT = Path(__file__).resolve().parents[1]
+REPLAY_WEIGHTS = {
+    "price_volatility": 0.40,
+    "liquidity": 0.15,
+    "positioning": 0.20,
+    "spot_premium": 0.15,
+    "macro_flows": 0.10,
+}
 
 
 class RegimeLabTests(unittest.TestCase):
@@ -77,6 +85,25 @@ class RegimeLabTests(unittest.TestCase):
                 "bad",
                 "This hypothesis is long enough but its weights are invalid.",
             )
+
+    def test_a_replay_challenger_needs_weights_and_a_version_but_no_hypothesis(self):
+        challenger = challenger_rulebook(self.baseline, REPLAY_WEIGHTS, "replay-1")
+        self.assertEqual(challenger.weights["price_volatility"], 0.40)
+        self.assertEqual(challenger.data["status"], "draft")
+        self.assertEqual(challenger.data["purpose"], self.baseline.data["purpose"])
+        partial = {k: v for k, v in REPLAY_WEIGHTS.items() if k != "macro_flows"}
+        with self.assertRaisesRegex(RegimeLabValidationError, "missing blocks: macro_flows"):
+            challenger_rulebook(self.baseline, partial, "replay-1")
+        with self.assertRaisesRegex(RegimeLabValidationError, "version is required"):
+            challenger_rulebook(self.baseline, REPLAY_WEIGHTS, " ")
+
+    def test_a_saved_challenger_still_needs_a_hypothesis(self):
+        with self.assertRaisesRegex(RegimeLabValidationError, "hypothesis"):
+            build_challenger_rulebook(self.baseline, REPLAY_WEIGHTS, "saved-1", "too short")
+        saved = build_challenger_rulebook(
+            self.baseline, REPLAY_WEIGHTS, "saved-1", "More price weight should admit more trending setups."
+        )
+        self.assertEqual(saved.data["purpose"], "More price weight should admit more trending setups.")
 
     def test_there_is_no_learning_gate(self):
         self.assertFalse(hasattr(regime_lab, "assess_learning_gate"))
