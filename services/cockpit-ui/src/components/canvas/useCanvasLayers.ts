@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
-import type { DepthResponse, Drawing, Opportunity } from '../../api/types'
+import type { DepthResponse, Opportunity } from '../../api/types'
+import type { Drawing } from '../../api/drawingTypes'
 import type { Shape } from './DrawingOverlay'
 import type { EvidenceMarker, PriceLevel } from './chartTypes'
 

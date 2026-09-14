@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiPost, apiDelete } from '../client'
-import type { DrawingList, Drawing, DrawingInput } from '../types'
+import type { DrawingList, Drawing, DrawingInput } from '../drawingTypes'
 
 export function useDrawings(symbol: string, interval: string) {
   return useQuery({
