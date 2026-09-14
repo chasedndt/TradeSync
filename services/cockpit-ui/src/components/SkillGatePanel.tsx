@@ -1,5 +1,7 @@
 import { useSkillGate } from '../api/hooks/useSkillGate'
-import type { SkillGateCell } from '../api/types'
+import type { SkillGateCell } from '../api/outcomeEvidenceTypes'
+import { CachedReadingNote } from './CachedReadingNote'
+import styles from './SkillGatePanel.module.css'
 
 /**
  * Three verdicts per horizon and regime, never collapsed into one.
@@ -11,10 +13,17 @@ import type { SkillGateCell } from '../api/types'
  * only on economic edge, and even then only with explicit operator approval.
  */
 export function SkillGatePanel({ symbol }: { symbol?: string }) {
-  const { data, isLoading, isError } = useSkillGate(symbol)
+  const { data, error, isLoading } = useSkillGate(symbol)
 
-  if (isError) return <section className="panel lab-section"><p className="tone-bad">Skill gate unavailable. Nothing is inferred.</p></section>
-  if (isLoading || !data) return <section className="panel lab-section"><p className="tone-dim">Measuring skill gate… (block bootstrap over every cell)</p></section>
+  if (error) {
+    return <section className="panel lab-section"><p className={`${styles.state} tone-bad`}>Skill gate unavailable: {error.message}. Nothing is inferred.</p></section>
+  }
+  if (isLoading || !data) {
+    return <section className="panel lab-section"><p className={`${styles.state} tone-dim`}>Asking for the skill gate…</p></section>
+  }
+  if (data.status === 'computing') {
+    return <section className="panel lab-section"><p className={`${styles.state} tone-dim`}>{data.note}</p></section>
+  }
 
   const v = data.verdict
   return (
@@ -23,21 +32,22 @@ export function SkillGatePanel({ symbol }: { symbol?: string }) {
         <div>
           <h2 id="skill-gate-title">Skill gate</h2>
           <p>Entry-time regimes · counted independence · Holm-adjusted across {data.cells_assessed_together} cells{symbol ? ` · ${symbol}` : ' · all symbols'}</p>
+          <CachedReadingNote computedAt={data.computed_at} cache={data.cache} />
         </div>
         <span className={v.gate === 'OPEN' ? 'tone-good' : 'tone-bad'}>{v.gate}</span>
       </div>
 
-      <div style={{ display: 'flex', gap: 22, flexWrap: 'wrap', padding: '0 16px 10px' }}>
+      <div className={styles.verdicts}>
         <Verdict label="Detectable anywhere" value={v.any_detectable} />
         <Verdict label="Positive skill anywhere" value={v.any_positive_skill} />
         <Verdict label="Economic edge anywhere" value={v.any_economic_edge} />
-        <span className="metric-sub" style={{ alignSelf: 'end' }}>
+        <span className={`metric-sub ${styles.costs}`}>
           costs {data.costs.total_pct.toFixed(3)}% round trip · {data.entry_regimes_pending > 0 ? `${data.entry_regimes_pending} opportunities not yet regime-labelled` : 'all opportunities regime-labelled'}
         </span>
       </div>
 
-      <div style={{ overflowX: 'auto', padding: '0 16px 12px' }}>
-        <table className="market-table" style={{ fontSize: 12 }}>
+      <div className={styles.scroll}>
+        <table className="market-table">
           <thead>
             <tr><th>Horizon</th><th>Regime</th><th>n</th><th>independent</th><th>skill</th><th>z</th><th>net %</th><th>hold-out</th><th>detectable</th><th>positive</th><th>edge</th></tr>
           </thead>
@@ -46,7 +56,7 @@ export function SkillGatePanel({ symbol }: { symbol?: string }) {
           </tbody>
         </table>
       </div>
-      <p className="market-footnote" style={{ padding: '0 16px 14px' }}>{data.note} Costs: {data.costs.source}.</p>
+      <p className={`market-footnote ${styles.foot}`}>{data.note} Costs: {data.costs.source}.</p>
     </section>
   )
 }
@@ -54,7 +64,7 @@ export function SkillGatePanel({ symbol }: { symbol?: string }) {
 function Verdict({ label, value }: { label: string; value: boolean }) {
   return (
     <div>
-      <span className="metric-sub" style={{ display: 'block' }}>{label}</span>
+      <span className={`metric-sub ${styles.verdictLabel}`}>{label}</span>
       <span className={`metric-main ${value ? 'tone-good' : 'tone-dim'}`}>{value ? 'YES' : 'no'}</span>
     </div>
   )

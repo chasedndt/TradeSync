@@ -80,3 +80,34 @@ export interface EvidenceCardsResponse {
   costs: SkillGateResponse['costs']
   note: string
 }
+
+// === Slow readings served from the statistics cache ===
+
+export interface CacheState {
+  age_s: number | null
+  ttl_s: number
+  stale: boolean
+  refreshing: boolean
+  duration_s: number | null
+  last_error: string | null
+}
+
+/** A measured reading: its body, when it was computed, and the cache's view of it. */
+export interface MeasuredReading {
+  status: 'ready'
+  computed_at: string
+  cache: CacheState
+}
+
+/** A market not measured yet; the API is measuring it behind the request. */
+export interface ComputingReading {
+  schema_version: string
+  status: 'computing'
+  symbol: string | null
+  computed_at: null
+  cache: CacheState
+  note: string
+}
+
+export type SkillGateReading = (SkillGateResponse & MeasuredReading) | ComputingReading
+export type EvidenceCardsReading = (EvidenceCardsResponse & MeasuredReading) | ComputingReading

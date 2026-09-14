@@ -1,0 +1,2 @@
+.note { display: block; margin-top: 4px; color: var(--muted); font: 11px var(--font-mono); overflow-wrap: anywhere; }
+.warn { color: #ffd27b; }

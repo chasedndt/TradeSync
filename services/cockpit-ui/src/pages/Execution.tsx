@@ -28,7 +28,9 @@ export function Execution() {
   const enabled = status.data?.execution_enabled === 'true'
   const hyperliquid = status.data?.venues?.find((v) => v.venue === 'hyperliquid')
   const executorUp = hyperliquid?.circuit_open === false
-  const verdict = gate.data?.verdict
+  // The skill gate is served from a measured cache; a first measurement answers "computing".
+  const measuring = gate.isLoading || gate.data?.status === 'computing'
+  const verdict = gate.data?.status === 'ready' ? gate.data.verdict : undefined
   const counts = rehearsals.data?.counts
 
   const gates: Gate[] = [
@@ -42,11 +44,11 @@ export function Execution() {
     {
       title: 'Demonstrated edge',
       requirement: 'At least one horizon and regime shows positive skill after the multiple-comparison adjustment and a positive mean return after fees, spread and slippage.',
-      now: gate.isLoading ? 'measuring…' : verdict
+      now: measuring ? 'measuring…' : verdict
         ? <>skill gate {verdict.gate} · positive skill {verdict.any_positive_skill ? 'yes' : 'no'} · economic edge {verdict.any_economic_edge ? 'yes' : 'no'} · <Link to="/regime-lab">Regime Lab</Link></>
-        : 'skill gate unavailable',
-      state: gate.isLoading ? 'checking' : verdict?.any_economic_edge ? 'met' : 'notMet',
-      label: gate.isLoading ? 'CHECKING' : verdict?.any_economic_edge ? 'MET' : 'NOT MET',
+        : `skill gate unavailable${gate.error ? `: ${gate.error.message}` : ''}`,
+      state: measuring ? 'checking' : verdict?.any_economic_edge ? 'met' : 'notMet',
+      label: measuring ? 'CHECKING' : verdict?.any_economic_edge ? 'MET' : 'NOT MET',
     },
     {
       title: 'Paper rehearsal journal',

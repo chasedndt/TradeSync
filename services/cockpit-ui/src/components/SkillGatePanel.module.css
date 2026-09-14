@@ -1,0 +1,6 @@
+.state { margin: 0; padding: 14px 17px; font-size: 12px; overflow-wrap: anywhere; }
+.verdicts { display: flex; flex-wrap: wrap; gap: 22px; padding: 10px 16px; }
+.verdictLabel { display: block; }
+.costs { align-self: end; }
+.scroll { overflow-x: auto; padding: 0 16px 12px; }
+.foot { padding: 0 16px 14px; }
