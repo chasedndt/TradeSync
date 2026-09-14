@@ -9,12 +9,15 @@ import unittest
 
 from tradesync_core.canvas_drawings import (
     MAX_LABEL_LENGTH,
+    MAX_POINTS,
     DrawingError,
     next_version,
     validate_drawing,
 )
 
 T = 1_788_800_000
+A = {"time_s": T, "price": 79000.0}
+B = {"time_s": T + 3600, "price": 79500.0}
 
 
 def _payload(kind="horizontal", points=None, **extra):
@@ -57,6 +60,76 @@ class KindTests(unittest.TestCase):
             validate_drawing(_payload("trendline", [same, dict(same)]))
 
 
+class ToolKindTests(unittest.TestCase):
+    """The tool rail's kinds, alongside the four the canvas started with."""
+
+    ONE_ANCHOR = ("horizontal", "horizontal_ray", "vertical")
+    TWO_ANCHOR = ("trendline", "ray", "extended_line", "range", "rectangle", "fib_retracement")
+
+    def test_each_one_anchor_kind_takes_exactly_one_point(self):
+        for kind in self.ONE_ANCHOR:
+            with self.subTest(kind=kind):
+                self.assertEqual(validate_drawing(_payload(kind, [A])).kind, kind)
+                with self.assertRaisesRegex(DrawingError, "exactly 1"):
+                    validate_drawing(_payload(kind, [A, B]))
+
+    def test_each_two_anchor_kind_takes_exactly_two_distinct_points(self):
+        for kind in self.TWO_ANCHOR:
+            with self.subTest(kind=kind):
+                self.assertEqual(len(validate_drawing(_payload(kind, [A, B])).points), 2)
+                with self.assertRaisesRegex(DrawingError, "exactly 2"):
+                    validate_drawing(_payload(kind, [A]))
+                with self.assertRaisesRegex(DrawingError, "exactly 2"):
+                    validate_drawing(_payload(kind, [A, B, {"time_s": T + 7200, "price": 80000.0}]))
+                with self.assertRaisesRegex(DrawingError, "two distinct"):
+                    validate_drawing(_payload(kind, [A, dict(A)]))
+
+    def test_text_and_note_take_one_point_and_need_their_label(self):
+        for kind in ("text", "note"):
+            with self.subTest(kind=kind):
+                self.assertEqual(validate_drawing(_payload(kind, [A], label="sweep")).label, "sweep")
+                with self.assertRaisesRegex(DrawingError, "exactly 1"):
+                    validate_drawing(_payload(kind, [A, B], label="sweep"))
+                with self.assertRaisesRegex(DrawingError, "needs a label"):
+                    validate_drawing(_payload(kind, [A], label="   "))
+
+    def test_every_kind_is_listed_when_one_is_unknown(self):
+        with self.assertRaises(DrawingError) as refused:
+            validate_drawing(_payload("arrow"))
+        for kind in self.ONE_ANCHOR + self.TWO_ANCHOR + ("pencil", "text", "note"):
+            self.assertIn(kind, str(refused.exception))
+
+
+class PencilTests(unittest.TestCase):
+    @staticmethod
+    def _stroke(count):
+        return [{"time_s": T + i * 60, "price": 79000.0 + i} for i in range(count)]
+
+    def test_the_point_ceiling_is_four_hundred(self):
+        self.assertEqual(MAX_POINTS, 400)
+
+    def test_a_stroke_takes_from_two_to_four_hundred_points(self):
+        for count in (2, 3, MAX_POINTS):
+            with self.subTest(count=count):
+                self.assertEqual(len(validate_drawing(_payload("pencil", self._stroke(count))).points), count)
+
+    def test_a_single_point_stroke_is_refused_with_the_accepted_range(self):
+        with self.assertRaisesRegex(DrawingError, "2 to 400"):
+            validate_drawing(_payload("pencil", self._stroke(1)))
+
+    def test_more_than_the_ceiling_is_refused(self):
+        with self.assertRaisesRegex(DrawingError, "at most 400"):
+            validate_drawing(_payload("pencil", self._stroke(MAX_POINTS + 1)))
+
+    def test_a_stroke_whose_points_all_coincide_is_refused(self):
+        with self.assertRaisesRegex(DrawingError, "at least two distinct"):
+            validate_drawing(_payload("pencil", [A, dict(A), dict(A)]))
+
+    def test_a_stroke_that_returns_to_its_start_is_kept(self):
+        drawing = validate_drawing(_payload("pencil", [A, B, dict(A)]))
+        self.assertEqual(len(drawing.points), 3)
+
+
 class PointTests(unittest.TestCase):
     def test_a_non_positive_price_is_refused(self):
         with self.assertRaisesRegex(DrawingError, "positive finite price"):
@@ -95,6 +168,15 @@ class LabelTests(unittest.TestCase):
     def test_an_overlong_label_is_refused(self):
         with self.assertRaisesRegex(DrawingError, "exceeds"):
             validate_drawing(_payload(label="x" * (MAX_LABEL_LENGTH + 1)))
+
+    def test_text_and_note_labels_are_accepted_up_to_280_characters(self):
+        self.assertEqual(MAX_LABEL_LENGTH, 280)
+        for kind in ("text", "note"):
+            with self.subTest(kind=kind):
+                drawing = validate_drawing(_payload(kind, label="x" * MAX_LABEL_LENGTH))
+                self.assertEqual(len(drawing.label), MAX_LABEL_LENGTH)
+                with self.assertRaisesRegex(DrawingError, "exceeds 280"):
+                    validate_drawing(_payload(kind, label="x" * (MAX_LABEL_LENGTH + 1)))
 
 
 class ContextTests(unittest.TestCase):

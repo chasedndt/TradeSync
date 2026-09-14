@@ -19,19 +19,35 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
+from tradesync_core.canvas_drawing_style import DrawingStyle, StyleError, validate_style
+
 SCHEMA_VERSION = "canvas_drawing_v1"
 
-# Each kind declares how many anchor points it needs. Validating the count here
-# keeps a malformed shape out of storage rather than out of the renderer.
-DRAWING_KINDS: dict[str, int] = {
-    "horizontal": 1,   # a price level; time is ignored
-    "trendline": 2,    # two anchors
-    "range": 2,        # a rectangle between two anchors
-    "note": 1,         # a comment anchored at a point
+MAX_LABEL_LENGTH = 280
+# A freehand stroke is simplified in the browser before it is sent, to at most
+# this many points. No other kind comes near it.
+MAX_POINTS = 400
+
+# Each kind declares how many anchor points it accepts, as (fewest, most).
+# Validating the count here keeps a malformed shape out of storage rather than
+# out of the renderer.
+DRAWING_KINDS: dict[str, tuple[int, int]] = {
+    "horizontal": (1, 1),       # a price level; time is ignored
+    "horizontal_ray": (1, 1),   # a price level from its anchor to the right
+    "vertical": (1, 1),         # a moment; price is ignored
+    "trendline": (2, 2),        # a segment between two anchors
+    "ray": (2, 2),              # from the first anchor through the second, onwards
+    "extended_line": (2, 2),    # through both anchors, both ways
+    "range": (2, 2),            # a rectangle between two anchors
+    "rectangle": (2, 2),        # a rectangle between opposite corners
+    "fib_retracement": (2, 2),  # retracement levels from a move's start to its end
+    "pencil": (2, MAX_POINTS),  # a freehand stroke
+    "note": (1, 1),             # a comment anchored at a point
+    "text": (1, 1),             # text written on the chart at a point
 }
 
-MAX_LABEL_LENGTH = 280
-MAX_POINTS = 8
+# Kinds whose label is their content, so an empty label records nothing.
+LABELLED_KINDS = frozenset({"note", "text"})
 
 
 class DrawingError(ValueError):
@@ -58,6 +74,7 @@ class Drawing:
     label: str = ""
     colour: str = ""
     points_raw: list[dict[str, Any]] = field(default_factory=list)
+    style: DrawingStyle | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -68,6 +85,7 @@ class Drawing:
             "points": [p.to_dict() for p in self.points],
             "label": self.label,
             "colour": self.colour,
+            "style": self.style.to_dict() if self.style else None,
             # Restated so no consumer mistakes an annotation for evidence.
             "authority": "none",
         }
@@ -78,6 +96,14 @@ def _number(value: Any) -> float | None:
         return None
     number = float(value)
     return number if number == number and abs(number) != float("inf") else None
+
+
+def _check_point_count(kind: str, count: int) -> None:
+    fewest, most = DRAWING_KINDS[kind]
+    if fewest == most and count != fewest:
+        raise DrawingError(f"a {kind} needs exactly {fewest} point(s), got {count}")
+    if not fewest <= count <= most:
+        raise DrawingError(f"a {kind} needs {fewest} to {most} points, got {count}")
 
 
 def validate_drawing(payload: Mapping[str, Any]) -> Drawing:
@@ -103,12 +129,7 @@ def validate_drawing(payload: Mapping[str, Any]) -> Drawing:
         raise DrawingError("points must be a list")
     if len(raw_points) > MAX_POINTS:
         raise DrawingError(f"at most {MAX_POINTS} points are accepted")
-
-    expected = DRAWING_KINDS[kind]
-    if len(raw_points) != expected:
-        raise DrawingError(
-            f"a {kind} needs exactly {expected} point(s), got {len(raw_points)}"
-        )
+    _check_point_count(kind, len(raw_points))
 
     points: list[DrawingPoint] = []
     for index, item in enumerate(raw_points):
@@ -122,16 +143,22 @@ def validate_drawing(payload: Mapping[str, Any]) -> Drawing:
             raise DrawingError(f"point {index} needs a positive integer time_s")
         points.append(DrawingPoint(time_s=time_s, price=price))
 
-    # A two-anchor shape with identical anchors is degenerate: it renders as
-    # nothing and usually means a click was registered twice.
-    if expected == 2 and points[0].time_s == points[1].time_s and points[0].price == points[1].price:
-        raise DrawingError(f"a {kind} needs two distinct points")
+    # Anchors that all coincide make a degenerate shape: it renders as nothing
+    # and usually means a click was registered twice.
+    if len(points) >= 2 and len({(p.time_s, p.price) for p in points}) == 1:
+        wanted = "two" if DRAWING_KINDS[kind][1] == 2 else "at least two"
+        raise DrawingError(f"a {kind} needs {wanted} distinct points")
 
     label = str(payload.get("label", "")).strip()
     if len(label) > MAX_LABEL_LENGTH:
         raise DrawingError(f"label exceeds {MAX_LABEL_LENGTH} characters")
-    if kind == "note" and not label:
-        raise DrawingError("a note needs a label; an empty note records nothing")
+    if kind in LABELLED_KINDS and not label:
+        raise DrawingError(f"a {kind} needs a label; an empty {kind} records nothing")
+
+    try:
+        style = validate_style(payload.get("style"))
+    except StyleError as exc:
+        raise DrawingError(str(exc)) from exc
 
     return Drawing(
         symbol=symbol,
@@ -140,6 +167,7 @@ def validate_drawing(payload: Mapping[str, Any]) -> Drawing:
         points=points,
         label=label,
         colour=str(payload.get("colour", "")).strip()[:32],
+        style=style,
     )
 
 
