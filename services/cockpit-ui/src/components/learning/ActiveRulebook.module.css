@@ -1,0 +1,8 @@
+.active { display: grid; gap: 4px; min-width: 0; padding: 12px 17px; border-bottom: 1px solid var(--border); background: var(--panel-muted); }
+.line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
+.line button { margin-left: auto; }
+.label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; }
+.version { color: var(--text); font: 600 13px var(--font-mono); overflow-wrap: anywhere; }
+.meta { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+.weights { margin: 0; color: var(--dim); font: 11px var(--font-mono); overflow-wrap: anywhere; }
+.message { margin: 0; padding: 12px 17px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }

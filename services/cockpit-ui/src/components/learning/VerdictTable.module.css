@@ -1,0 +1,11 @@
+.controls { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 17px 4px; }
+.scroll { overflow-x: auto; }
+.table { width: 100%; min-width: 820px; border-collapse: collapse; font-size: 12px; }
+.table thead th { padding: 10px; border-bottom: 1px solid var(--border); color: var(--muted); font: 600 10px/1.2 var(--font-mono); text-transform: uppercase; letter-spacing: 0.07em; text-align: left; white-space: nowrap; }
+.table td, .table tbody th { padding: 8px 10px; border-bottom: 1px solid var(--border-soft); text-align: left; white-space: nowrap; }
+.name { color: var(--text); font-weight: 500; }
+.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.range { display: block; color: var(--dim); font-size: 10px; }
+.count { color: var(--dim); font-size: 10px; }
+.message { margin: 0; padding: 12px 17px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.foot { margin: 0; padding: 10px 17px 14px; border-top: 1px solid var(--border); color: var(--muted); font-size: 11px; line-height: 1.5; }
