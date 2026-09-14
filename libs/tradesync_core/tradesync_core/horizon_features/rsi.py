@@ -1,16 +1,18 @@
-"""RSI: Wilder's relative strength, on a period matched to the horizon."""
+"""RSI: Wilder's relative strength, on a period matched to the horizon and the bars it is read on."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from ..horizon_outlook import Horizon
+from ..horizon_spec import INTERVAL_WORDS, Horizon
 from .base import Bars, Reading, series
 
 
-def period_days(h: Horizon) -> int:
-    """14 daily bars up to one month ahead; 98 daily bars for longer horizons, not weekly RSI."""
-    return 14 if h.days <= 30 else 98
+def period_bars(h: Horizon) -> int:
+    return h.rsi_bars
+
+
+period_days = period_bars  # the older name
 
 
 def wilder_rsi(closes: tuple[float, ...], period: int) -> list[float | None]:
@@ -33,10 +35,12 @@ class Rsi:
     key = "rsi"
     label = "RSI"
     kind = "context"
-    measures = "Wilder's relative strength: 14 daily bars up to one month ahead, 98 daily bars for three and six months. This is not RSI calculated from weekly candles. Flat prices read neutral at 50. Above 70 is overbought, below 30 oversold."
+    measures = ("Wilder's relative strength on the horizon's own bars: 14 or 56 bars of 15-minute or hourly candles for the short term, "
+                "14 daily bars up to a month, 98 daily bars for three and six months. Flat prices read neutral at 50. "
+                "Above 70 is overbought, below 30 oversold.")
 
     def values(self, bars: Bars, h: Horizon) -> list[float | None]:
-        return wilder_rsi(bars.closes, period_days(h))
+        return wilder_rsi(bars.closes, h.rsi_bars)
 
     def states(self, bars: Bars, h: Horizon) -> list[str | None]:
         return [None if v is None else "overbought" if v >= 70 else "oversold" if v <= 30 else "firm" if v >= 50 else "soft"
@@ -45,13 +49,13 @@ class Rsi:
     def read(self, bars: Bars, h: Horizon) -> Reading:
         value = self.values(bars, h)[-1]
         if value is None:
-            return Reading(None, "context", None, f"Needs {period_days(h) + 1} daily closes.")
+            return Reading(None, "context", None, f"Needs {h.rsi_bars + 1} bars.")
         state = self.states(bars, h)[-1]
-        scale = f"{period_days(h)}-day"
-        return Reading(state, "context", round(value, 1), f"The {scale} RSI is {value:.0f}, {str(state).replace('_', ' ')}.")
+        return Reading(state, "context", round(value, 1),
+                       f"RSI({h.rsi_bars}) on {INTERVAL_WORDS[h.interval]} bars is {value:.0f}, {str(state).replace('_', ' ')}.")
 
     def overlays(self, bars: Bars, h: Horizon, start: int) -> list[dict[str, Any]]:
-        line = series(f"RSI ({period_days(h)} days)", bars.times, self.values(bars, h), start, role="oscillator", pane="lower")
+        line = series(f"RSI({h.rsi_bars}), {INTERVAL_WORDS[h.interval]}", bars.times, self.values(bars, h), start, role="oscillator", pane="lower")
         return [{**line, "guides": [30, 70], "range": [0, 100]}]
 
 
