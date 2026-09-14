@@ -13,86 +13,14 @@ import json
 from datetime import datetime, timezone
 from typing import Any
 
-import re
-
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel, Field
 
 from app import hermes_jobs, hermes_link, fleet_live
+from app.fleet_models import DirectiveReport, DirectiveRequest, FleetSnapshot
+from app.fleet_rules import BRIDGE_KINDS, GATEWAY_KINDS, SCHEDULE_PRESETS, directive_payload
+from app.fleet_store import _upsert_jobs, _upsert_runs, _upsert_usage
 
 router = APIRouter(tags=["fleet"])
-
-DIRECTIVE_KINDS = ("set_schedule", "set_enabled", "set_workdir", "set_deliver", "pause", "resume", "run_now")
-# Applied at once through the Hermes gateway's jobs API on its port.
-GATEWAY_KINDS = frozenset({"set_schedule", "set_enabled", "set_deliver", "pause", "resume", "run_now"})
-# The host bridge can apply these by editing jobs.json: the working directory
-# (which the API does not expose), and schedule or enabled when the gateway is down.
-BRIDGE_KINDS = frozenset({"set_schedule", "set_enabled", "set_workdir"})
-DELIVER_RE = re.compile(r"^(local|discord:[0-9][0-9:]{5,63})$")
-# Schedules the panel offers. Anything else is a hand edit on the fleet host.
-SCHEDULE_PRESETS = {
-    "15m": {"kind": "interval", "minutes": 15, "display": "every 15m"},
-    "30m": {"kind": "interval", "minutes": 30, "display": "every 30m"},
-    "1h": {"kind": "interval", "minutes": 60, "display": "every 60m"},
-    "3h": {"kind": "interval", "minutes": 180, "display": "every 180m"},
-    "6h": {"kind": "interval", "minutes": 360, "display": "every 360m"},
-    "daily-08": {"kind": "cron", "expr": "0 8 * * *", "display": "0 8 * * *"},
-    "weekly-mon-08": {"kind": "cron", "expr": "0 8 * * 1", "display": "0 8 * * 1"},
-}
-
-
-class JobSnapshot(BaseModel):
-    job_id: str
-    name: str
-    enabled: bool = True
-    schedule: dict[str, Any] = Field(default_factory=dict)
-    schedule_display: str = ""
-    deliver: str = "local"
-    workdir: str | None = None
-    script: str | None = None
-    no_agent: bool = False
-    model: str | None = None
-    description: str = ""
-    last_run_at: datetime | None = None
-    last_status: str | None = None
-    next_run_at: datetime | None = None
-    state: str | None = None
-    # Redacted by the bridge (tradesync_core.job_errors) before it leaves the host.
-    last_error: str | None = None
-    last_delivery_error: str | None = None
-
-
-class RunSnapshot(BaseModel):
-    id: str
-    job_id: str
-    status: str
-    claimed_at: datetime | None = None
-    started_at: datetime | None = None
-    finished_at: datetime | None = None
-    duration_ms: int | None = None
-    error: str | None = None
-
-
-class UsageSnapshot(BaseModel):
-    fire_id: str
-    job_id: str
-    ts: datetime
-    model: str | None = None
-    prompt_tokens: int = 0
-    completion_tokens: int = 0
-    total_tokens: int = 0
-    duration_ms: int | None = None
-    deliver_target: str | None = None
-    response_silent: bool | None = None
-    error: str | None = None
-
-
-class FleetSnapshot(BaseModel):
-    jobs: list[JobSnapshot] = Field(default_factory=list)
-    runs: list[RunSnapshot] = Field(default_factory=list)
-    usage: list[UsageSnapshot] = Field(default_factory=list)
-    # Hermes's own gateway_state.json (platform states, pid, version), as read by the bridge.
-    gateway: dict[str, Any] | None = None
 
 
 def _parse_ts(value: Any) -> datetime | None:
@@ -103,69 +31,6 @@ def _parse_ts(value: Any) -> datetime | None:
     except ValueError:
         return None
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
-
-
-class DirectiveRequest(BaseModel):
-    job_id: str
-    kind: str
-    preset: str | None = None  # for set_schedule
-    enabled: bool | None = None  # for set_enabled
-    workdir: str | None = None  # for set_workdir
-    deliver: str | None = None  # for set_deliver: "local" or "discord:<channel id>"
-    requested_by: str = "operator"
-
-
-class DirectiveReport(BaseModel):
-    id: str
-    status: str
-    previous: dict[str, Any] | None = None
-    detail: str = ""
-
-
-async def _upsert_jobs(conn, jobs: list[JobSnapshot]) -> None:
-    for j in jobs:
-        await conn.execute(
-            """
-            INSERT INTO fleet_jobs (job_id, name, enabled, schedule, schedule_display, deliver, workdir, script, no_agent, model,
-                                    description, last_run_at, last_status, next_run_at, state, last_error, last_delivery_error, snapshot_at)
-            VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, now())
-            ON CONFLICT (job_id) DO UPDATE SET name = EXCLUDED.name, enabled = EXCLUDED.enabled, schedule = EXCLUDED.schedule,
-                schedule_display = EXCLUDED.schedule_display, deliver = EXCLUDED.deliver, workdir = EXCLUDED.workdir,
-                script = EXCLUDED.script, no_agent = EXCLUDED.no_agent, model = EXCLUDED.model, description = EXCLUDED.description,
-                last_run_at = EXCLUDED.last_run_at, last_status = EXCLUDED.last_status, next_run_at = EXCLUDED.next_run_at,
-                state = EXCLUDED.state, last_error = EXCLUDED.last_error, last_delivery_error = EXCLUDED.last_delivery_error,
-                snapshot_at = now()
-            """,
-            j.job_id, j.name, j.enabled, json.dumps(j.schedule), j.schedule_display, j.deliver, j.workdir, j.script,
-            j.no_agent, j.model, j.description, j.last_run_at, j.last_status, j.next_run_at, j.state,
-            j.last_error, j.last_delivery_error,
-        )
-
-
-async def _upsert_runs(conn, runs: list[RunSnapshot]) -> None:
-    for r in runs:
-        await conn.execute(
-            """
-            INSERT INTO fleet_runs (id, job_id, status, claimed_at, started_at, finished_at, duration_ms, error, snapshot_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now())
-            ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status, started_at = EXCLUDED.started_at,
-                finished_at = EXCLUDED.finished_at, duration_ms = EXCLUDED.duration_ms, error = EXCLUDED.error, snapshot_at = now()
-            """,
-            r.id, r.job_id, r.status, r.claimed_at, r.started_at, r.finished_at, r.duration_ms, r.error,
-        )
-
-
-async def _upsert_usage(conn, usage: list[UsageSnapshot]) -> None:
-    for u in usage:
-        await conn.execute(
-            """
-            INSERT INTO fleet_usage (fire_id, job_id, ts, model, prompt_tokens, completion_tokens, total_tokens, duration_ms,
-                                     deliver_target, response_silent, error)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) ON CONFLICT (fire_id) DO NOTHING
-            """,
-            u.fire_id, u.job_id, u.ts, u.model, u.prompt_tokens, u.completion_tokens, u.total_tokens, u.duration_ms,
-            u.deliver_target, u.response_silent, u.error,
-        )
 
 
 async def apply_via_gateway(job_id: str, kind: str, payload: dict[str, Any]) -> tuple[dict[str, Any], str, dict[str, Any]]:
@@ -203,28 +68,6 @@ async def refresh_job_row(conn, job: dict[str, Any]) -> None:
         str(job.get("id")), bool(job.get("enabled", True)), json.dumps(schedule), hermes_jobs.schedule_display(job),
         str(job.get("deliver") or "local"), job.get("state"), _parse_ts(job.get("next_run_at")),
     )
-
-
-def directive_payload(req: "DirectiveRequest") -> dict[str, Any]:
-    if req.kind not in DIRECTIVE_KINDS:
-        raise HTTPException(status_code=400, detail=f"kind must be one of {', '.join(DIRECTIVE_KINDS)}")
-    if req.kind == "set_schedule":
-        if req.preset not in SCHEDULE_PRESETS:
-            raise HTTPException(status_code=400, detail=f"preset must be one of {', '.join(SCHEDULE_PRESETS)}")
-        return {"schedule": SCHEDULE_PRESETS[req.preset], "preset": req.preset}
-    if req.kind == "set_enabled":
-        if req.enabled is None:
-            raise HTTPException(status_code=400, detail="enabled is required")
-        return {"enabled": req.enabled}
-    if req.kind == "set_workdir":
-        if not req.workdir:
-            raise HTTPException(status_code=400, detail="workdir is required")
-        return {"workdir": req.workdir}
-    if req.kind == "set_deliver":
-        if not req.deliver or not DELIVER_RE.fullmatch(req.deliver):
-            raise HTTPException(status_code=400, detail="deliver must be 'local' or 'discord:<channel id>'")
-        return {"deliver": req.deliver}
-    return {}
 
 
 def register(app, state) -> None:

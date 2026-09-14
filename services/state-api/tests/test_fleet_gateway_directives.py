@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
 
-from app import fleet, hermes_jobs
+from app import fleet_rules, hermes_jobs
 from app.main import app, state
 
 client = TestClient(app)
@@ -97,7 +97,7 @@ def test_delivery_targets_are_validated() -> None:
     with patch.object(state, "pool", fake_pool(FakeConn())):
         bad = client.post("/state/fleet/directives", json={"job_id": JOB, "kind": "set_deliver", "deliver": "https://example.com"})
     assert bad.status_code == 400
-    assert fleet.DELIVER_RE.fullmatch("local") and fleet.DELIVER_RE.fullmatch("discord:1520762323734888449")
+    assert fleet_rules.DELIVER_RE.fullmatch("local") and fleet_rules.DELIVER_RE.fullmatch("discord:1520762323734888449")
 
 
 def test_job_ids_are_checked_before_any_request() -> None:
