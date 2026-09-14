@@ -171,15 +171,9 @@ function LiquidationsPanel({ snapshot }: { snapshot: MarketSnapshot }) {
   const liqMetric = snapshot.available_metrics.find((m) => m.metric === 'liquidations')
   const status = liqMetric?.status || 'UNAVAILABLE'
 
-  if (status === 'UNAVAILABLE' || !snapshot.liquidations) {
-    return (
-      <div className="bg-gray-900 rounded-lg p-6 border border-gray-800 border-dashed flex flex-col items-center justify-center text-center">
-        <AlertCircle size={24} className="text-gray-700 mb-2" />
-        <p className="text-xs text-gray-400">Direct Hyperliquid liquidation feed unavailable</p>
-        <MetricStatusBadge status="UNAVAILABLE" />
-      </div>
-    )
-  }
+  // Hyperliquid publishes no market-wide liquidation feed; received liquidations
+  // and the estimated liquidation map are shown by their own panels instead.
+  if (status === 'UNAVAILABLE' || !snapshot.liquidations) return null
 
   const { liquidations } = snapshot
 
@@ -679,11 +673,11 @@ export function Market() {
       {/* Main Content — single-venue detailed panels */}
       {activeSnapshot && !isMultiVenue && (
         <>
-          {/* Data Age Banner */}
-          {activeSnapshot.data_age_ms > 30000 && (
+          {/* Data Age Banner: snapshot_age_ms is the snapshot's liveness; data_age_ms is its oldest metric and never refreshes. */}
+          {activeSnapshot.snapshot_age_ms > 60000 && (
             <div className="bg-red-900/30 border border-red-700/50 rounded-lg px-4 py-2 flex items-center gap-2 text-red-400 text-sm">
               <AlertCircle size={16} />
-              Data is stale ({Math.floor(activeSnapshot.data_age_ms / 1000)}s old)
+              Market data last updated {Math.floor(activeSnapshot.snapshot_age_ms / 1000)}s ago
             </div>
           )}
 

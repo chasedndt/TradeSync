@@ -10,15 +10,18 @@ services:
 
   redis:
     restart: unless-stopped
-    mem_limit: 256m
-    mem_reservation: 128m
+    # 160mb filled on 2026-09-14 (seven days of 15 s feature series) and, with
+    # noeviction, every market-data write failed until it was raised. Durable
+    # history belongs in Postgres; Redis holds the hot window.
+    mem_limit: 1g
+    mem_reservation: 256m
     cpus: 0.25
     command:
       - redis-server
       - --appendonly
       - "yes"
       - --maxmemory
-      - 160mb
+      - 700mb
       - --maxmemory-policy
       - noeviction
     logging:
