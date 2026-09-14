@@ -1,0 +1,18 @@
+/* Its bottom-left corner sits on the clicked point, where the saved text will be drawn. */
+.input {
+  position: absolute;
+  z-index: 10;
+  min-width: 200px;
+  padding: 4px 8px;
+  border: 1px solid var(--accent, #4fd1a1);
+  border-radius: 3px;
+  background: rgba(7, 17, 31, 0.95);
+  color: var(--text, #e8edf5);
+  font: 13px var(--font-sans, system-ui, sans-serif);
+  outline: none;
+  transform: translateY(-100%);
+}
+
+.input::placeholder {
+  color: var(--dim, #68768b);
+}

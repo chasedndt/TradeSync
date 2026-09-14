@@ -27,6 +27,11 @@ books (nSigFigs 2 and 3), Hyperliquid open interest, and liquidations received f
 Bybit and Binance (context only). Written once a minute by state-api's
 `market_recorder`; retention downsamples to 15 minutes (books after 3 days, open
 interest after 7) and drops books after 90 days and liquidations after 180.
+`027_canvas_drawing_kinds.sql` widens the canvas drawing kind check for the tool
+rail (ray, extended_line, horizontal_ray, vertical, rectangle, fib_retracement,
+pencil, text) and adds a nullable `style` jsonb per version. Not yet applied.
+UP, DOWN and UP again verified on a throwaway PostgreSQL 17 cluster; DOWN keeps
+rows of the newer kinds and restores the narrower check as NOT VALID.
 
 `026_paper_control.sql` proposes default-paused persistent paper entry control and
 an audit trail. Not yet applied; no current runtime control changed.
