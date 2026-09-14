@@ -16,6 +16,13 @@ Examples:
 
 Current repository migrations:
 
+`028_opportunity_learning.sql` adds per-horizon outcome attributions (result after
+costs, classification, reason sentence, per-feature and per-block attribution) and
+weight-learning proposals with walk-forward evidence and the operator's decision.
+Adoption writes to the existing `regime_rulebooks` / `regime_weight_activations`
+tables (002). Not yet applied. 027 and 029-031 are reserved by parallel branches;
+the runner applies pending versions in order, so a gap is safe.
+
 `026_paper_control.sql` proposes default-paused persistent paper entry control and
 an audit trail. Not yet applied; no current runtime control changed.
 
