@@ -47,7 +47,7 @@ REQUEST = {
 
 
 @patch(
-    "app.main._regime_lab_evidence",
+    "app.regime_lab_routes._regime_lab_evidence",
     new=AsyncMock(return_value=(FEATURE_RESULTS, SOURCE_STATUS)),
 )
 def test_evaluate_is_paper_only_and_persistable_after_learning_gate():
@@ -61,7 +61,7 @@ def test_evaluate_is_paper_only_and_persistable_after_learning_gate():
 
 
 @patch(
-    "app.main._regime_lab_evidence",
+    "app.regime_lab_routes._regime_lab_evidence",
     new=AsyncMock(return_value=(FEATURE_RESULTS, SOURCE_STATUS)),
 )
 def test_save_fails_closed_when_postgres_is_unavailable():
@@ -74,7 +74,7 @@ def test_save_fails_closed_when_postgres_is_unavailable():
 def test_invalid_weight_total_is_rejected():
     invalid = {**REQUEST, "weights": {name: 0.1 for name in REQUEST["weights"]}}
     with patch(
-        "app.main._regime_lab_evidence",
+        "app.regime_lab_routes._regime_lab_evidence",
         new=AsyncMock(return_value=(FEATURE_RESULTS, SOURCE_STATUS)),
     ):
         response = client.post("/state/regime-lab/evaluate", json=invalid)
