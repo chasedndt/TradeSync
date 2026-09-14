@@ -131,7 +131,7 @@ Do not use `down -v`; that removes persistent volumes.
 
 - `/` — Mission Control: authoritative market pulse, readiness, context feeds, system output, and safety state.
 - `/market` — detailed market snapshots; the future Market Canvas drilldown starts here.
-- `/regime-lab` — private paper-shadow feature evidence, challenger controls, learning gates, comparison, and draft experiment history.
+- `/regime-lab` — private paper-shadow feature evidence with source health, challenger weights judged by replaying stored decisions, and draft experiment history.
 - `/pipeline` — live Tier A/federated topology, missing-link evidence, workflow edges, capability gaps, and recovery targets. The top-bar status is focus/hover inspectable from every route.
 - `/opportunities` — paper opportunity review.
 - `/sources` — temporary legacy surface; roadmap replacement is Knowledge Graph intake and provenance.

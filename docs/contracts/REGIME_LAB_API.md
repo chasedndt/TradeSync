@@ -2,67 +2,117 @@
 
 ## Purpose
 
-The private Regime Lab is an operator-learning and paper-research surface. It
-connects the same Python calculations used by replay code to visible controls
-without giving the browser activation, approval, wallet, or execution authority.
+The private Regime Lab is a paper-research surface. It shows the live feature
+evidence behind the baseline rulebook and judges challenger weights by
+replaying the paper scorer's stored decisions. The browser has no activation,
+approval, wallet, or execution authority, and there is no activation endpoint.
 
 ## Read model
 
 `GET /state/regime-lab/overview?venue=hyperliquid&symbol=BTC-PERP`
 
-Returns the immutable baseline and catalog identities, current source status,
-all 17 feature gates, backend-normalized values, backend-aggregated blocks,
-baseline evaluation, and current learning questions.
+Returns the immutable baseline and catalog identities, market-data source
+status, one result per catalog feature with its backend normalization,
+backend-aggregated blocks, the baseline evaluation, and `health`.
 
-Feature status is part of the evidence contract:
+Each feature result carries, besides its value, normalization and score:
 
-- `ready` means a scoring-eligible feature passed provenance, freshness,
-  history, and dispersion gates;
-- `collecting_history` means a current real value exists but the declared
-  minimum comparison history has not been reached;
-- `not_normalized` means the value is intentionally display-only, proxy, or
-  context rather than a generic score;
-- `unavailable` includes missing sources, planned adapters, stale values, and
-  zero-dispersion windows, with the exact reason retained.
+- `feed`: where its reading comes from (Hyperliquid order book, Hyperliquid
+  market context, Hyperliquid trades, Coinbase, Binance, GDELT, or no live
+  adapter);
+- `age_ms`, `fresh_after_ms`, `stale_after_ms` and `freshness` (`fresh`,
+  `stale`, `missing`), judged against the feature's own catalog limits;
+- `coverage_reason`, exactly one of `fresh`, `stale`, `flat`,
+  `collecting_history`, `display_only`, `unavailable`.
 
-An unavailable market-data service does not create fixture values. The endpoint
-still returns configuration and 17 explicit unavailable records so the learning
-surface can operate honestly in degraded development mode.
+`normalization.method` is the method actually used. A tick-valued feature whose
+median absolute deviation is zero falls back to the ordinary z-score and records
+`requested_method` and `fallback`. A window of identical values stays
+unavailable with the reason `flat: every recent value identical`. Which
+features may score is decided by the catalog alone.
 
-## Stateless evaluation
+`health` reports market-data status, counts the coverage reasons, counts the
+fresh readings (the only ones called live), and gives each feed its newest
+reading's age against the tightest stale limit among its features.
 
-`POST /state/regime-lab/evaluate`
+An unavailable market-data service does not create fixture values: every
+feature is returned as unavailable with its reason.
 
-The operator supplies an experiment name, challenger version, testable
-hypothesis, evaluation window, expected effect, all five weights, the weight-sum
-answer, and a written coverage explanation. The API fetches market evidence
-itself; browser-supplied block scores and quality are not accepted.
+## Judging a challenger by replay
 
-Deterministic gates:
+`POST /state/regime-lab/replay`
 
-- weights sum to `1.0` within `1e-9`;
-- one block cannot exceed `0.40`;
-- the arithmetic answer is `1.0`;
-- the reflection has at least 20 non-whitespace characters.
+```json
+{
+  "hours": 168,
+  "horizon_minutes": 60,
+  "symbol": null,
+  "challenger_weights": {
+    "price_volatility": 0.35, "liquidity": 0.20, "positioning": 0.20,
+    "spot_premium": 0.15, "macro_flows": 0.10
+  },
+  "challenger_version": "1.0.0-c1"
+}
+```
 
-The service records only that reflection exists. It does not claim free text is
-mathematically correct without human review.
+- `hours` is 24, 168 or 720; `horizon_minutes` is 15, 60 or 240; a null
+  `symbol` replays every market.
+- Weights must name all five blocks, sum to `1.0` within `1e-9`, and no block
+  may exceed `0.40`. A violation is `422` with the reason.
 
-## Draft persistence
+The scorer's recorded decisions in the window, admitted and refused, are
+re-decided under the baseline and the challenger with the live decision code.
+Weights change admission, not direction. The response counts:
 
-`POST /state/regime-lab/experiments` repeats evaluation server-side and saves
-only when both learning gates pass. Configurations are immutable by digest, and
-the experiment is stored as `draft`. PostgreSQL failure returns `503`; there is
-no browser-storage, Redis, or untracked-file fallback.
+- `decisions`: replayed, changed, admissions gained, admissions lost, direction
+  flips;
+- `outcomes`: over decisions with a measured outcome at the horizon (those that
+  opened a paper opportunity), each rulebook's admitted set with its sample
+  count, hit rate, the hit rate its long/short mix would score by luck, skill,
+  and mean signed return;
+- `window`: decisions in the window, the sampling bucket for the decision
+  counts (one decision per market per 1, 10 or 30 minutes; every decision with
+  an outcome is kept), from when refused decisions are still available (they
+  are kept in full for seven days) and how many rows could not be replayed.
 
-`GET /state/regime-lab/experiments` lists recent drafts. There is deliberately
-no activation endpoint.
+Only the evidence a replay needs is read. Queries carry a 45-second timeout
+that answers `504` with a reason, and the replay runs in a worker thread.
+
+## Draft experiments
+
+`POST /state/regime-lab/experiments` takes `name`, `version`, `hypothesis` (at
+least 20 characters), `weights`, `hours`, `horizon_minutes` and `symbol`. It
+runs the same replay on the server and stores the hypothesis, the challenger
+configuration and the replay judgement as an immutable `draft`. Configurations
+are stored once by digest; a version already saved with another configuration
+answers `409`. PostgreSQL failure returns `503`; nothing is kept in browser
+storage, Redis or files.
+
+`GET /state/regime-lab/experiments?limit=8` lists recent drafts with their
+hypothesis, weights, window and replay counts. Drafts saved before replay
+judging list without a judgement.
+
+There is no learning gate and no single-snapshot evaluation endpoint.
+
+## Slow statistics
+
+`GET /state/outcomes/skill-gate` and `GET /state/outcomes/evidence-cards` are
+served from a measured cache:
+
+- `200` with `status: ready`, `computed_at` and `cache` (age, a 10-minute TTL,
+  whether it is stale, whether it is being refreshed, the last error);
+- `202` with `status: computing` while a market is measured for the first time;
+- `503` naming the error when a first measurement failed.
+
+Measurements run one at a time in a worker thread. The background loop
+`outcome_statistics_refresh` re-measures every market requested in the last 30
+minutes shortly before its entry expires.
 
 ## Market-data inputs
 
 - `GET /features/{venue}/{symbol}` returns current admitted measurements.
-- `GET /feature-history/{venue}/{symbol}/{feature_id}?window=7d` returns
-  cadence-governed history.
+- `GET /feature-histories/{venue}/{symbol}?window=7d` returns cadence-governed
+  histories for several features in one request.
 
 One latest observation is retained per sampling bucket. The browser never
 samples or normalizes features.
@@ -74,10 +124,10 @@ direct liquidation feed.
 
 ## Degraded development mode
 
-`STATE_API_DEGRADED_START=true` permits configuration, learning, and stateless
-evaluation when PostgreSQL is unavailable. This is not Tier A readiness.
-Database-dependent endpoints remain blocked, and Compose does not enable it by
-default.
+`STATE_API_DEGRADED_START=true` permits configuration and the overview when
+PostgreSQL is unavailable. Replay, experiments and the slow statistics need
+PostgreSQL and answer `503` without it. This is not Tier A readiness, and
+Compose does not enable it by default.
 
 ## Local runtime verification
 
