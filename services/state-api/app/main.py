@@ -706,65 +706,6 @@ async def get_latest_signals(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/state/opportunities", response_model=List[OpportunityResponse])
-async def get_opportunities(
-    symbol: Optional[str] = None, 
-    status: str = "new",
-    limit: int = Query(20, le=100)
-):
-    """Fetch opportunities."""
-    if symbol:
-        symbol = normalize_symbol(symbol)
-
-    if not state.pool:
-        raise HTTPException(status_code=503, detail="DB Pool not ready")
-
-    # "all" is a wildcard, not a stored status. Comparing it literally matched
-    # no row and silently returned an empty list, which the Cockpit rendered as
-    # "no scored opportunities available" even when opportunities existed.
-    filters = []
-    params: list = []
-    if symbol:
-        params.append(symbol)
-        filters.append(f"symbol = ${len(params)}")
-    if status and status.lower() != "all":
-        params.append(status)
-        filters.append(f"status = ${len(params)}")
-    where = f"WHERE {' AND '.join(filters)}" if filters else ""
-    params.append(limit)
-
-    try:
-        async with state.pool.acquire() as conn:
-            rows = await conn.fetch(
-                f"""
-                    SELECT id, symbol, timeframe, bias, quality, dir, status, snapshot_ts, links, confluence
-                    FROM opportunities
-                    {where}
-                    ORDER BY snapshot_ts DESC
-                    LIMIT ${len(params)}
-                """,
-                *params,
-            )
-
-            return [
-                {
-                    "id": str(r["id"]),
-                    "symbol": r["symbol"],
-                    "timeframe": r["timeframe"],
-                    "bias": r["bias"],
-                    "quality": r["quality"],
-                    "dir": r["dir"],
-                    "status": r["status"],
-                    "snapshot_ts": r["snapshot_ts"],
-                    "links": json.loads(r["links"]) if isinstance(r["links"], str) else r["links"],
-                    # Phase 3C: Include confluence with score_breakdown, execution_risk, warnings
-                    "confluence": json.loads(r["confluence"]) if isinstance(r["confluence"], str) else (r["confluence"] or {})
-                }
-                for r in rows
-            ]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 @app.get("/state/evidence", response_model=EvidenceResponse)
 async def get_evidence(opportunity_id: str):
     """Assembles all evidence for a given opportunity ID."""
@@ -3830,3 +3771,9 @@ register_mobile_alerts(app, state)
 
 from app.managed_paper import register as register_managed_paper  # noqa: E402
 register_managed_paper(app, state, market_data_url=MARKET_DATA_URL)
+
+# The opportunities list, moved to app/opportunities_routes.py; the /opps alias
+# above calls the handler returned here.
+from app.opportunities_routes import register as register_opportunities  # noqa: E402
+
+get_opportunities = register_opportunities(app, state, OpportunityResponse)
