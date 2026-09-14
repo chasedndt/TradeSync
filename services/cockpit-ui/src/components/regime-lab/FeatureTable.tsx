@@ -82,6 +82,9 @@ export function FeatureTable({ symbol, overview, cards }: Props) {
           </div>
         )}
       </div>
+      {data && !cards.data && cards.error && (
+        <p className={`${styles.state} tone-warn`}>Evidence-card verdicts unavailable: {cards.error.message}</p>
+      )}
       {overview.isLoading && <p className={styles.state}>Reading feature evidence for {symbol}…</p>}
       {!data && overview.error && <p className={`${styles.state} tone-bad`}>Feature evidence unavailable: {overview.error.message}</p>}
       {data && (

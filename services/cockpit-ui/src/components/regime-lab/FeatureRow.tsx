@@ -50,7 +50,9 @@ export function FeatureRow({ feature, symbol, open, onToggle, card, cardsState, 
         <td data-label="Value" className={styles.num}>{reading(feature.current_value)}</td>
         <td data-label="Age" className={`${styles.num} ${ageTone}`}>{duration(feature.age_ms)}</td>
         <td data-label="History" className={styles.num}>
-          {feature.minimum_history_points > 0 ? `${feature.history_count ?? 0}/${feature.minimum_history_points}` : '—'}
+          {feature.age_ms != null && feature.coverage_reason !== 'display_only' && feature.minimum_history_points > 0
+            ? `${feature.history_count ?? 0}/${feature.minimum_history_points}`
+            : '—'}
         </td>
         <td data-label="z" className={styles.num}>{signed(feature.normalization?.z_score)}</td>
         <td data-label="Score" className={`${styles.num} ${scoreTone}`}>{signed(feature.score, 3)}</td>
