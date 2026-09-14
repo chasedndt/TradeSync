@@ -16,6 +16,11 @@ Examples:
 
 Current repository migrations:
 
+`030_horizon_readings.sql` stores every Hermes reading of the timeframe outlook, one per band
+(short term, lower, medium, higher), with its start and finish times and the measurement it read,
+so the Timeframes page shows each reading's exact time, keeps the last good reading while a new one
+runs, and flags a reading older than the numbers under it.
+
 `031_market_history.sql` adds durable market history for the liquidity heatmap,
 the estimated liquidation map and timeframe records: aggregated Hyperliquid order
 books (nSigFigs 2 and 3), Hyperliquid open interest, and liquidations received from
