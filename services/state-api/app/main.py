@@ -3779,3 +3779,9 @@ register_managed_paper(app, state, market_data_url=MARKET_DATA_URL)
 from app.opportunities_routes import register as register_opportunities  # noqa: E402
 
 get_opportunities = register_opportunities(app, state, OpportunityResponse)
+
+# Opportunity learning: attributions, verdicts, walk-forward proposals and the
+# operator's adopt/reject/revert; see app/learning_routes.py.
+from app.learning_routes import register as register_learning  # noqa: E402
+
+register_learning(app, state, regime_lab_engine.baseline)
