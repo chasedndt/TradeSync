@@ -1,5 +1,0 @@
-.panel { display: grid; }
-.body { padding: 2px 17px 14px; display: grid; gap: 10px; max-width: 900px; }
-.body p { margin: 0; font-size: 13px; line-height: 1.65; }
-.muted { color: var(--muted); font-size: 11.5px !important; }
-.status { color: var(--amber); font-size: 12px !important; }

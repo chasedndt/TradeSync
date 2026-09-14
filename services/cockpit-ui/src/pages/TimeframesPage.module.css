@@ -1,0 +1,6 @@
+.page { display: grid; gap: 14px; min-width: 0; }
+.split { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+@media (max-width: 1100px) { .split { grid-template-columns: 1fr; } }
+.message { margin: 0; padding: 16px; color: var(--muted); font-size: 12px; }
+.error { margin: 0; padding: 16px; color: var(--red); font-size: 12px; }
+.note { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.5; }

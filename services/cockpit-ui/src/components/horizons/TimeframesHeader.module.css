@@ -1,0 +1,12 @@
+.header { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; padding: 14px 18px; flex-wrap: wrap; }
+.title h2 { margin: 0 0 4px; }
+.title p { margin: 0; color: var(--muted); max-width: 640px; font-size: 12.5px; line-height: 1.5; }
+.side { display: grid; gap: 8px; justify-items: end; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.status { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; color: var(--muted); font-size: 12px; justify-content: flex-end; }
+.status time { color: var(--text, #d7e3f0); font-family: var(--font-mono); }
+.price { color: var(--text, #d7e3f0); font: 600 13px var(--font-mono); }
+.error { color: var(--red); font-size: 12px; }
+@media (max-width: 760px) {
+  .side, .chips, .status { justify-items: start; justify-content: flex-start; }
+}

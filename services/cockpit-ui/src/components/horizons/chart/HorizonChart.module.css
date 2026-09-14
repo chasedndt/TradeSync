@@ -1,0 +1,22 @@
+.panel { padding: 12px 14px 14px; display: grid; gap: 8px; min-width: 0; scroll-margin-top: 80px; }
+.head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.head h3 { margin: 0; font-size: 14px; }
+.toggles { display: flex; flex-wrap: wrap; gap: 6px; }
+.panes { display: grid; gap: 0; min-width: 0; }
+.main { height: 440px; min-width: 0; }
+.lowerWrap { position: relative; border-top: 1px solid var(--border); }
+.lower { height: 130px; min-width: 0; }
+.paneTitle { position: absolute; left: 8px; top: 4px; z-index: 2; color: var(--muted); font: 600 10px var(--font-mono); text-transform: uppercase; letter-spacing: 0.06em; pointer-events: none; }
+.legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; min-height: 22px; padding: 2px 0 6px; font-size: 11.5px; color: var(--muted); }
+.when { font-family: var(--font-mono); color: var(--text, #d7e3f0); }
+.ohlc { font-family: var(--font-mono); }
+.item { display: inline-flex; align-items: center; gap: 6px; }
+.item i { display: inline-block; width: 16px; }
+.item b, .ohlc b { font-family: var(--font-mono); color: var(--text, #d7e3f0); font-weight: 600; }
+.note { margin: 6px 0 0; color: var(--muted); font-size: 11px; }
+.empty { height: 440px; display: grid; place-items: center; color: var(--muted); font-size: 12px; border: 1px dashed var(--border); border-radius: 6px; }
+@media (max-width: 760px) {
+  .main { height: 320px; }
+  .lower { height: 110px; }
+  .empty { height: 320px; }
+}

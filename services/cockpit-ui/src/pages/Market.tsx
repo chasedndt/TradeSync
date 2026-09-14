@@ -630,7 +630,7 @@ export function Market() {
                   <span className="text-xs text-gray-500 ml-2">{snap.symbol}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  {snap.data_age_ms > 30000 && (
+                  {(snap.snapshot_age_ms ?? 0) > 60000 && (
                     <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-900/50 text-red-400 border border-red-700">STALE</span>
                   )}
                   <span className="text-[9px] text-gray-500">{new Date(snap.ts).toLocaleTimeString()}</span>
@@ -674,10 +674,10 @@ export function Market() {
       {activeSnapshot && !isMultiVenue && (
         <>
           {/* Data Age Banner: snapshot_age_ms is the snapshot's liveness; data_age_ms is its oldest metric and never refreshes. */}
-          {activeSnapshot.snapshot_age_ms > 60000 && (
+          {(activeSnapshot.snapshot_age_ms ?? 0) > 60000 && (
             <div className="bg-red-900/30 border border-red-700/50 rounded-lg px-4 py-2 flex items-center gap-2 text-red-400 text-sm">
               <AlertCircle size={16} />
-              Market data last updated {Math.floor(activeSnapshot.snapshot_age_ms / 1000)}s ago
+              Market data last updated {Math.floor((activeSnapshot.snapshot_age_ms ?? 0) / 1000)}s ago
             </div>
           )}
 
