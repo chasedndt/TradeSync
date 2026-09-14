@@ -21,6 +21,8 @@ const BY_FEATURE_ROLE: Record<string, Stroke> = {
   'drawdown:range_high': { color: '#f28fad', width: 2, style: LineStyle.SparseDotted },
   'rsi:oscillator': { color: '#81a1c1', width: 2, style: LineStyle.Solid },
   'participation:average': { color: '#ebcb8b', width: 2, style: LineStyle.Solid },
+  'funding:funding': { color: '#d08770', width: 2, style: LineStyle.Solid },
+  'premium:premium': { color: '#88c0d0', width: 2, style: LineStyle.Solid },
 }
 
 export const CONE: Record<string, Stroke> = {

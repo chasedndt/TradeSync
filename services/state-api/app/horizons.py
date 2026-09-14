@@ -29,7 +29,7 @@ import httpx
 from fastapi import APIRouter, HTTPException, Query
 
 from app import background, horizon_reading
-from tradesync_core.horizon_bars import Bars
+from tradesync_core.horizon_bars import Bars, with_funding
 from tradesync_core.horizon_chart import chart_payload
 from tradesync_core.horizon_evaluation import evaluate_all
 from tradesync_core.horizon_features import FEATURES
@@ -98,14 +98,31 @@ async def fetch_interval(client: httpx.AsyncClient, market_data_url: str, symbol
     return [store[t] for t in sorted(store)]
 
 
-async def fetch_part(market_data_url: str, symbol: str, part: str) -> dict[str, list[dict[str, Any]]]:
+async def fetch_funding(client: httpx.AsyncClient, market_data_url: str, symbol: str, part: str) -> list[list[float]]:
+    """Hourly funding rate and premium rows for the part's history; empty when unavailable (the candle analysis stands without them)."""
+    now_s = int(time.time())
+    start_s = DAILY_HISTORY_START_S if part == "long" else now_s - INTRADAY_BARS * 3600
+    try:
+        response = await client.get(f"{market_data_url}/funding-history/hyperliquid/{symbol}",
+                                    params={"start_ms": start_s * 1000, "end_ms": now_s * 1000})
+        response.raise_for_status()
+        return response.json().get("rows") or []
+    except (httpx.HTTPError, ValueError):
+        return []
+
+
+async def fetch_part(market_data_url: str, symbol: str, part: str) -> dict[str, list[Any]]:
     async with httpx.AsyncClient(trust_env=False, timeout=60.0) as client:
-        return {interval: await fetch_interval(client, market_data_url, symbol, interval) for interval in PARTS[part]}
+        out: dict[str, list[Any]] = {interval: await fetch_interval(client, market_data_url, symbol, interval) for interval in PARTS[part]}
+        out["funding"] = await fetch_funding(client, market_data_url, symbol, part)
+        return out
 
 
-def _measure(symbol: str, part: str, candles: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
+def _measure(symbol: str, part: str, candles: dict[str, list[Any]]) -> dict[str, Any]:
     now = time.time()
-    bars = {interval: Bars.from_candles(rows, now, INTERVAL_SECONDS[interval]) for interval, rows in candles.items()}
+    funding = candles.get("funding") or []
+    bars = {interval: with_funding(Bars.from_candles(rows, now, INTERVAL_SECONDS[interval]), funding)
+            for interval, rows in candles.items() if interval in INTERVAL_SECONDS}
     horizons = tuple(h for h in HORIZONS if h.interval in PARTS[part])
     return {"at": now, "part": part, "bars": bars, "charts": {},
             "outlook": compose_horizons(symbol, bars, datetime.now(timezone.utc), horizons),

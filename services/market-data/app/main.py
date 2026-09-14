@@ -1095,6 +1095,19 @@ async def get_binance_open_interest_history(symbol: str, period: str = "1h", lim
         return JSONResponse(status_code=502, content={"error": "provider_unavailable", "detail": type(exc).__name__})
 
 
+@app.get("/funding-history/hyperliquid/{symbol}")
+async def get_funding_history_rows(symbol: str, start_ms: int, end_ms: int | None = None):
+    """Hourly Hyperliquid funding rate and premium for a window, as [time_s, rate, premium] rows (context for timeframe records)."""
+    if symbol not in SYMBOLS:
+        return JSONResponse(status_code=404, content={"error": "untracked_symbol", "symbol": symbol})
+    provider = next((p for p in providers if p.venue == "hyperliquid" and p.enabled), None)
+    if provider is None:
+        return JSONResponse(status_code=503, content={"error": "provider_unavailable", "venue": "hyperliquid"})
+    rows = await provider.fetch_funding_history(symbol, start_ms, end_ms)
+    return {"venue": "hyperliquid", "symbol": symbol, "authority": "display_only",
+            "rows": [[int(r["ts"]) // 1000, float(r["rate"]), float(r.get("premium") or 0.0)] for r in rows]}
+
+
 @app.get("/timeseries/{venue}/{symbol}/{metric}")
 async def get_timeseries(
     venue: str,

@@ -1,8 +1,8 @@
-"""Features read on daily candles for the multi-horizon outlook: one module per feature, registered here."""
+"""Features read on each horizon's bars for the multi-horizon outlook: one module per feature, registered here."""
 
 from __future__ import annotations
 
-from . import drawdown, momentum, participation, range_position, rsi, trend, volatility
+from . import drawdown, funding, momentum, participation, premium, range_position, rsi, trend, volatility
 from .base import Bars, HorizonFeature, Reading
 
 FEATURES: tuple[HorizonFeature, ...] = (
@@ -13,6 +13,8 @@ FEATURES: tuple[HorizonFeature, ...] = (
     drawdown.FEATURE,
     rsi.FEATURE,
     participation.FEATURE,
+    funding.FEATURE,
+    premium.FEATURE,
 )
 
 __all__ = ["Bars", "FEATURES", "HorizonFeature", "Reading"]

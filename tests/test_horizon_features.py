@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 from dataclasses import replace
 
-from tradesync_core.horizon_bars import Bars
+from tradesync_core.horizon_bars import Bars, with_funding
 from tradesync_core.horizon_chart import chart_payload, projection
 from tradesync_core.horizon_evaluation import evaluate_all, evaluate_horizon, tally_sentence
 from tradesync_core.horizon_features import FEATURES
@@ -19,12 +19,16 @@ DAY = 86400
 T0 = 1_600_000_000
 
 
-def bars(n=900, per_bar=0.002, wobble=0.03, volume=1000.0, interval="1d"):
+def bars(n=900, per_bar=0.002, wobble=0.03, volume=1000.0, interval="1d", funding=True):
     step = INTERVAL_SECONDS[interval]
     closes = [100 * math.exp(per_bar * i) * (1 + wobble * math.sin(i / 5)) for i in range(n)]
     candles = [{"time": T0 + i * step, "open": c, "high": c * 1.01, "low": c * 0.99, "close": c, "volume": volume * (1 + 0.1 * math.sin(i / 7))}
                for i, c in enumerate(closes)]
-    return Bars.from_candles(candles, bar_seconds=step)
+    built = Bars.from_candles(candles, bar_seconds=step)
+    if not funding:
+        return built
+    hours = range(T0 - 3600, T0 + n * step + 3600, 3600)
+    return with_funding(built, [[t, 1e-5 * (1 + math.sin(t / 86400)), 2e-4 * math.cos(t / 43200)] for t in hours])
 
 
 def feature(key):

@@ -13,7 +13,7 @@ from typing import Any, Mapping
 from tradesync_core.horizon_features.base import fmt_price
 from tradesync_core.horizon_spec import BANDS, HORIZONS, INTERVAL_WORDS
 
-FEATURE_NAMES = ("Trend", "Momentum", "Volatility", "Range position", "Drawdown", "RSI", "Participation")
+FEATURE_NAMES = ("Trend", "Momentum", "Volatility", "Range position", "Drawdown", "RSI", "Participation", "Funding", "Premium")
 
 
 def record_line(stats: Mapping[str, Any] | None) -> str:
