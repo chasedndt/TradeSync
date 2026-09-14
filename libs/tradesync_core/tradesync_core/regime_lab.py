@@ -12,6 +12,7 @@ import math
 from dataclasses import dataclass
 from typing import Any, Mapping, Sequence
 
+from .feature_weights import feature_weight
 from .market_features import FeatureCatalog
 from .regime_weights import (
     RegimeRulebook,
@@ -66,8 +67,13 @@ class DirectionalEvidence:
 def aggregate_directional_evidence(
     catalog: FeatureCatalog,
     feature_results: Sequence[Mapping[str, Any]],
+    feature_weights: Mapping[str, float] | None = None,
 ) -> DirectionalEvidence:
-    """Aggregate only the features permitted to establish a direction."""
+    """Aggregate only the features permitted to establish a direction.
+
+    ``feature_weights`` (from an adopted rulebook) scale each feature's pull on
+    the score. Coverage is unaffected: it counts evidence collected, not trust.
+    """
 
     admitted = [
         feature_id
@@ -84,6 +90,7 @@ def aggregate_directional_evidence(
 
     numerator = 0.0
     quality_total = 0.0
+    weighted_quality_total = 0.0
     contributors: list[dict[str, Any]] = []
     for feature_id in admitted:
         result = result_by_id.get(feature_id)
@@ -96,17 +103,24 @@ def aggregate_directional_evidence(
         if not math.isfinite(float(score)) or not math.isfinite(float(quality)):
             continue
         safe_quality = min(max(float(quality), 0.0), 1.0)
-        numerator += float(score) * safe_quality
+        weight = feature_weight(feature_weights, feature_id)
+        numerator += float(score) * safe_quality * weight
         quality_total += safe_quality
-        contributors.append(
-            {
-                "feature_id": feature_id,
-                "score": round(float(score), 12),
-                "quality": round(safe_quality, 12),
-            }
-        )
+        weighted_quality_total += safe_quality * weight
+        contributor = {
+            "feature_id": feature_id,
+            "score": round(float(score), 12),
+            "quality": round(safe_quality, 12),
+        }
+        if weight != 1.0:
+            contributor["weight"] = weight
+        contributors.append(contributor)
 
-    score = round(numerator / quality_total, 12) if quality_total > 0 else None
+    score = (
+        round(numerator / weighted_quality_total, 12)
+        if weighted_quality_total > 0
+        else None
+    )
     coverage = round(quality_total / len(admitted), 12) if admitted else 0.0
     return DirectionalEvidence(
         score=score,
@@ -138,6 +152,7 @@ def aggregate_feature_evidence(
     block_scores: dict[str, float] = {}
     data_quality: dict[str, float] = {}
     block_details: dict[str, dict[str, Any]] = {}
+    weights = rulebook.feature_weights
 
     for block in rulebook.weights:
         admitted = [
@@ -150,6 +165,7 @@ def aggregate_feature_evidence(
         ready: list[dict[str, Any]] = []
         numerator = 0.0
         quality_total = 0.0
+        weighted_quality_total = 0.0
         for feature_id in admitted:
             result = result_by_id.get(feature_id)
             if not result or not result.get("scoring_allowed"):
@@ -163,18 +179,25 @@ def aggregate_feature_evidence(
             if not math.isfinite(float(score)) or not math.isfinite(float(quality)):
                 continue
             safe_quality = min(max(float(quality), 0.0), 1.0)
-            numerator += float(score) * safe_quality
+            weight = feature_weight(weights, feature_id)
+            numerator += float(score) * safe_quality * weight
             quality_total += safe_quality
-            ready.append(
-                {
-                    "feature_id": feature_id,
-                    "score": round(float(score), 12),
-                    "quality": round(safe_quality, 12),
-                }
-            )
+            weighted_quality_total += safe_quality * weight
+            entry = {
+                "feature_id": feature_id,
+                "score": round(float(score), 12),
+                "quality": round(safe_quality, 12),
+            }
+            if weight != 1.0:
+                entry["weight"] = weight
+            ready.append(entry)
 
+        # Quality (coverage) counts evidence collected; weights change only
+        # how hard each collected reading pulls on the block's score.
         block_quality = quality_total / len(admitted) if admitted else 0.0
-        block_score = numerator / quality_total if quality_total > 0 else None
+        block_score = (
+            numerator / weighted_quality_total if weighted_quality_total > 0 else None
+        )
         if block_score is not None:
             block_scores[block] = round(block_score, 12)
             data_quality[block] = round(block_quality, 12)

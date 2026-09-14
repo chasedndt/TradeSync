@@ -15,6 +15,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from .feature_weights import (
+    FEATURE_WEIGHTS_KEY,
+    FeatureWeightError,
+    diff_feature_weights,
+    feature_weights_of,
+    validate_feature_weights,
+)
+
 
 class RulebookValidationError(ValueError):
     """Raised when a rulebook or score input violates its contract."""
@@ -37,6 +45,11 @@ class RegimeRulebook:
     @property
     def rulebook_id(self) -> str:
         return str(self.data["rulebook_id"])
+
+    @property
+    def feature_weights(self) -> dict[str, float]:
+        """Per-feature multipliers; empty means every feature counts once."""
+        return feature_weights_of(self.data)
 
 
 def _canonical_json(value: Mapping[str, Any]) -> str:
@@ -167,6 +180,11 @@ def validate_rulebook(data: Mapping[str, Any]) -> RegimeRulebook:
                 f"paper_risk.caps.{flag} must be between {minimum} and {maximum}"
             )
         risk_caps[str(flag)] = cap
+
+    try:
+        validate_feature_weights(data.get(FEATURE_WEIGHTS_KEY))
+    except FeatureWeightError as exc:
+        raise RulebookValidationError(str(exc)) from exc
 
     copied = json.loads(json.dumps(data))
     return RegimeRulebook(
@@ -373,6 +391,7 @@ def diff_rulebooks(before: RegimeRulebook, after: RegimeRulebook) -> dict[str, A
         "before": {"version": before.version, "digest": before.digest},
         "after": {"version": after.version, "digest": after.digest},
         "weight_changes": weight_changes,
+        "feature_weight_changes": diff_feature_weights(before.feature_weights, after.feature_weights),
         "risk_cap_changes": risk_cap_changes,
         "compression_k": {
             "before": before.compression_k,
