@@ -2,17 +2,24 @@ import unittest
 from pathlib import Path
 
 from tradesync_core.market_features import load_catalog
+from tradesync_core import regime_lab
 from tradesync_core.regime_lab import (
     RegimeLabValidationError,
     aggregate_feature_evidence,
-    assess_learning_gate,
     build_challenger_rulebook,
-    compare_experiment,
+    challenger_rulebook,
 )
 from tradesync_core.regime_weights import load_rulebook
 
 
 ROOT = Path(__file__).resolve().parents[1]
+REPLAY_WEIGHTS = {
+    "price_volatility": 0.40,
+    "liquidity": 0.15,
+    "positioning": 0.20,
+    "spot_premium": 0.15,
+    "macro_flows": 0.10,
+}
 
 
 class RegimeLabTests(unittest.TestCase):
@@ -78,42 +85,28 @@ class RegimeLabTests(unittest.TestCase):
                 "This hypothesis is long enough but its weights are invalid.",
             )
 
-    def test_learning_gate_checks_math_but_not_prose_correctness(self):
-        gate = assess_learning_gate(
-            1.0,
-            "Coverage measures available evidence, not the chance a trade wins.",
-        )
-        self.assertTrue(gate["complete"])
-        self.assertEqual(gate["reflection_review"], "operator_review_required")
-        self.assertFalse(assess_learning_gate(100, "long enough reflection text")["complete"])
+    def test_a_replay_challenger_needs_weights_and_a_version_but_no_hypothesis(self):
+        challenger = challenger_rulebook(self.baseline, REPLAY_WEIGHTS, "replay-1")
+        self.assertEqual(challenger.weights["price_volatility"], 0.40)
+        self.assertEqual(challenger.data["status"], "draft")
+        self.assertEqual(challenger.data["purpose"], self.baseline.data["purpose"])
+        partial = {k: v for k, v in REPLAY_WEIGHTS.items() if k != "macro_flows"}
+        with self.assertRaisesRegex(RegimeLabValidationError, "missing blocks: macro_flows"):
+            challenger_rulebook(self.baseline, partial, "replay-1")
+        with self.assertRaisesRegex(RegimeLabValidationError, "version is required"):
+            challenger_rulebook(self.baseline, REPLAY_WEIGHTS, " ")
 
-    def test_comparison_uses_same_evidence_and_has_no_activation_authority(self):
-        challenger = build_challenger_rulebook(
-            self.baseline,
-            {
-                "price_volatility": 0.25,
-                "liquidity": 0.35,
-                "positioning": 0.20,
-                "spot_premium": 0.10,
-                "macro_flows": 0.10,
-            },
-            "1.0.0-test",
-            "Increasing liquidity emphasis should reduce fragile paper setups.",
+    def test_a_saved_challenger_still_needs_a_hypothesis(self):
+        with self.assertRaisesRegex(RegimeLabValidationError, "hypothesis"):
+            build_challenger_rulebook(self.baseline, REPLAY_WEIGHTS, "saved-1", "too short")
+        saved = build_challenger_rulebook(
+            self.baseline, REPLAY_WEIGHTS, "saved-1", "More price weight should admit more trending setups."
         )
-        evidence = aggregate_feature_evidence(
-            self.catalog,
-            self.baseline,
-            [{
-                "feature_id": "hl_spread_bps",
-                "score": -0.5,
-                "data_quality": 1.0,
-                "scoring_allowed": True,
-            }],
-        )
-        result = compare_experiment(self.baseline, challenger, evidence)
-        self.assertTrue(result["same_market_evidence"])
-        self.assertFalse(result["activation_authority"])
-        self.assertEqual(result["baseline"]["paper_risk_multiplier"], 0.5)
+        self.assertEqual(saved.data["purpose"], "More price weight should admit more trending setups.")
+
+    def test_challengers_are_judged_by_replay_not_a_snapshot_comparison(self):
+        self.assertFalse(hasattr(regime_lab, "assess_learning_gate"))
+        self.assertFalse(hasattr(regime_lab, "compare_experiment"))
 
 
 if __name__ == "__main__":

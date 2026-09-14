@@ -21,8 +21,6 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel, Field
 from tradesync_core import RiskGuardian
 from tradesync_core import normalize_symbol, normalize_venue
-from tradesync_core.paper_signal import AdmissionPolicy
-from tradesync_core.regime_weights import RulebookValidationError, validate_rulebook
 from tradesync_core.quarantine import (
     content_digest,
     QuarantineError,
@@ -31,11 +29,6 @@ from tradesync_core.quarantine import (
 )
 from tradesync_core.state_history import annotate_node, detect_transitions
 from tradesync_core.tradingview_webhook import parse_alert
-from tradesync_core.replay import (
-    ReplayError,
-    case_from_stored_evidence,
-    compare_rulebooks,
-)
 from app.macro_feed import macro_feed, MacroHeadline
 from app.context_feed import context_feed
 from tradesync_core.agent_harness import HarnessError
@@ -64,9 +57,7 @@ from app.graph_projection import (
 from app.integration_pipeline import collect_integration_pipeline
 from app.regime_lab import (
     RegimeLabEngine,
-    RegimeLabValidationError,
     collect_live_feature_results,
-    persist_experiment,
 )
 
 # --- Logging Setup ---
@@ -338,19 +329,6 @@ class PreviewResponse(BaseModel):
 class ExecuteRequest(BaseModel):
     decision_id: str
     confirm: bool
-
-class RegimeLabExperimentRequest(BaseModel):
-    name: str = Field(default="Local paper challenger", min_length=3, max_length=120)
-    version: str = Field(min_length=1, max_length=40)
-    hypothesis: str = Field(min_length=20, max_length=800)
-    evaluation_window: str = Field(
-        default="current_evidence_snapshot", min_length=3, max_length=120
-    )
-    expected_effect: str = Field(default="uncertain", max_length=80)
-    weights: Dict[str, float]
-    arithmetic_answer: float
-    reflection: str = Field(min_length=1, max_length=1200)
-    risk_flags: List[str] = Field(default_factory=list)
 
 # ExecutionResult is used as the response model for execute_action
 
@@ -1366,116 +1344,6 @@ async def get_all_market_snapshots():
     except Exception as e:
         logger.error(f"Error fetching market snapshots: {e}", extra={"trace_id": "market"})
         raise HTTPException(status_code=503, detail="Market data service unavailable")
-
-class ReplayRequest(BaseModel):
-    """A frozen-window replay request. Weights must form a valid rulebook."""
-
-    hours: int = Field(24, ge=1, le=720)
-    symbol: Optional[str] = None
-    horizon_minutes: int = Field(60, ge=1)
-    challenger_weights: Optional[Dict[str, float]] = None
-
-
-@app.post("/state/regime-lab/replay", tags=["regime-lab"])
-async def replay_fixed_window(request: ReplayRequest):
-    """Re-run the rulebook over a frozen window of recorded evidence.
-
-    Champion and challenger see identical stored evidence, so any difference is
-    attributable to the configuration rather than to the market having moved.
-    Paper only: replay cannot activate a rulebook or place an order.
-    """
-    if not state.pool:
-        raise HTTPException(status_code=503, detail="DB Pool not ready")
-
-    symbol = normalize_symbol(request.symbol) if request.symbol else None
-    try:
-        async with state.pool.acquire() as conn:
-            rows = await conn.fetch(
-                """
-                SELECT s.id, s.symbol, s.features,
-                       o.signed_return_pct, o.forward_return_pct
-                FROM signals s
-                JOIN opportunities opp ON opp.signal_id = s.id
-                JOIN opportunity_outcomes o
-                  ON o.opportunity_id = opp.id AND o.horizon_minutes = $1
-                WHERE s.agent = 'regime_paper_scorer'
-                  AND s.created_at > now() - ($2 || ' hours')::interval
-                  AND o.status = 'measured'
-                  AND ($3::text IS NULL OR s.symbol = $3)
-                ORDER BY s.created_at
-                """,
-                request.horizon_minutes,
-                str(request.hours),
-                symbol,
-            )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-    cases = []
-    skipped = 0
-    for row in rows:
-        stored = row["features"]
-        if isinstance(stored, str):
-            stored = json.loads(stored)
-        try:
-            cases.append(
-                case_from_stored_evidence(
-                    str(row["id"]),
-                    row["symbol"],
-                    stored,
-                    outcome_signed_return_pct=row["signed_return_pct"],
-                    market_move_pct=row["forward_return_pct"],
-                )
-            )
-        except ReplayError:
-            # Evidence recorded before the current schema cannot be replayed
-            # faithfully, so it is counted and excluded rather than guessed at.
-            skipped += 1
-
-    if not cases:
-        return {
-            "schema_version": "regime_replay_v1",
-            "window_cases": 0,
-            "skipped_unreplayable": skipped,
-            "note": (
-                "No measured decision in this window carries replayable "
-                "evidence. Outcomes need the horizon to have closed."
-            ),
-        }
-
-    champion = regime_lab_engine.baseline
-    challenger = champion
-    if request.challenger_weights:
-        try:
-            data = json.loads(json.dumps(champion.data))
-            for block, weight in request.challenger_weights.items():
-                if block not in data["blocks"]:
-                    raise HTTPException(
-                        status_code=400, detail=f"unknown block '{block}'"
-                    )
-                data["blocks"][block]["weight"] = weight
-            data["version"] = f"{champion.version}-challenger"
-            challenger = validate_rulebook(data)
-        except RulebookValidationError as exc:
-            raise HTTPException(status_code=400, detail=str(exc))
-
-    result = compare_rulebooks(
-        cases,
-        champion,
-        challenger,
-        AdmissionPolicy(),
-        {
-            "catalog_id": regime_lab_engine.catalog.data["catalog_id"],
-            "version": regime_lab_engine.catalog.version,
-            "digest": regime_lab_engine.catalog.digest,
-        },
-    )
-    result["horizon_minutes"] = request.horizon_minutes
-    result["window_hours"] = request.hours
-    result["skipped_unreplayable"] = skipped
-    result["execution_authority"] = False
-    return result
-
 
 class QuarantineSubmission(BaseModel):
     """One external submission. Nothing here confers authority."""
@@ -3305,118 +3173,6 @@ async def _regime_lab_evidence(venue: str, symbol: str):
     )
 
 
-@app.get("/state/regime-lab/overview", tags=["regime-lab"])
-async def get_regime_lab_overview(
-    venue: str = Query("hyperliquid"),
-    symbol: str = Query("BTC-PERP"),
-):
-    """Return source evidence, baseline math, and the current learning gate."""
-    feature_results, source_status = await _regime_lab_evidence(venue, symbol)
-    return regime_lab_engine.build_overview(feature_results, source_status)
-
-
-@app.post("/state/regime-lab/evaluate", tags=["regime-lab"])
-async def evaluate_regime_lab_experiment(
-    request: RegimeLabExperimentRequest,
-    venue: str = Query("hyperliquid"),
-    symbol: str = Query("BTC-PERP"),
-):
-    """Validate and compare a draft without writing or activating it."""
-    feature_results, source_status = await _regime_lab_evidence(venue, symbol)
-    try:
-        evaluation = regime_lab_engine.evaluate_request(
-            request.model_dump(), feature_results
-        )
-    except RegimeLabValidationError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-    evaluation["source_status"] = source_status
-    return evaluation
-
-
-@app.post("/state/regime-lab/experiments", tags=["regime-lab"])
-async def save_regime_lab_experiment(
-    request: RegimeLabExperimentRequest,
-    venue: str = Query("hyperliquid"),
-    symbol: str = Query("BTC-PERP"),
-):
-    """Persist a draft experiment after the deterministic learning gates pass."""
-    feature_results, source_status = await _regime_lab_evidence(venue, symbol)
-    try:
-        evaluation = regime_lab_engine.evaluate_request(
-            request.model_dump(), feature_results
-        )
-    except RegimeLabValidationError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-    if not evaluation["learning_gate"]["complete"]:
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                "Complete the weight-sum answer and write at least 20 characters "
-                "explaining coverage before saving."
-            ),
-        )
-    if not state.pool:
-        raise HTTPException(
-            status_code=503,
-            detail="PostgreSQL is unavailable; evaluation succeeded but was not saved",
-        )
-    try:
-        async with state.pool.acquire() as conn:
-            async with conn.transaction():
-                experiment_id = await persist_experiment(
-                    conn, regime_lab_engine, request.model_dump(), evaluation
-                )
-    except Exception as exc:
-        logger.error(
-            f"Regime Lab persistence failed: {exc}",
-            extra={"trace_id": "regime-lab"},
-        )
-        raise HTTPException(
-            status_code=503,
-            detail="Regime Lab persistence is unavailable; verify migrations",
-        ) from exc
-    return {
-        "saved": True,
-        "experiment_id": experiment_id,
-        "status": "draft",
-        "source_status": source_status,
-        "activation_available": False,
-        "evaluation": evaluation,
-    }
-
-
-@app.get("/state/regime-lab/experiments", tags=["regime-lab"])
-async def list_regime_lab_experiments(limit: int = Query(20, ge=1, le=100)):
-    """List immutable draft experiment records; no activation action is exposed."""
-    if not state.pool:
-        raise HTTPException(status_code=503, detail="PostgreSQL is unavailable")
-    try:
-        async with state.pool.acquire() as conn:
-            rows = await conn.fetch(
-                """
-                select e.id, e.name, e.status, e.horizon, e.hypothesis,
-                       e.evaluation_plan, e.results, e.created_at,
-                       champion.version as baseline_version,
-                       challenger.version as challenger_version
-                from regime_experiments e
-                join regime_rulebooks champion on champion.id=e.champion_rulebook_id
-                join regime_rulebooks challenger on challenger.id=e.challenger_rulebook_id
-                order by e.created_at desc
-                limit $1
-                """,
-                limit,
-            )
-        return {"experiments": [dict(row) for row in rows], "count": len(rows)}
-    except Exception as exc:
-        logger.error(
-            f"Regime Lab history failed: {exc}",
-            extra={"trace_id": "regime-lab"},
-        )
-        raise HTTPException(
-            status_code=503,
-            detail="Regime Lab history is unavailable; verify migrations",
-        ) from exc
-
 # --- Phase 3C: Macro Feed Endpoints ---
 
 class MacroHeadlineResponse(BaseModel):
@@ -3640,3 +3396,13 @@ register_managed_paper(app, state, market_data_url=MARKET_DATA_URL)
 from app.canvas_drawings import register as register_canvas_drawings  # noqa: E402
 
 register_canvas_drawings(app, state)
+
+# The Regime Lab's overview and draft experiments; see app/regime_lab_routes.py.
+from app.regime_lab_routes import register as register_regime_lab  # noqa: E402
+
+register_regime_lab(app, state, engine=regime_lab_engine, evidence=_regime_lab_evidence)
+
+# Fixed-window replay of stored decisions under a challenger; see app/regime_replay.py.
+from app.regime_replay import register as register_regime_replay  # noqa: E402
+
+register_regime_replay(app, state, engine=regime_lab_engine)

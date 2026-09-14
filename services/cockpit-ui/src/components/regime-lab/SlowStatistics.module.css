@@ -1,0 +1,8 @@
+.slow { border: 1px solid var(--border); border-radius: 4px; background: var(--panel); }
+.summary { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; padding: 12px 17px; color: #f2f6fb; cursor: pointer; font-size: 14px; font-weight: 600; list-style: none; }
+.summary::-webkit-details-marker { display: none; }
+.summary::before { content: '▸'; margin-right: 2px; color: var(--muted); }
+.slow[open] > .summary::before { content: '▾'; }
+.summary small { margin-left: auto; color: var(--muted); font-size: 12px; font-weight: 400; }
+.summary:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+.body { display: grid; gap: 12px; padding: 0 12px 12px; }

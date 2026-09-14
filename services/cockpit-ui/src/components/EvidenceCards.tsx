@@ -1,5 +1,6 @@
 import { useEvidenceCards } from '../api/hooks/useEvidenceCards'
-import type { EvidenceCard, EvidenceCardCell } from '../api/types'
+import type { EvidenceCard, EvidenceCardCell } from '../api/outcomeEvidenceTypes'
+import { CachedReadingNote } from './CachedReadingNote'
 import styles from './EvidenceCards.module.css'
 
 /**
@@ -12,10 +13,17 @@ import styles from './EvidenceCards.module.css'
  * is an operator decision with a change record.
  */
 export function EvidenceCards({ symbol }: { symbol?: string }) {
-  const { data, isLoading, isError } = useEvidenceCards(symbol)
+  const { data, error, isLoading } = useEvidenceCards(symbol)
 
-  if (isError) return <section className="panel lab-section"><p className="tone-bad">Evidence cards unavailable. Nothing is inferred.</p></section>
-  if (isLoading || !data) return <section className="panel lab-section"><p className="tone-dim">Measuring evidence cards… (every cell bootstrapped together)</p></section>
+  if (error) {
+    return <section className="panel lab-section"><p className={`${styles.state} tone-bad`}>Evidence cards unavailable: {error.message}. Nothing is inferred.</p></section>
+  }
+  if (isLoading || !data) {
+    return <section className="panel lab-section"><p className={`${styles.state} tone-dim`}>Asking for the evidence cards…</p></section>
+  }
+  if (data.status === 'computing') {
+    return <section className="panel lab-section"><p className={`${styles.state} tone-dim`}>{data.note}</p></section>
+  }
 
   const earned = data.cards.filter((c) => c.earned).length
   return (
@@ -27,6 +35,7 @@ export function EvidenceCards({ symbol }: { symbol?: string }) {
             Weights earned by measured skill, not by more screens · catalog v{data.catalog_version} · {data.cards.length} features · Holm across {data.cells_assessed_together} cells
             {symbol ? ` · ${symbol}` : ' · all symbols'}
           </p>
+          <CachedReadingNote computedAt={data.computed_at} cache={data.cache} />
         </div>
         <span className={earned > 0 ? 'tone-good' : 'tone-dim'}>{earned} earned</span>
       </div>

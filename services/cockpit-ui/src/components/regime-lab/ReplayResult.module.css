@@ -1,0 +1,23 @@
+.result { display: grid; gap: 12px; padding: 14px 17px; border-top: 1px solid var(--border); }
+.summary h4 { margin: 0; color: #f2f6fb; font-size: 14px; }
+.summary p { margin: 4px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.counts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+.count { display: grid; gap: 3px; padding: 9px 11px; border: 1px solid var(--border-soft); border-radius: 4px; background: var(--panel-muted); }
+.count span { color: var(--muted); font-size: 11px; }
+.count strong { color: #f4f8fc; font: 600 18px var(--font-mono); }
+.count small { color: var(--dim); font-size: 11px; }
+.scroll { overflow-x: auto; }
+.table { width: 100%; min-width: 460px; border-collapse: collapse; font-size: 12px; }
+.table caption { padding-bottom: 6px; color: var(--muted); font-size: 12px; text-align: left; }
+.table th,
+.table td { padding: 6px 10px; border-bottom: 1px solid var(--border-soft); font-family: var(--font-mono); text-align: right; white-space: nowrap; }
+.table thead th { color: var(--muted); font-size: 11px; font-weight: 600; }
+.table th[scope='row'] { color: #c5cfdc; font-family: var(--font-sans); font-weight: 400; text-align: left; white-space: normal; }
+.examples summary { color: var(--muted); cursor: pointer; font-size: 12px; }
+.examples summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.examples .table { margin-top: 8px; }
+.note { margin: 0; color: var(--dim); font-size: 11px; line-height: 1.5; }
+
+@media (max-width: 700px) {
+  .counts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

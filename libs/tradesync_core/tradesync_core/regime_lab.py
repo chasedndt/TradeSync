@@ -1,8 +1,9 @@
 """Paper-only Regime Lab calculations shared by API, replay, and tests.
 
-The browser never calculates a score.  It submits operator controls and this
-module validates the draft, aggregates admitted feature evidence, and compares
-the same market inputs under the baseline and challenger rulebooks.
+The browser never calculates a score. It submits operator controls; this module
+validates a challenger draft and aggregates admitted feature evidence into
+rulebook blocks. Challengers are judged by replaying stored decisions
+(``replay_judgement``), not by re-scoring one market snapshot.
 """
 
 from __future__ import annotations
@@ -16,8 +17,6 @@ from .market_features import FeatureCatalog
 from .regime_weights import (
     RegimeRulebook,
     RulebookValidationError,
-    diff_rulebooks,
-    evaluate_blocks,
     validate_rulebook,
 )
 
@@ -199,20 +198,20 @@ def aggregate_feature_evidence(
     )
 
 
-def build_challenger_rulebook(
+def challenger_rulebook(
     baseline: RegimeRulebook,
     weights: Mapping[str, Any],
     version: str,
-    hypothesis: str,
+    purpose: str | None = None,
 ) -> RegimeRulebook:
-    """Create a validated draft without mutating the baseline configuration."""
+    """A validated paper draft of ``baseline`` with new block weights.
+
+    The baseline configuration is never mutated. A replay needs only this; a
+    saved experiment also records its hypothesis as the draft's purpose.
+    """
 
     if not isinstance(version, str) or not version.strip():
         raise RegimeLabValidationError("challenger version is required")
-    if not isinstance(hypothesis, str) or len(hypothesis.strip()) < 20:
-        raise RegimeLabValidationError(
-            "hypothesis must contain at least 20 characters"
-        )
     if not isinstance(weights, Mapping):
         raise RegimeLabValidationError("weights must be an object")
     expected = set(baseline.weights)
@@ -230,7 +229,8 @@ def build_challenger_rulebook(
     draft["version"] = version.strip()
     draft["status"] = "draft"
     draft["environment"] = "paper"
-    draft["purpose"] = hypothesis.strip()
+    if purpose:
+        draft["purpose"] = purpose.strip()
     for block, raw_weight in weights.items():
         draft["blocks"][block]["weight"] = raw_weight
 
@@ -240,64 +240,16 @@ def build_challenger_rulebook(
         raise RegimeLabValidationError(str(exc)) from exc
 
 
-def assess_learning_gate(
-    arithmetic_answer: Any,
-    reflection: Any,
-) -> dict[str, Any]:
-    """Assess only deterministic gates; do not pretend to understand prose."""
-
-    arithmetic_passed = False
-    if isinstance(arithmetic_answer, (int, float)) and not isinstance(
-        arithmetic_answer, bool
-    ):
-        arithmetic_passed = math.isfinite(float(arithmetic_answer)) and math.isclose(
-            float(arithmetic_answer), 1.0, abs_tol=1e-9, rel_tol=0
-        )
-    reflection_recorded = isinstance(reflection, str) and len(reflection.strip()) >= 20
-    return {
-        "question": "What must all block weights add to?",
-        "expected_answer": 1.0,
-        "arithmetic_passed": arithmetic_passed,
-        "reflection_recorded": reflection_recorded,
-        "reflection_review": "operator_review_required"
-        if reflection_recorded
-        else "not_recorded",
-        "complete": arithmetic_passed and reflection_recorded,
-        "note": (
-            "The arithmetic is checked deterministically. The written explanation is "
-            "stored for human review and is never auto-declared correct."
-        ),
-    }
-
-
-def compare_experiment(
+def build_challenger_rulebook(
     baseline: RegimeRulebook,
-    challenger: RegimeRulebook,
-    evidence: AggregatedEvidence,
-    risk_flags: Sequence[str] | None = None,
-) -> dict[str, Any]:
-    """Evaluate one evidence set under baseline and challenger weights."""
+    weights: Mapping[str, Any],
+    version: str,
+    hypothesis: str,
+) -> RegimeRulebook:
+    """The draft a saved experiment stores: a hypothesis of at least 20 characters is its purpose."""
 
-    baseline_result = evaluate_blocks(
-        baseline,
-        evidence.block_scores,
-        evidence.data_quality,
-        risk_flags or [],
-    )
-    challenger_result = evaluate_blocks(
-        challenger,
-        evidence.block_scores,
-        evidence.data_quality,
-        risk_flags or [],
-    )
-    return {
-        "baseline": baseline_result,
-        "challenger": challenger_result,
-        "score_delta": round(
-            challenger_result["weighted_score"] - baseline_result["weighted_score"],
-            12,
-        ),
-        "rulebook_diff": diff_rulebooks(baseline, challenger),
-        "same_market_evidence": True,
-        "activation_authority": False,
-    }
+    if not isinstance(hypothesis, str) or len(hypothesis.strip()) < 20:
+        raise RegimeLabValidationError(
+            "hypothesis must contain at least 20 characters"
+        )
+    return challenger_rulebook(baseline, weights, version, hypothesis)

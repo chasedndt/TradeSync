@@ -1,0 +1,2 @@
+.failed { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px 17px; border-color: #633039; color: #ffd0d4; font-size: 12px; }
+.failed span { color: var(--muted); overflow-wrap: anywhere; }

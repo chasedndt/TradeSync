@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import os
 import time
 from pathlib import Path
@@ -17,14 +16,12 @@ from tradesync_core.market_features import (
     normalize_feature,
 )
 from tradesync_core.regime_lab import (
-    RegimeLabValidationError,
     aggregate_directional_evidence,
     aggregate_feature_evidence,
-    assess_learning_gate,
-    build_challenger_rulebook,
-    compare_experiment,
 )
 from tradesync_core.regime_weights import RegimeRulebook, evaluate_blocks, load_rulebook
+
+from .regime_lab_health import annotate, summarize
 
 
 def _repository_config_path(relative: str, module_file: Path | None = None) -> Path | None:
@@ -70,7 +67,7 @@ def default_rulebook_path() -> Path:
 
 
 class RegimeLabEngine:
-    """Load canonical configs and evaluate source-backed paper challengers."""
+    """Load the canonical catalog and rulebook, normalize live readings and build the overview."""
 
     def __init__(
         self,
@@ -100,15 +97,6 @@ class RegimeLabEngine:
                 "digest": self.catalog.digest,
                 "feature_count": len(self.catalog.features),
             },
-            "learning": {
-                "module": "Year 2 Probability and Statistics",
-                "class": "Regime Lab 02 - weights, coverage, and challenger controls",
-                "arithmetic_prompt": "What must all block weights add to?",
-                "interpretation_prompt": (
-                    "Explain why data coverage describes evidence availability, not the "
-                    "probability that a trade wins."
-                ),
-            },
         }
 
     def normalize_observations(
@@ -136,23 +124,25 @@ class RegimeLabEngine:
                 "sampling_interval_ms": definition["sampling_interval_ms"],
                 "minimum_history_points": definition["minimum_history_points"],
                 "lookback_points": definition["lookback_points"],
+                "signal_kind": definition["signal_kind"],
+                "scoring_eligible": definition["scoring_eligible"],
+                "score_mode": definition["score_mode"],
             }
             if observation is None:
-                results.append(
-                    {
-                        **common,
-                        "availability": definition["availability"],
-                        "status": "unavailable",
-                        "current_value": None,
-                        "score": None,
-                        "data_quality": 0.0,
-                        "scoring_allowed": False,
-                        "reason": (
-                            f"no current admitted observation; catalog state is "
-                            f"{definition['availability']}"
-                        ),
-                    }
-                )
+                unobserved = {
+                    **common,
+                    "availability": definition["availability"],
+                    "status": "unavailable",
+                    "current_value": None,
+                    "score": None,
+                    "data_quality": 0.0,
+                    "scoring_allowed": False,
+                    "reason": (
+                        f"no current admitted observation; catalog state is "
+                        f"{definition['availability']}"
+                    ),
+                }
+                results.append(annotate(unobserved, definition, None, now_ms))
                 continue
 
             current_ts = int(observation["observed_at_ms"])
@@ -185,12 +175,13 @@ class RegimeLabEngine:
                     "feature_id": feature_id,
                     "status": "unavailable",
                     "current_value": observation.get("value"),
+                    "observed_at_ms": current_ts,
                     "score": None,
                     "data_quality": 0.0,
                     "scoring_allowed": False,
                     "reason": str(exc),
                 }
-            results.append({**common, **result})
+            results.append(annotate({**common, **result}, definition, current_ts, now_ms))
         return results
 
     def build_overview(
@@ -217,49 +208,7 @@ class RegimeLabEngine:
             "block_evidence": evidence.blocks,
             "baseline_evaluation": baseline_evaluation,
             "directional_evidence": directional.to_dict(),
-            "operator_action_required": (
-                "Enter a testable hypothesis, a complete five-block weight set, "
-                "the arithmetic answer, and your own coverage explanation."
-            ),
-        }
-
-    def evaluate_request(
-        self,
-        payload: Mapping[str, Any],
-        feature_results: list[Mapping[str, Any]],
-    ) -> dict[str, Any]:
-        evidence = aggregate_feature_evidence(
-            self.catalog, self.baseline, feature_results
-        )
-        challenger = build_challenger_rulebook(
-            self.baseline,
-            payload.get("weights", {}),
-            str(payload.get("version", "")),
-            str(payload.get("hypothesis", "")),
-        )
-        learning = assess_learning_gate(
-            payload.get("arithmetic_answer"), payload.get("reflection")
-        )
-        comparison = compare_experiment(
-            self.baseline, challenger, evidence, payload.get("risk_flags", [])
-        )
-        return {
-            "valid": True,
-            "mode": "paper_shadow",
-            "execution_authority": False,
-            "hypothesis": str(payload["hypothesis"]).strip(),
-            "evaluation_window": payload.get(
-                "evaluation_window", "current_evidence_snapshot"
-            ),
-            "expected_effect": payload.get("expected_effect", "uncertain"),
-            "weight_sum": round(sum(challenger.weights.values()), 12),
-            "learning_gate": learning,
-            "block_evidence": evidence.blocks,
-            "comparison": comparison,
-            "challenger_config": challenger.data,
-            "challenger_digest": challenger.digest,
-            "persistable": learning["complete"],
-            "activation_available": False,
+            "health": summarize(feature_results, source_status, int(time.time() * 1000)),
         }
 
 
@@ -327,83 +276,3 @@ async def collect_live_feature_results(
             "observation_count": 0,
             "reason": str(exc),
         }
-
-
-async def persist_experiment(
-    conn,
-    engine: RegimeLabEngine,
-    payload: Mapping[str, Any],
-    evaluation: Mapping[str, Any],
-    created_by: str = "local-operator",
-) -> str:
-    """Persist immutable baseline/challenger configs and one draft experiment."""
-
-    challenger = validate_rulebook(evaluation["challenger_config"])
-
-    async def ensure_rulebook(rulebook: RegimeRulebook) -> str:
-        row = await conn.fetchrow(
-            """
-            insert into regime_rulebooks (
-              rulebook_id, version, schema_version, status, environment, horizon,
-              config_digest, config, created_by
-            ) values ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9)
-            on conflict (config_digest) do nothing
-            returning id
-            """,
-            rulebook.rulebook_id,
-            rulebook.version,
-            rulebook.data["schema_version"],
-            rulebook.data["status"],
-            rulebook.data["environment"],
-            rulebook.data["horizon"],
-            rulebook.digest,
-            json.dumps(rulebook.data),
-            created_by,
-        )
-        if row:
-            return str(row["id"])
-        existing = await conn.fetchrow(
-            "select id from regime_rulebooks where config_digest=$1",
-            rulebook.digest,
-        )
-        if not existing:
-            raise RuntimeError("rulebook insert did not return or resolve an ID")
-        return str(existing["id"])
-
-    baseline_id = await ensure_rulebook(engine.baseline)
-    challenger_id = await ensure_rulebook(challenger)
-    row = await conn.fetchrow(
-        """
-        insert into regime_experiments (
-          name, status, horizon, champion_rulebook_id, challenger_rulebook_id,
-          hypothesis, evaluation_plan, results
-        ) values ($1,'draft',$2,$3::uuid,$4::uuid,$5,$6::jsonb,$7::jsonb)
-        returning id
-        """,
-        payload.get("name") or f"Regime Lab {challenger.version}",
-        engine.baseline.data["horizon"],
-        baseline_id,
-        challenger_id,
-        evaluation["hypothesis"],
-        json.dumps(
-            {
-                "evaluation_window": evaluation["evaluation_window"],
-                "expected_effect": evaluation["expected_effect"],
-                "learning_gate": evaluation["learning_gate"],
-                "operator_reflection": payload.get("reflection", ""),
-                "mode": "paper_shadow",
-            }
-        ),
-        json.dumps(
-            {
-                "comparison": evaluation["comparison"],
-                "block_evidence": evaluation["block_evidence"],
-                "source_snapshot_only": True,
-            }
-        ),
-    )
-    return str(row["id"])
-
-
-# Imported late to keep the persistence function easy to unit test.
-from tradesync_core.regime_weights import validate_rulebook  # noqa: E402

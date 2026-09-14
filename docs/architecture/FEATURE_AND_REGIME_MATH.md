@@ -40,8 +40,8 @@ flowchart TD
   DISP{"normalization = none?"}
   GATE3["status: not_normalized<br/>DISPLAY ONLY"]
   NORMZ["z-score or robust z-score"]
-  MAD{"dispersion > 0?"}
-  GATE4["status: unavailable<br/>MAD is zero, statistic undefined"]
+  MAD{"any dispersion?<br/>(robust with MAD zero falls back to the ordinary z-score, recorded)"}
+  GATE4["status: unavailable<br/>flat: every recent value identical"]
   BOUND["tanh compression to -1..+1"]
   MODE{"score_mode?"}
   PB["playbook_specific<br/>CONTEXT READY, visible, cannot score"]
@@ -63,10 +63,14 @@ flowchart TD
   style GATE4 fill:#2a2416,stroke:#a8883a
 ```
 
-`hl_spread_bps` currently stops at the MAD gate: its value sits at 0.13 for the
-overwhelming majority of samples, so the median absolute deviation is exactly
-zero and a robust z-score is genuinely undefined. Reporting "unavailable" there
-is honest refusal, not a bug.
+`hl_spread_bps` and `hl_buy_impact_5k_bps` move in whole ticks: the value sits
+at 0.13 for most samples, so the median absolute deviation is exactly zero and a
+robust z-score has no scale although the values do vary. Since 2026-09-14 the
+ordinary z-score (mean and sample standard deviation) is used in that case and
+the normalization records `method: ordinary_zscore`, `requested_method:
+robust_zscore` and the fallback. Only when every recent value is identical is
+there no dispersion at all; that reading stays unavailable with the reason
+`flat: every recent value identical`. Which features may score is unchanged.
 
 ## 3. The five blocks, and the coverage ceiling
 
@@ -86,8 +90,8 @@ flowchart LR
   subgraph LQ["liquidity — weight 0.25"]
     LQ1["hl_depth_25bp_usd — direct ✅"]
     LQ2["hl_orderbook_imbalance_1pct — direct ✅"]
-    LQ3["hl_spread_bps — inverse, MAD zero"]
-    LQ4["hl_buy_impact_5k_bps — inverse, MAD zero"]
+    LQ3["hl_spread_bps — inverse, tick values: ordinary z-score fallback"]
+    LQ4["hl_buy_impact_5k_bps — inverse, tick values: ordinary z-score fallback"]
   end
   subgraph PO["positioning — weight 0.20"]
     PO1["funding, OI, oracle premium<br/>all playbook_specific ❌"]

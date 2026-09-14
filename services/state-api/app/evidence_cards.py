@@ -15,12 +15,15 @@ the catalog and its change record.
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 
+from app import statistics_cache
 from app.regime_lab import default_catalog_path
 from app.skill_gate import COSTS
+from app.statistics_cache import StatisticsCache, checked_symbol
 from tradesync_core.entry_features import candidate_features
 from tradesync_core.feature_evidence import (
     FeatureOutcomeRow,
@@ -136,24 +139,43 @@ def _next_step(earned: bool, standing: str) -> str:
 
 
 async def compute_evidence_cards(pool, symbol: str | None) -> dict[str, Any]:
-    """The full evidence-card reading; shared by the endpoint and the thesis."""
-    catalog = load_catalog(default_catalog_path())
-    specs = {f: catalog.features[f] for f in candidate_features(catalog.features)}
+    """The full evidence-card reading; shared by the endpoint and the thesis.
+
+    Every card's cells are bootstrapped together in pure Python, which takes
+    seconds; that work runs in a worker thread so no other request waits.
+    """
     async with pool.acquire() as conn:
         rows = await conn.fetch(ROWS_SQL, symbol)
         cov_rows = await conn.fetch(COVERAGE_SQL, symbol)
         pending = await conn.fetchval(PENDING_SQL)
+    return await asyncio.to_thread(_cards_from_rows, symbol, rows, cov_rows, int(pending or 0))
+
+
+def _cards_from_rows(symbol: str | None, rows, cov_rows, pending: int) -> dict[str, Any]:
+    catalog = load_catalog(default_catalog_path())
+    specs = {f: catalog.features[f] for f in candidate_features(catalog.features)}
     coverage = {r["feature_id"]: {"present": r["present"], "absent": r["absent"]} for r in cov_rows}
     return build_response(
-        symbol, catalog.version, specs, rows_to_feature_outcomes(rows), coverage, int(pending or 0)
+        symbol, catalog.version, specs, rows_to_feature_outcomes(rows), coverage, pending
     )
 
 
+CACHE = StatisticsCache(
+    "evidence_cards",
+    "The evidence cards",
+    lambda pool, symbol: compute_evidence_cards(pool, symbol),
+    "evidence_cards_v1",
+)
+
+
 def register(app, state) -> None:
+    statistics_cache.register(CACHE, state)
+
     @router.get("/state/outcomes/evidence-cards")
-    async def evidence_cards(symbol: str | None = None):
+    async def evidence_cards(response: Response, symbol: str | None = None):
+        """Served from the statistics cache: 200 with computed_at, or 202 while first measured."""
         if not state.pool:
             raise HTTPException(status_code=503, detail="DB Pool not ready")
-        return await compute_evidence_cards(state.pool, symbol)
+        return CACHE.respond(state.pool, checked_symbol(symbol), response)
 
     app.include_router(router)

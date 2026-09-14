@@ -6,7 +6,7 @@ Primary topic: weighted averages in Mathematical Methods and descriptive
 statistics in Probability and Statistics.
 
 TradeSync application: compare an immutable baseline and a draft challenger
-using exactly the same market evidence.
+on exactly the same recorded decisions.
 
 ## Formula
 
@@ -26,15 +26,15 @@ requested evidence is usable. It is not the probability a trade wins.
 ## Operator exercise
 
 1. Open `/regime-lab` and choose one Hyperliquid market.
-2. Record which features are admitted, collecting history, planned, or unavailable.
+2. Read the health strip and the feature table: which feeds are fresh, and why
+   each feature is or is not scoring.
 3. Write a falsifiable “if / then / because” hypothesis.
 4. Change at least two weights while keeping each block at or below `0.40`.
 5. Make all five weights sum to `1.00`.
-6. Enter `1.0` for the arithmetic learning gate.
-7. Explain in your own words why coverage is not win probability.
-8. Evaluate the challenger.
-9. Explain why score delta is not evidence of better trading performance.
-10. Save the draft only when PostgreSQL is healthy.
+6. Evaluate: replay a 24-hour or 7-day window of stored decisions.
+7. Explain why admissions changed while directions did not.
+8. Compare hit rate and skill only together with their sample counts.
+9. Save the draft only when PostgreSQL is healthy.
 
 ## Hand calculation
 
@@ -52,6 +52,6 @@ coverage    = 0.35 = 35%
 
 ## Completion boundary
 
-Completing this lab makes a draft eligible for storage, not activation. Fixed
-historical replay, outcome KPIs, guardrails, and operator approval remain
-separate future gates.
+Saving stores a draft and its replay judgement, not an activation. One replay
+window cannot show a challenger is better in general; guardrails and operator
+approval remain separate future gates.
