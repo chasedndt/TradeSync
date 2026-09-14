@@ -1,0 +1,33 @@
+.strip { display: grid; gap: 12px; padding: 12px 14px; }
+.note { margin: 0; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; overflow: hidden; border: 1px solid var(--border-soft); border-radius: 4px; background: var(--border-soft); }
+.stat { display: grid; gap: 4px; align-content: start; min-width: 0; padding: 10px 12px; background: var(--panel); }
+.stat span { color: var(--muted); font-size: 11px; }
+.stat strong { color: #f4f8fc; font: 600 18px/1.1 var(--font-mono); }
+.stat small { color: var(--dim); font-size: 11px; overflow-wrap: anywhere; }
+.good strong { color: var(--green); }
+.warn strong { color: var(--amber); }
+.bad strong { color: var(--red); }
+.reasons { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.reason { display: inline-flex; align-items: baseline; gap: 6px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 3px; color: var(--muted); font-size: 12px; }
+.reason b { color: var(--text); font: 600 12px var(--font-mono); }
+.reason[data-reason='fresh'] b { color: var(--green); }
+.reason[data-reason='stale'] b,
+.reason[data-reason='flat'] b,
+.reason[data-reason='collecting_history'] b { color: var(--amber); }
+.reason[data-reason='unavailable'] b { color: #ff8a91; }
+.zero { opacity: 0.5; }
+.feeds { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
+.feed { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; padding: 7px 10px; border-left: 3px solid var(--dim); border-radius: 0 3px 3px 0; background: var(--panel-muted); font-size: 12px; }
+.feed[data-status='fresh'] { border-left-color: var(--green); }
+.feed[data-status='partly_stale'],
+.feed[data-status='stale'] { border-left-color: var(--amber); }
+.feedName { color: var(--text); }
+.feedCount { color: var(--muted); font-family: var(--font-mono); text-align: right; }
+.feedAge { grid-column: 1 / -1; color: var(--muted); font: 11px var(--font-mono); }
+.feed[data-status='stale'] .feedAge,
+.feed[data-status='partly_stale'] .feedAge { color: #ffd27b; }
+
+@media (max-width: 900px) {
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

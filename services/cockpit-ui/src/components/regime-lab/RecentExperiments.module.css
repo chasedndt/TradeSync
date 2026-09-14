@@ -1,0 +1,13 @@
+.panel { overflow: hidden; }
+.state { margin: 0; padding: 14px 17px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.list { margin: 0; padding: 0; list-style: none; }
+.item { display: grid; gap: 5px; padding: 11px 17px; border-bottom: 1px solid var(--border-soft); }
+.item:last-child { border-bottom: 0; }
+.top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; font-size: 13px; }
+.top strong { color: #eef3f9; font-weight: 600; }
+.top span { color: var(--muted); font: 11px var(--font-mono); }
+.hypothesis { margin: 0; color: #c5cfdc; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.weights,
+.judgement,
+.unjudged { margin: 0; color: var(--muted); font: 11px/1.5 var(--font-mono); overflow-wrap: anywhere; }
+.judgement { color: #b9c6d6; }

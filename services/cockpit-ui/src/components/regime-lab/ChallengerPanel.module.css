@@ -1,0 +1,37 @@
+.panel { overflow: hidden; }
+.state { margin: 0; padding: 14px 17px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.form { display: grid; align-content: start; gap: 12px; padding: 14px 17px; border-left: 1px solid var(--border-soft); }
+.field { display: grid; gap: 5px; min-width: 0; }
+.field > span { color: var(--muted); font-size: 11px; }
+.field input,
+.field select,
+.field textarea { width: 100%; padding: 8px 10px; border: 1px solid #34475d; border-radius: 4px; background: #091522; color: var(--text); font: 13px var(--font-sans); }
+.field textarea { min-height: 64px; line-height: 1.45; resize: vertical; }
+.field input:focus-visible,
+.field select:focus-visible,
+.field textarea:focus-visible { border-color: var(--cyan); outline: none; box-shadow: 0 0 0 2px rgba(39, 198, 199, 0.15); }
+.field small { color: var(--dim); font-size: 11px; }
+.pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.triple { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.actions { display: grid; gap: 8px; }
+.action { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.button { min-width: 112px; padding: 8px 14px; border: 1px solid #3b4c61; border-radius: 4px; background: #132238; color: #dce5ee; cursor: pointer; font-size: 13px; font-weight: 600; }
+.button:hover:not(:disabled) { border-color: #5a7089; background: #172b44; }
+.button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.primary { border-color: #31b8ba; background: var(--cyan); color: #062122; }
+.primary:hover:not(:disabled) { background: #4ed7d8; }
+.button:disabled { cursor: not-allowed; opacity: 0.45; }
+.why { color: #ffd27b; font-size: 12px; }
+.error { margin: 0; padding: 8px 10px; border: 1px solid #633039; border-radius: 4px; background: rgba(255, 65, 77, 0.06); color: #ffb5ba; font-size: 12px; overflow-wrap: anywhere; }
+.saved { margin: 0; padding: 8px 10px; border: 1px solid #285b3a; border-radius: 4px; background: rgba(56, 223, 116, 0.05); color: #aef1c4; font-size: 12px; }
+
+@media (max-width: 1100px) {
+  .body { grid-template-columns: minmax(0, 1fr); }
+  .form { border-top: 1px solid var(--border-soft); border-left: 0; }
+}
+
+@media (max-width: 560px) {
+  .pair,
+  .triple { grid-template-columns: minmax(0, 1fr); }
+}

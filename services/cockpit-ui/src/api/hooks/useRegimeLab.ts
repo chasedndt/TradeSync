@@ -1,53 +1,49 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiPost } from '../client'
 import type {
-  RegimeLabEvaluationResponse,
   RegimeLabExperimentList,
   RegimeLabExperimentRequest,
   RegimeLabOverview,
-} from '../types'
+  RegimeLabSaveResponse,
+  ReplayJudgement,
+  ReplayRequest,
+} from '../regimeLabTypes'
 
-function query(venue: string, symbol: string) {
-  return `venue=${encodeURIComponent(venue)}&symbol=${encodeURIComponent(symbol)}`
-}
+/** TradeSync reads and trades Hyperliquid only. */
+const VENUE = 'hyperliquid'
 
-export function useRegimeLabOverview(venue: string, symbol: string) {
+export function useRegimeLabOverview(symbol: string) {
   return useQuery({
-    queryKey: ['regime-lab', 'overview', venue, symbol],
+    queryKey: ['regime-lab', 'overview', symbol],
     queryFn: () => apiGet<RegimeLabOverview>(
-      `/state/regime-lab/overview?${query(venue, symbol)}`
+      `/state/regime-lab/overview?venue=${VENUE}&symbol=${encodeURIComponent(symbol)}`,
     ),
-    refetchInterval: 15000,
+    refetchInterval: 15_000,
     retry: 1,
   })
 }
 
-export function useEvaluateRegimeLab(venue: string, symbol: string) {
+/** Judge challenger weights by replaying stored decisions. */
+export function useReplayChallenger() {
   return useMutation({
-    mutationFn: (body: RegimeLabExperimentRequest) =>
-      apiPost<RegimeLabEvaluationResponse>(
-        `/state/regime-lab/evaluate?${query(venue, symbol)}`,
-        body,
-      ),
+    mutationFn: (body: ReplayRequest) => apiPost<ReplayJudgement>('/state/regime-lab/replay', body),
   })
 }
 
-export function useSaveRegimeLab(venue: string, symbol: string) {
+/** Save a draft; the server replays it again and stores that judgement. */
+export function useSaveExperiment() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (body: RegimeLabExperimentRequest) =>
-      apiPost<{ saved: boolean; experiment_id: string; status: string }>(
-        `/state/regime-lab/experiments?${query(venue, symbol)}`,
-        body,
-      ),
+      apiPost<RegimeLabSaveResponse>('/state/regime-lab/experiments', body),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['regime-lab', 'experiments'] }),
   })
 }
 
-export function useRegimeLabExperiments() {
+export function useRegimeLabExperiments(limit = 8) {
   return useQuery({
-    queryKey: ['regime-lab', 'experiments'],
-    queryFn: () => apiGet<RegimeLabExperimentList>('/state/regime-lab/experiments?limit=8'),
+    queryKey: ['regime-lab', 'experiments', limit],
+    queryFn: () => apiGet<RegimeLabExperimentList>(`/state/regime-lab/experiments?limit=${limit}`),
     retry: false,
   })
 }

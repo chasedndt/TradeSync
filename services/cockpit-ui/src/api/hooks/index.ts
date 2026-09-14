@@ -13,8 +13,8 @@ export { useContextOverview } from './useContextOverview'
 export { useIntegrationPipeline } from './useIntegrationPipeline'
 export {
   useRegimeLabOverview,
-  useEvaluateRegimeLab,
-  useSaveRegimeLab,
+  useReplayChallenger,
+  useSaveExperiment,
   useRegimeLabExperiments,
 } from './useRegimeLab'
 
