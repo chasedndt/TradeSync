@@ -1,3 +1,11 @@
+import type { IChartApi, ISeriesApi } from 'lightweight-charts'
+
+/** The chart and its candle series, handed to a layer that draws on it. */
+export interface ChartHandles {
+  chart: IChartApi
+  series: ISeriesApi<'Candlestick'>
+}
+
 export interface EvidenceMarker {
   /** UNIX seconds, aligned to a candle open. */
   time: number
