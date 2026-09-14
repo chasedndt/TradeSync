@@ -20,6 +20,11 @@ from tradesync_core.market_features import (  # noqa: E402
     validate_catalog,
     validate_rulebook_compatibility,
 )
+from tradesync_core.feature_statistics import (  # noqa: E402
+    FLAT_REASON,
+    MAD_FALLBACK,
+    z_score_statistics,
+)
 from tradesync_core.regime_weights import load_rulebook  # noqa: E402
 
 
@@ -193,7 +198,7 @@ class MarketFeatureTests(unittest.TestCase):
         with self.assertRaisesRegex(FeatureValidationError, "before current"):
             normalize_feature(self.catalog, request)
 
-    def test_zero_dispersion_returns_unavailable_not_zero_score(self):
+    def test_flat_history_returns_unavailable_not_zero_score(self):
         request = {
             "feature_id": "hl_spread_bps",
             "symbol": "BTC-PERP",
@@ -204,7 +209,62 @@ class MarketFeatureTests(unittest.TestCase):
         }
         result = normalize_feature(self.catalog, request)
         self.assertEqual(result["status"], "unavailable")
-        self.assertIn("median absolute deviation is zero", result["reason"])
+        self.assertEqual(result["reason"], FLAT_REASON)
+        self.assertIsNone(result["score"])
+        self.assertFalse(result["scoring_allowed"])
+
+    def _tick_request(self, feature_id, current_value=0.6):
+        """Twenty prior readings on one tick and ten on the next: MAD is zero, SD is not."""
+        values = [0.5] * 20 + [0.6] * 10
+        return {
+            "feature_id": feature_id,
+            "symbol": "BTC-PERP",
+            "timeframe": "snapshot",
+            "evaluated_at_ms": 101000,
+            "current": {"ts": 100000, "value": current_value, "source_event_id": "evt"},
+            "history": [{"ts": index + 1, "value": value} for index, value in enumerate(values)],
+        }
+
+    def test_tick_values_with_zero_mad_fall_back_to_ordinary_zscore(self):
+        result = normalize_feature(self.catalog, self._tick_request("hl_spread_bps"))
+        expected = ordinary_statistics([0.5] * 20 + [0.6] * 10, 0.6)
+        self.assertEqual(result["status"], "ready")
+        normalization = result["normalization"]
+        self.assertEqual(normalization["method"], "ordinary_zscore")
+        self.assertEqual(normalization["requested_method"], "robust_zscore")
+        self.assertEqual(normalization["fallback"], MAD_FALLBACK)
+        self.assertEqual(normalization["mad"], 0.0)
+        self.assertAlmostEqual(normalization["z_score"], expected["z_score"])
+        self.assertAlmostEqual(normalization["dispersion"], expected["dispersion"])
+        # Spread is inverse: a wider-than-usual spread counts against the setup.
+        self.assertTrue(result["scoring_allowed"])
+        self.assertLess(result["score"], 0)
+        self.assertAlmostEqual(result["score"], -result["normalized_value"])
+
+    def test_fallback_does_not_change_which_features_score(self):
+        # Eligible but playbook-specific: normalized with the fallback, still never scored.
+        result = normalize_feature(self.catalog, self._tick_request("hl_funding_hourly_rate"))
+        self.assertEqual(result["status"], "ready")
+        self.assertEqual(result["normalization"]["fallback"], MAD_FALLBACK)
+        self.assertIsNone(result["score"])
+        self.assertFalse(result["scoring_allowed"])
+
+    def test_robust_method_is_kept_when_mad_is_not_zero(self):
+        stats = z_score_statistics([1, 2, 3, 4, 5], 6, "robust_zscore")
+        self.assertEqual(stats["method"], "robust_zscore")
+        self.assertIsNone(stats["fallback"])
+        self.assertAlmostEqual(stats["z_score"], 3 / 1.4826)
+
+    def test_flat_values_are_unavailable_under_either_method(self):
+        for method in ("ordinary_zscore", "robust_zscore"):
+            with self.assertRaisesRegex(FeatureValidationError, "^flat: every recent value identical$"):
+                z_score_statistics([0.13] * 25, 0.14, method)
+
+    def test_too_little_history_keeps_the_method_error(self):
+        with self.assertRaisesRegex(FeatureValidationError, "robust z-score requires at least 2"):
+            z_score_statistics([0.5], 0.6, "robust_zscore")
+        with self.assertRaisesRegex(FeatureValidationError, "method must be"):
+            z_score_statistics([1, 2], 3, "percentile")
 
 
 if __name__ == "__main__":

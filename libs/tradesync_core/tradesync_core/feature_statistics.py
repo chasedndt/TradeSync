@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import statistics
-from typing import Sequence
+from typing import Any, Sequence
 
 from .feature_catalog import FeatureValidationError, _number
+
+FLAT_REASON = "flat: every recent value identical"
+MAD_FALLBACK = "median absolute deviation is zero; ordinary z-score used"
 
 
 def ordinary_statistics(
@@ -56,6 +59,42 @@ def robust_statistics(
         "dispersion": dispersion,
         "z_score": (current - center) / dispersion,
     }
+
+
+def z_score_statistics(
+    history: Sequence[float], current_value: float, method: str
+) -> dict[str, Any]:
+    """The z-score by the requested method, with one recorded fallback.
+
+    Spread and buy impact move in whole ticks, so most recent values are often
+    identical: the median absolute deviation is then zero although the values
+    do vary, and the robust z-score has no scale. The ordinary z-score is used
+    instead and the substitution is recorded in ``method`` and ``fallback``.
+    When every recent value is identical there is no dispersion by either
+    measure and the reading stays unavailable.
+    """
+
+    if method not in {"ordinary_zscore", "robust_zscore"}:
+        raise FeatureValidationError(
+            "method must be ordinary_zscore or robust_zscore"
+        )
+    values = [_number(value, "history value") for value in history]
+    recorded = {"requested_method": method, "fallback": None}
+    if len(values) >= 2 and all(value == values[0] for value in values):
+        raise FeatureValidationError(FLAT_REASON)
+    if method == "ordinary_zscore":
+        return {**ordinary_statistics(values, current_value), **recorded, "method": method}
+    if len(values) >= 2:
+        center = statistics.median(values)
+        if statistics.median(abs(value - center) for value in values) == 0:
+            return {
+                **ordinary_statistics(values, current_value),
+                **recorded,
+                "method": "ordinary_zscore",
+                "mad": 0.0,
+                "fallback": MAD_FALLBACK,
+            }
+    return {**robust_statistics(values, current_value), **recorded, "method": method}
 
 
 def freshness_factor(

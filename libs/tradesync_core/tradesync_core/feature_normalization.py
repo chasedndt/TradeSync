@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 from .feature_catalog import FeatureCatalog, FeatureValidationError, _number
-from .feature_statistics import freshness_factor, ordinary_statistics, robust_statistics
+from .feature_statistics import freshness_factor, z_score_statistics
 from .regime_weights import bounded_z_score
 
 
@@ -151,11 +151,7 @@ def normalize_feature(
 
     values = [value for _, value in selected]
     try:
-        stats = (
-            ordinary_statistics(values, current_value)
-            if method == "ordinary_zscore"
-            else robust_statistics(values, current_value)
-        )
+        stats = z_score_statistics(values, current_value, method)
     except FeatureValidationError as exc:
         result["reason"] = str(exc)
         return result
@@ -184,7 +180,9 @@ def normalize_feature(
             "history_end_ms": selected[-1][0],
             "history_count": len(selected),
             "normalization": {
-                "method": method,
+                "method": stats["method"],
+                "requested_method": stats["requested_method"],
+                "fallback": stats["fallback"],
                 "center": round(stats["center"], 12),
                 "dispersion": round(stats["dispersion"], 12),
                 "mad": round(stats["mad"], 12) if "mad" in stats else None,
