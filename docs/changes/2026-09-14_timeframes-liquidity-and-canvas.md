@@ -1,7 +1,7 @@
-# 2026-09-14 — Timeframes rebuild, liquidity and liquidations, canvas drawing, market-data outage
+# 2026-09-14 — Timeframes, liquidity and liquidations, canvas drawing, Regime Lab, opportunity learning
 
 Paper-only throughout: no execution flag, gate, signer or wallet changed. Every feature added here is
-context: none carries a scoring weight until it earns one.
+context: none carries a scoring weight until it earns one, and no weight moves without an operator.
 
 ## Why
 
@@ -9,7 +9,10 @@ Operator review of 14 September: the short-term timeframe addition was "trading 
 actual lower timeframe analysis"; theses had no timestamp or refresh; the timeframe charts were
 unusable and did not use the integration pipeline; the Market page always said data was stale and that
 the direct Hyperliquid liquidation feed was unavailable; the liquidity heatmap could not show where
-liquidity builds up; nothing liquidity-related fed the thesis; the canvas could not be drawn on.
+liquidity builds up; nothing liquidity-related fed the thesis; the canvas could not be drawn on;
+opportunities still said demo, observe mode and dry run, and nothing recorded why a call failed or which
+part of the taxonomy or weighting caused it; the Regime Lab was poor and its Learning Gate could not be
+typed in.
 
 ## Outage found on the way (fixed, deployed)
 
@@ -47,6 +50,10 @@ liquidity builds up; nothing liquidity-related fed the thesis; the canvas could 
   their own range, with records and weights like any feature.
 - Live check (BTC, 18:41 and 18:58 BST): 4 hours ahead weighted "balanced" −0.07 (Drawdown 0.17, Momentum
   0.16, Trend 0.09 earned); funding +10.9% a year, percentile 95 of 30 days, weight 0 so far.
+- Live check after the final deploy (BTC, 19:45 BST): "refresh now" showed "measuring…" and moved both
+  measurement times (19:41 and 19:37) to 19:45 within 10 seconds; 4 hours ahead then read weighted lower
+  −0.20. The 4-hour chart shows 15-minute candles, the 12-hour average, one ordinary 4-hour move above
+  and below, the record cone (median, middle half, 10th to 90th) and an RSI pane.
 
 ## Liquidity and liquidations (deployed)
 
@@ -65,6 +72,10 @@ liquidity builds up; nothing liquidity-related fed the thesis; the canvas could 
   non-scoring context; three of them added to the thesis context Hermes reads.
 - Live check (BTC): bid wall 78,700 ($33.7m, −0.19%), ask wall 79,200 ($37.1m, +0.44%); estimated
   clusters 84,557 (+7.3%) and 73,278 (−7.0%).
+- Live check after the final deploy (BTC, about 19:50 BST): resting liquidity over 24 hours, ask wall
+  79,500 ($106.7m) and bid wall 79,100 ($32.0m, −0.19%); estimated liquidations over 7 days, clusters
+  84,557 (+7.0%, $195.4m) and 73,278 (−7.3%, $139.5m), balance within 3% +0.87; received liquidations
+  over 24 hours, 159 events, shorts $4.1m and longs $14k.
 
 ## Market Canvas drawing (merged, deployed)
 
@@ -72,11 +83,68 @@ TradingView-style drawing layer as a lightweight-charts series primitive: tool r
 extended and horizontal lines, vertical line, rectangle, fib retracement, measure, pencil, text; select,
 drag, style bar, undo, drawings shown on every interval (merge `c13e882`, migration `027`).
 
-## Tests (latest runs)
+- Live check: Trend line selected and dragged across the BTC 15-minute chart; the drawing was saved
+  (`POST /state/canvas/drawings` 200) and listed; Ctrl+Z removed it (`DELETE` 200); after a reload the
+  four drawings recorded on 8 September were unchanged.
 
-- Root 697 passed; one expected failure (`test_migrations` contiguous numbering) until migrations 028
-  (opportunity learning) and 029 merge or are reassigned.
-- State API 197, market-data 141, Cockpit unit tests 59, `npm run build` clean.
+## Regime Lab (merged, deployed)
+
+Rebuilt (merge `a41148d`): the Learning Gate is gone; statistics are cached and computed off the event
+loop (the overview answered in 0.12 s); challengers are judged by replaying a fixed window; each section
+fails on its own without blanking the page. Live check (BTC): 23 of 28 readings fresh, scoring coverage
+70%, sections Feature evidence, Challenger and Saved drafts; the page states that nothing in it can
+activate a rulebook or place an order.
+
+## Opportunity learning (merged, deployed)
+
+Merge `4a46401`, migration `028_opportunity_learning.sql`:
+
+- Opportunities expire (15 minutes by default) instead of piling up as "new".
+- Every outcome at 15 minutes, 1 hour and 4 hours is attributed: clean win, win after drawdown, no
+  follow-through, reversed or wrong direction, after a 0.12% round trip, with the readings that supported
+  or misled the call in plain words (for example a SOL short "misled by Coinbase premium, CVD order flow
+  and depth within 25 bp while price rose; entry regime rising").
+- Verdicts per feature, block, entry regime and symbol: the misled rate against chance, with a 95%
+  interval on an effective sample that counts calls in the same horizon-long window as one cluster.
+- Walk-forward weight proposals, learned on older decisions and replayed on the newest; an operator
+  adopts, rejects or reverts, and the name is recorded. Nothing is adopted automatically.
+- Opportunities page: "demo", "observe mode" and "dry run" wording removed; a Learning view shows the
+  scoreboard after costs, weight proposals, the latest failures and what the evidence says.
+- Live scoreboard (14 days to 14 September, 8,689 attributed horizons): 15 minutes won 25.6% (21.2% to
+  30.7%), mean net −0.119%; 1 hour 35.6% (25.9% to 46.6%), −0.113%; 4 hours 42.5% (24.9% to 62.4%),
+  −0.127%. The walk-forward at 19:36 BST (2,998 decisions) found no feature or block with a verdict at
+  1 hour, so no weight moved: every interval still includes chance (Coinbase premium misled 51.4%, CVD
+  51.0%, 1-hour return 47.4%, each on about 80 effective samples).
+
+## Why calls are refused (measured 14 September)
+
+Seven days to 18:48 UTC: 19,945 admitted, 17,632 refused. A refusal can carry several reasons: direction
+too weak to call 10,864; data coverage below the 0.3 floor 7,387; directional coverage below the 0.5
+floor 5,982; no admitted evidence 2,805; paper risk fully capped 2,805; no directional evidence 2,674.
+
+- The directional-coverage refusals cluster in outage and restart windows, when the 1-hour return had no
+  comparator for nearly every verdict: 11 September 21–23 UTC, 12 September 06–08 and 11–15,
+  13 September 12–15, 14 September 06–11 (the Redis outage) and 17–18 (the recreate). In ordinary hours
+  they run at 0 to 50 an hour.
+- Positioning (weight 0.20) and macro flows (0.10) have no admitted features, so their quality is always
+  0. Coinbase premium, the only spot-premium feature, exists for BTC, ETH and SOL only, so the other seven
+  symbols can reach at most two of three directional readings: each is admitted about 1,100 to 1,200
+  times a week against about 4,000 for BTC, ETH and SOL.
+
+## Tests (fully merged tree)
+
+- Root 803, state-api 282, market-data 141, exec-hl-svc 3, signer-svc 10 passed.
+- Cockpit unit tests 61 passed; `npm run build` clean (0 TypeScript errors).
+- Migrations 026 to 030 applied and contiguous (market history renumbered from 031 to 029 in the merge;
+  the database also keeps a harmless 031 record from before the rename).
+
+## Deploys
+
+State-api and core-scorer rebuilt after the merges (healthy; background loops include
+`opportunity_expiry` and `opportunity_learning`); Cockpit rebuilt at 19:38 BST (healthy). No errors in the
+state-api, core-scorer or market-data logs in the following 15 minutes. In the browser, Timeframes,
+Market, Opportunities (both views), Regime Lab and Market Canvas show none of "demo", "observe mode",
+"dry run", "Learning Gate", "data is stale" or "feed unavailable".
 
 ## Incident: Docker Desktop
 
@@ -88,8 +156,11 @@ was restarted with operator approval; the Hermes gateway came back once a hidden
 
 ## Not yet done
 
-- Regime Lab rebuild and opportunity learning (attribution, proposals, wording) are on their branches,
-  awaiting merge, migration 028 and deploy.
-- The Cockpit build with the timeframe wording fixes and the funding and premium chart colours is not yet
-  deployed.
-- Longer heatmap windows (7 and 30 days) fill in as recorded history accumulates.
+- Hermes readings per band run on demand ("ask Hermes"), not on a schedule, given the Hermes compute
+  review; the short band currently reads "Not read yet".
+- Longer heatmap windows (7 and 30 days) fill in as recorded books accumulate; the estimated liquidation
+  map already reaches back to 25 August through Binance open-interest history.
+- After a market-data restart the 1-hour return has no comparator for an hour, so most calls are refused
+  for that time.
+- Positioning and macro flows carry no admitted scoring features; admitting one stays an operator
+  decision on its evidence card.
