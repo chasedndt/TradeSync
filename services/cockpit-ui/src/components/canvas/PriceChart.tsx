@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createChart, type IChartApi, type ISeriesApi } from 'lightweight-charts'
 import type { Candle } from '../../api/types'
-import { DrawingOverlay, type Shape } from './DrawingOverlay'
-import type { EvidenceMarker, PriceLevel } from './chartTypes'
+import type { ChartHandles, EvidenceMarker, PriceLevel } from './chartTypes'
 import {
   CANDLE_SERIES_OPTIONS,
   priceChartOptions,
@@ -15,20 +14,15 @@ import { useSeriesMarkers } from './useSeriesMarkers'
 interface Props {
   candles: Candle[]
   markers?: EvidenceMarker[]
-  /** Operator levels, persisted and versioned server-side. */
+  /** Horizontal price lines derived from venue data, such as resting walls. */
   levels?: PriceLevel[]
-  /** Two-anchor shapes, drawn in an overlay above the chart. */
-  shapes?: Shape[]
   height?: number
-  /** Called with the clicked price when the operator is placing a level. */
-  onPickPrice?: (price: number) => void
-  /** Called with time and price when placing a two-anchor shape. */
-  onPickPoint?: (point: { time_s: number; price: number }) => void
   /**
-   * Handed the chart api so panes below can follow this chart's time scale.
-   * Called with null on unmount.
+   * Handed the chart and its candle series once they exist, so a drawing layer
+   * can attach and panes below can follow the time scale. Called with null on
+   * unmount.
    */
-  onChartReady?: (chart: IChartApi | null) => void
+  onReady?: (handles: ChartHandles | null) => void
 }
 
 /**
@@ -37,33 +31,20 @@ interface Props {
  * The chart owns no data fetching and no interpretation: it draws exactly what
  * it is given. Markers are placed from recorded paper signals, so a mark on
  * this chart always corresponds to a stored row that can be inspected.
+ *
+ * Drawing is not part of the chart. The Market Canvas attaches its drawing
+ * layer through `onReady`; a chart used without it, as on the home page, has
+ * no drawing at all.
  */
-export function PriceChart({
-  candles,
-  markers = [],
-  levels = [],
-  shapes = [],
-  height = 460,
-  onPickPrice,
-  onPickPoint,
-  onChartReady,
-}: Props) {
+export function PriceChart({ candles, markers = [], levels = [], height = 460, onReady }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const fittedRef = useRef(false)
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
   const volumeRef = useRef<ISeriesApi<'Histogram'> | null>(null)
-  // Kept in a ref so the chart's click handler, registered once, always
-  // sees the current callback rather than the one from first render.
-  const onPickPriceRef = useRef(onPickPrice)
-  onPickPriceRef.current = onPickPrice
-  const onPickPointRef = useRef(onPickPoint)
-  onPickPointRef.current = onPickPoint
-  const onChartReadyRef = useRef(onChartReady)
-  onChartReadyRef.current = onChartReady
-  // Bumped whenever data or size changes, so the overlay reprojects.
-  const [revision, setRevision] = useState(0)
-  const [chartApi, setChartApi] = useState<IChartApi | null>(null)
+  // Kept in a ref so the chart, created once, always reports to the current callback.
+  const onReadyRef = useRef(onReady)
+  onReadyRef.current = onReady
   const [seriesApi, setSeriesApi] = useState<ISeriesApi<'Candlestick'> | null>(null)
 
   useEffect(() => {
@@ -72,37 +53,17 @@ export function PriceChart({
     fittedRef.current = false
 
     const chart = createChart(el, priceChartOptions(height))
-
-    seriesRef.current = chart.addCandlestickSeries(CANDLE_SERIES_OPTIONS)
-
-    setSeriesApi(seriesRef.current)
-
-    volumeRef.current = chart.addHistogramSeries(VOLUME_SERIES_OPTIONS)
+    const series = chart.addCandlestickSeries(CANDLE_SERIES_OPTIONS)
+    const volume = chart.addHistogramSeries(VOLUME_SERIES_OPTIONS)
     chart.priceScale('volume').applyOptions({
       scaleMargins: VOLUME_SCALE_MARGINS,
     })
 
     chartRef.current = chart
-
-    chart.subscribeClick((param) => {
-      const series = seriesRef.current
-      if (!series || !param.point) return
-      const price = series.coordinateToPrice(param.point.y)
-      if (price == null) return
-
-      const pointHandler = onPickPointRef.current
-      if (pointHandler) {
-        // param.time is absent when the click lands outside the plotted data;
-        // falling back to now would anchor the shape where it was not placed.
-        if (param.time == null) return
-        pointHandler({ time_s: Number(param.time), price: Number(price) })
-        return
-      }
-      onPickPriceRef.current?.(Number(price))
-    })
-
-    setChartApi(chart)
-    onChartReadyRef.current?.(chart)
+    seriesRef.current = series
+    volumeRef.current = volume
+    setSeriesApi(series)
+    onReadyRef.current?.({ chart, series })
 
     const observer = new ResizeObserver((entries) => {
       const width = entries[0]?.contentRect.width
@@ -112,9 +73,8 @@ export function PriceChart({
 
     return () => {
       observer.disconnect()
-      onChartReadyRef.current?.(null)
+      onReadyRef.current?.(null)
       chart.remove()
-      setChartApi(null)
       setSeriesApi(null)
       chartRef.current = null
       seriesRef.current = null
@@ -144,20 +104,10 @@ export function PriceChart({
       chartRef.current.timeScale().fitContent()
       fittedRef.current = true
     }
-    setRevision((r) => r + 1)
   }, [candles])
 
   usePriceLines(seriesApi, levels)
   useSeriesMarkers(seriesApi, markers)
 
-  return (
-    <div ref={containerRef} style={{ width: '100%', position: 'relative' }}>
-      <DrawingOverlay
-        chart={chartApi}
-        series={seriesApi}
-        shapes={shapes}
-        revision={revision}
-      />
-    </div>
-  )
+  return <div ref={containerRef} style={{ width: '100%' }} />
 }

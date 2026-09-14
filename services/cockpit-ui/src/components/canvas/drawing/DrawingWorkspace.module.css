@@ -1,0 +1,16 @@
+.workspace {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+/* The chart and the panes that follow it share this column, so their plot areas line up. */
+.column {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* The style bar and text input are positioned against the price pane. */
+.chart {
+  position: relative;
+}

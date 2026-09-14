@@ -4,21 +4,15 @@ import type { IChartApi } from 'lightweight-charts'
 import { useCandles } from '../api/hooks/useCandles'
 import { useOpportunities } from '../api/hooks/useOpportunities'
 import { useDepth, useMarketContext } from '../api/hooks/useMarketContext'
-import { useCreateDrawing, useDeleteDrawing, useDrawings } from '../api/hooks/useDrawings'
-import { PriceChart } from '../components/canvas/PriceChart'
-import { AnnotationList } from '../components/canvas/AnnotationList'
-import { CanvasToolbar, type PlacingKind } from '../components/canvas/CanvasToolbar'
+import { CanvasToolbar } from '../components/canvas/CanvasToolbar'
 import { CanvasViewChips } from '../components/canvas/CanvasViewChips'
 import { Stat } from '../components/canvas/CanvasStat'
 import { ContextPanes } from '../components/canvas/ContextPanes'
+import { DrawingWorkspace } from '../components/canvas/drawing/DrawingWorkspace'
 import { EvidencePanel } from '../components/canvas/EvidencePanel'
 import { formatPrice } from '../components/canvas/format'
 import { OrderBookPanel } from '../components/canvas/OrderBookPanel'
-import {
-  useEvidenceMarkers,
-  usePriceLevels,
-  useShapes,
-} from '../components/canvas/useCanvasLayers'
+import { useDepthWalls, useEvidenceMarkers } from '../components/canvas/useCanvasLayers'
 import { useTrackedSymbols } from '../api/hooks/useTrackedSymbols'
 
 const INTERVALS = ['1m', '5m', '15m', '1h', '4h', '1d']
@@ -52,10 +46,6 @@ export function MarketCanvas() {
     setParams(params, { replace: true })
   }
 
-  // null = not placing. 'horizontal' takes one click; the two-anchor kinds
-  // collect a first anchor and wait for the second.
-  const [placing, setPlacing] = useState<PlacingKind | null>(null)
-  const [firstAnchor, setFirstAnchor] = useState<{ time_s: number; price: number } | null>(null)
   const [showDepth, setShowDepth] = useState(false)
   const showEvidence = params.get('view') === 'evidence'
   // Held so the context panes can follow this chart's time scale.
@@ -65,55 +55,16 @@ export function MarketCanvas() {
   const context = useMarketContext(symbol, interval, CANDLE_LIMIT)
   const depth = useDepth(symbol, showDepth)
   const { data: opportunities } = useOpportunities('all', 100)
-  const { data: drawings } = useDrawings(symbol, interval)
-  const createDrawing = useCreateDrawing()
-  const deleteDrawing = useDeleteDrawing()
 
   const markerMode = params.get('signals') === 'all' ? 'all' : 'changes'
   const markers = useEvidenceMarkers(opportunities, symbol, interval, markerMode)
-  const shapes = useShapes(drawings?.drawings)
-  const { levels, annotations } = usePriceLevels(
-    drawings?.drawings,
-    depth.data,
-    showDepth,
-  )
+  const walls = useDepthWalls(depth.data, showDepth)
 
   const candles = data?.candles ?? []
   const candleTimes = useMemo(() => candles.map((c) => c.time), [candles])
   const last = candles.length ? candles[candles.length - 1] : undefined
   const first = candles.length ? candles[0] : undefined
   const windowChange = first && last ? ((last.close - first.open) / first.open) * 100 : null
-
-  function placePoint(point: { time_s: number; price: number }) {
-    if (placing !== 'trendline' && placing !== 'range') return
-    if (!firstAnchor) {
-      setFirstAnchor(point)
-      return
-    }
-    // Two clicks on the same candle and price would be a degenerate shape; the
-    // server refuses it, so stop here with a clearer signal than an error.
-    if (firstAnchor.time_s === point.time_s && firstAnchor.price === point.price) {
-      setFirstAnchor(null)
-      setPlacing(null)
-      return
-    }
-    const kind = placing
-    setFirstAnchor(null)
-    setPlacing(null)
-    createDrawing.mutate({ symbol, interval, kind, points: [firstAnchor, point], label: kind })
-  }
-
-  function placeLevel(price: number) {
-    if (placing !== 'horizontal') return
-    setPlacing(null)
-    createDrawing.mutate({
-      symbol,
-      interval,
-      kind: 'horizontal',
-      points: [{ time_s: Math.floor(Date.now() / 1000), price: Number(price.toFixed(6)) }],
-      label: `level ${price.toFixed(price < 1000 ? 2 : 1)}`,
-    })
-  }
 
   return (
     <div className="page">
@@ -141,12 +92,6 @@ export function MarketCanvas() {
           interval={interval}
           onSymbol={setSymbol}
           onInterval={setInterval}
-          placing={placing}
-          hasFirstAnchor={firstAnchor !== null}
-          onPlacing={(kind) => {
-            setFirstAnchor(null)
-            setPlacing((current) => (current === kind ? null : kind))
-          }}
           showDepth={showDepth}
           onToggleDepth={() => setShowDepth((v) => !v)}
         >
@@ -175,17 +120,14 @@ export function MarketCanvas() {
             The venue returned no candles for this window. Nothing is interpolated.
           </p>
         ) : (
-          <>
-            <PriceChart
-              key={`${symbol}:${interval}`}
-              candles={candles}
-              markers={showEvidence ? markers : []}
-              levels={levels}
-              shapes={shapes}
-              onChartReady={setChart}
-              onPickPrice={placing === 'horizontal' ? placeLevel : undefined}
-              onPickPoint={placing === 'trendline' || placing === 'range' ? placePoint : undefined}
-            />
+          <DrawingWorkspace
+            symbol={symbol}
+            interval={interval}
+            candles={candles}
+            markers={showEvidence ? markers : []}
+            levels={walls}
+            onChartReady={setChart}
+          >
             {showEvidence && <ContextPanes
               candleTimes={candleTimes}
               context={context.data}
@@ -193,23 +135,14 @@ export function MarketCanvas() {
               isError={context.isError}
               syncWith={chart}
             />}
-          </>
+          </DrawingWorkspace>
         )}
-
-        <AnnotationList
-          levels={annotations}
-          shapes={shapes}
-          onRemove={(id) => deleteDrawing.mutate(id)}
-          removing={deleteDrawing.isPending}
-        />
-        {createDrawing.isError && <p role="alert" className="tone-bad">Drawing was not saved. Check the connection and try again.</p>}
-        {deleteDrawing.isError && <p role="alert" className="tone-bad">Drawing was not removed. Its stored history is unchanged.</p>}
 
         <p className="market-footnote" style={{ marginTop: 12 }}>
           Source: Hyperliquid <code>candleSnapshot</code> &nbsp;•&nbsp; markers are
           stored paper opportunities, snapped to the candle open &nbsp;•&nbsp;
-          levels are versioned server-side; removing one keeps its history
-          &nbsp;•&nbsp; no order can be placed here
+          drawings are versioned server-side and shown on every interval; removing
+          one keeps its history &nbsp;•&nbsp; no order can be placed here
         </p>
       </section>
 
