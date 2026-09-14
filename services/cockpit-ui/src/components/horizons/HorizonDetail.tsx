@@ -1,7 +1,7 @@
 import type { HorizonEvaluation, HorizonRead } from '../../api/horizonTypes'
 import { price } from '../ledger/format'
 import { LinkedText, type LinkTarget } from './LinkedText'
-import { INTERVAL_WORDS, LEAN_LABEL, TREND_WORDS, capitalise, recordLine, signedPct } from './timeframeText'
+import { INTERVAL_WORDS, LEAN_LABEL, TREND_WORDS, capitalise, recordLine, signedPct, spanWords } from './timeframeText'
 import styles from './HorizonDetail.module.css'
 
 interface Props {
@@ -54,7 +54,7 @@ export function HorizonDetail({ read, evaluation, targets, onPick }: Props) {
           </>
         )}
         <dt>Levels</dt>
-        <dd>Trend flips {above ? 'below' : 'above'} {price(levels.trend_flips_at)}; the last {levels.recent_label} ranged {price(levels.recent_low)} to {price(levels.recent_high)}.</dd>
+        <dd>Trend flips {above ? 'below' : 'above'} {price(levels.trend_flips_at)}; the last {spanWords(levels.recent_label)} ranged {price(levels.recent_low)} to {price(levels.recent_high)}.</dd>
       </dl>
       {evaluation && <p className={styles.tally}><LinkedText text={evaluation.summary} targets={targets} onPick={onPick} /></p>}
     </section>

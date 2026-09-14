@@ -44,6 +44,10 @@ export const adjective = (label: string): string => label.replace(/^(\d+) (\w+?)
 
 export const capitalise = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1)
 
+/** "8-hour" → "8 hours", "1-day" → "1 day": a span as it reads after "the last". */
+export const spanWords = (span: string): string =>
+  span.replace(/^(\d+(?:\.\d+)?)-(\w+)$/, (_, n: string, unit: string) => `${n} ${unit}${n === '1' ? '' : 's'}`)
+
 /** "14 Sep, 12:41": an absolute local time a reader can check against the clock. */
 export const clock = (iso: string | null | undefined): string =>
   iso ? new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'

@@ -1,5 +1,5 @@
 import type { FeatureEvaluation, HorizonEvaluation } from '../../api/horizonTypes'
-import { LEAN_LABEL, heldOutLine, pct, signedPct } from './timeframeText'
+import { LEAN_LABEL, adjective, heldOutLine, pct, signedPct } from './timeframeText'
 import styles from './EvidenceTable.module.css'
 
 interface Props {
@@ -24,7 +24,7 @@ export function EvidenceTable({ evaluation, horizonLabel, active, onToggle, high
         <h3 id="evidence-title">Feature evidence over {horizonLabel}</h3>
         <p>
           Weight is the skill each feature showed on the newest 30% of history after learning on the older 70%, above what chance
-          would score. All {horizonLabel} windows rose {pct(evaluation.base_share_up)} of the time.
+          would score. All {adjective(horizonLabel)} windows rose {pct(evaluation.base_share_up)} of the time.
         </p>
       </header>
       <div className={styles.scroll}>
