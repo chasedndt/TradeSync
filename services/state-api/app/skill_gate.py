@@ -20,6 +20,7 @@ looked at. Nothing here opens a gate: it describes evidence.
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -65,7 +66,11 @@ def rows_to_observations(rows) -> dict[tuple[int, str], list[Observation]]:
 
 
 async def compute_skill_gate(pool, symbol: str | None) -> dict[str, Any]:
-    """The full skill-gate reading; shared by the endpoint and the thesis."""
+    """The full skill-gate reading; shared by the endpoint and the thesis.
+
+    The block bootstrap is pure Python and takes seconds. It runs in a worker
+    thread so the event loop, and every other request, keeps being served.
+    """
     async with pool.acquire() as conn:
         rows = await conn.fetch(
             """
@@ -86,7 +91,11 @@ async def compute_skill_gate(pool, symbol: str | None) -> dict[str, Any]:
             WHERE o.dir IN ('LONG','SHORT') AND r.opportunity_id IS NULL
             """
         )
+    return await asyncio.to_thread(build_skill_gate, symbol, rows, int(unlabelled or 0))
 
+
+def build_skill_gate(symbol: str | None, rows, unlabelled: int) -> dict[str, Any]:
+    """Assess every (horizon, entry regime) cell together; CPU-bound, no I/O."""
     cells = rows_to_observations(rows)
     assessed = assess_cells(
         [(f"{h}m {regime}", h, obs) for (h, regime), obs in sorted(cells.items())],
