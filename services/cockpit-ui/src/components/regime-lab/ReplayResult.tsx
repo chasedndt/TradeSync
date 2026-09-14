@@ -14,7 +14,7 @@ interface OutcomeRow {
 
 /** What the challenger changed on the stored decisions, and how each rulebook's admitted set fared where outcomes exist. */
 export function ReplayResult({ result, current }: { result: ReplayJudgement; current: boolean }) {
-  const { decisions, outcomes, window: span } = result
+  const { decisions, outcomes } = result
   const rows: OutcomeRow[] = [
     {
       label: 'Admitted with an outcome (n)',
@@ -42,9 +42,7 @@ export function ReplayResult({ result, current }: { result: ReplayJudgement; cur
       </ul>
       <div className={styles.scroll}>
         <table className={styles.table}>
-          <caption>
-            {count(outcomes.cases_with_outcome)} replayed decisions have a measured {HORIZON_LABELS[span.horizon_minutes]} outcome: the ones that opened a paper opportunity
-          </caption>
+          <caption>{describeOutcomes(result)}</caption>
           <thead>
             <tr>
               <th scope="col"><span className="sr-only">Measure</span></th>
@@ -81,18 +79,28 @@ function Count({ label, value, sub }: { label: string; value: number; sub: strin
   )
 }
 
-/** Which decisions were replayed, how they were sampled, and how far back refusals reach. */
+/**
+ * Which decisions the counts cover and how far back refusals reach. The counts keep one decision per
+ * market per sampling bucket, the one-minute bucket over 24 hours included.
+ */
 function describeSpan({ window: span, decisions }: ReplayJudgement): string {
   const scope = span.symbol ?? 'all markets'
   if (span.decisions_in_window === 0) {
     return `${WINDOW_LABELS[span.hours]}, ${scope}: no decisions were recorded, so there is nothing to replay.`
   }
-  const sample = span.sample_bucket_seconds <= 60
-    ? 'every decision'
-    : `one decision per market per ${duration(span.sample_bucket_seconds * 1000)}`
+  const bucket = duration(span.sample_bucket_seconds * 1000)
   const refusals = span.refusals_available_since
     ? `refused decisions available since ${utcTime(span.refusals_available_since)} UTC`
     : 'no refused decisions stored in this window'
   const skipped = span.skipped_unreplayable > 0 ? ` · ${count(span.skipped_unreplayable)} could not be replayed` : ''
-  return `${WINDOW_LABELS[span.hours]}, ${scope} · ${count(decisions.replayed)} of ${count(span.decisions_in_window)} decisions replayed (${sample}) · ${refusals}, kept ${span.refusal_retention_days} days${skipped}`
+  return `${WINDOW_LABELS[span.hours]}, ${scope} · ${count(decisions.replayed)} of ${count(span.decisions_in_window)} decisions replayed for the counts below, one per market per ${bucket} · ${refusals}, kept ${span.refusal_retention_days} days${skipped}`
+}
+
+/** The outcome comparison covers every decision in the window with a measured outcome, whether it was sampled for the counts or not. */
+function describeOutcomes({ outcomes, window: span }: ReplayJudgement): string {
+  const horizon = HORIZON_LABELS[span.horizon_minutes]
+  if (outcomes.cases_with_outcome === 0) {
+    return `No decision in this window has an outcome measured at ${horizon}; only decisions that opened a paper opportunity get one`
+  }
+  return `Decisions with an outcome measured at ${horizon}: ${count(outcomes.cases_with_outcome)}, every one in the window whether sampled for the counts or not; only decisions that opened a paper opportunity get one`
 }
