@@ -62,6 +62,25 @@ def test_a_cron_preset_is_sent_as_its_expression() -> None:
     patch_job.assert_awaited_once_with(JOB, {"schedule": "0 8 * * *"})
 
 
+def test_a_daily_time_is_sent_as_a_cron_expression_at_that_time() -> None:
+    with patch.object(state, "pool", fake_pool(FakeConn())), patch.object(hermes_jobs, "available", return_value=True), \
+            patch.object(hermes_jobs, "get_job", AsyncMock(return_value=before_job())), \
+            patch.object(hermes_jobs, "patch_job", AsyncMock(return_value=before_job())) as patch_job:
+        resp = client.post("/state/fleet/directives", json={"job_id": JOB, "kind": "set_schedule", "preset": "daily-0840"})
+    assert resp.status_code == 200
+    assert resp.json()["payload"]["schedule"] == {"kind": "cron", "expr": "40 8 * * *", "display": "40 8 * * *"}
+    patch_job.assert_awaited_once_with(JOB, {"schedule": "40 8 * * *"})
+
+
+def test_a_daily_time_off_the_clock_is_refused_before_any_request() -> None:
+    with patch.object(state, "pool", fake_pool(FakeConn())), patch.object(hermes_jobs, "available", return_value=True), \
+            patch.object(hermes_jobs, "get_job", AsyncMock(return_value=before_job())) as get_job:
+        for preset in ("daily-2400", "daily-0860", "daily-840", "daily-08:40", "daily-"):
+            resp = client.post("/state/fleet/directives", json={"job_id": JOB, "kind": "set_schedule", "preset": preset})
+            assert resp.status_code == 400 and "daily-HHMM" in resp.json()["detail"], preset
+    get_job.assert_not_awaited()
+
+
 def test_when_the_gateway_is_down_a_schedule_change_waits_for_the_bridge() -> None:
     conn = FakeConn()
     failing = AsyncMock(side_effect=hermes_jobs.HermesJobsError(502, "gateway unreachable (ConnectError)"))

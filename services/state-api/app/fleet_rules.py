@@ -16,7 +16,8 @@ GATEWAY_KINDS = frozenset({"set_schedule", "set_enabled", "set_deliver", "pause"
 # (which the API does not expose), and schedule or enabled when the gateway is down.
 BRIDGE_KINDS = frozenset({"set_schedule", "set_enabled", "set_workdir"})
 DELIVER_RE = re.compile(r"^(local|discord:[0-9][0-9:]{5,63})$")
-# Schedules the panel offers. Anything else is a hand edit on the fleet host.
+# Schedules the panel offers by name. ``daily-HHMM`` below adds one exact daily time;
+# anything else is a hand edit on the fleet host.
 SCHEDULE_PRESETS = {
     "15m": {"kind": "interval", "minutes": 15, "display": "every 15m"},
     "30m": {"kind": "interval", "minutes": 30, "display": "every 30m"},
@@ -26,15 +27,30 @@ SCHEDULE_PRESETS = {
     "daily-08": {"kind": "cron", "expr": "0 8 * * *", "display": "0 8 * * *"},
     "weekly-mon-08": {"kind": "cron", "expr": "0 8 * * 1", "display": "0 8 * * 1"},
 }
+# Once a day at an exact time on the fleet host's clock, for chains whose stages must keep
+# their order: ``daily-0840`` runs at 08:40.
+DAILY_PRESET_RE = re.compile(r"^daily-([01][0-9]|2[0-3])([0-5][0-9])$")
+
+
+def schedule_for(preset: str | None) -> dict[str, Any] | None:
+    """A named preset, or ``daily-HHMM`` as a daily cron at that time; None for anything else."""
+    if preset in SCHEDULE_PRESETS:
+        return SCHEDULE_PRESETS[preset]
+    match = DAILY_PRESET_RE.fullmatch(preset or "")
+    if not match:
+        return None
+    expr = f"{int(match.group(2))} {int(match.group(1))} * * *"
+    return {"kind": "cron", "expr": expr, "display": expr}
 
 
 def directive_payload(req: "DirectiveRequest") -> dict[str, Any]:
     if req.kind not in DIRECTIVE_KINDS:
         raise HTTPException(status_code=400, detail=f"kind must be one of {', '.join(DIRECTIVE_KINDS)}")
     if req.kind == "set_schedule":
-        if req.preset not in SCHEDULE_PRESETS:
-            raise HTTPException(status_code=400, detail=f"preset must be one of {', '.join(SCHEDULE_PRESETS)}")
-        return {"schedule": SCHEDULE_PRESETS[req.preset], "preset": req.preset}
+        schedule = schedule_for(req.preset)
+        if schedule is None:
+            raise HTTPException(status_code=400, detail=f"preset must be one of {', '.join(SCHEDULE_PRESETS)}, or daily-HHMM")
+        return {"schedule": schedule, "preset": req.preset}
     if req.kind == "set_enabled":
         if req.enabled is None:
             raise HTTPException(status_code=400, detail="enabled is required")
