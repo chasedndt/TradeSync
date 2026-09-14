@@ -1,0 +1,103 @@
+/* Floats over the top of the price pane while a drawing is selected. */
+.bar {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px;
+  border: 1px solid var(--border, rgba(131, 151, 170, 0.3));
+  border-radius: 4px;
+  background: rgba(13, 25, 40, 0.94);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  transform: translateX(-50%);
+}
+
+.name {
+  color: var(--muted, #93a0b4);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.swatch {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 1px solid rgba(7, 17, 31, 0.9);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.option {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--muted, #93a0b4);
+  cursor: pointer;
+}
+
+.option:hover:not(:disabled) {
+  background: rgba(131, 151, 170, 0.12);
+  color: var(--text, #e8edf5);
+}
+
+.swatch.chosen {
+  outline: 2px solid var(--text, #e8edf5);
+  outline-offset: 1px;
+}
+
+.option.chosen {
+  border-color: rgba(79, 209, 161, 0.45);
+  color: var(--accent, #4fd1a1);
+}
+
+.bar button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.bar button:focus-visible {
+  outline: 2px solid var(--accent, #4fd1a1);
+  outline-offset: 1px;
+}
+
+.widthSample {
+  display: block;
+  width: 14px;
+  border-radius: 1px;
+  background: currentColor;
+}
+
+.solidSample,
+.dashedSample {
+  display: block;
+  width: 16px;
+  height: 0;
+  border-top: 2px solid currentColor;
+}
+
+.dashedSample {
+  border-top-style: dashed;
+}
+
+.delete:hover:not(:disabled) {
+  color: var(--red, #ff414d);
+}
+
+.lock {
+  color: var(--amber, #ffb000);
+}
