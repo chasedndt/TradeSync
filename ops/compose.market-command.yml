@@ -15,11 +15,16 @@ services:
     # history belongs in Postgres; Redis holds the hot window.
     mem_limit: 1g
     mem_reservation: 256m
-    cpus: 0.25
+    # At 0.25 CPU (and with RDB snapshots on top of the append-only log, one
+    # every ~108 s taking up to 42 s) writes queued and a market-data pass grew
+    # from ~15 s to over a minute. The append-only log is the persistence.
+    cpus: 1.0
     command:
       - redis-server
       - --appendonly
       - "yes"
+      - --save
+      - ""
       - --maxmemory
       - 700mb
       - --maxmemory-policy
@@ -32,7 +37,7 @@ services:
     restart: unless-stopped
     mem_limit: 512m
     mem_reservation: 256m
-    cpus: 0.50
+    cpus: 1.0
     logging:
       driver: json-file
       options: {max-size: "10m", max-file: "3"}

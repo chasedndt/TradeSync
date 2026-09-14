@@ -109,7 +109,10 @@ async def run(redis):
             if code in (401, 403, 451):
                 await status('provider_access_denied', http_status=code)
                 return  # Do not bypass regional/account/access restrictions.
-            await status('disconnected', error_type=type(exc).__name__)
+            try:
+                await status('disconnected', error_type=type(exc).__name__)
+            except Exception:
+                pass  # a full or unreachable Redis must not end the collector; the next attempt retries
             await asyncio.sleep(30)
 
 
