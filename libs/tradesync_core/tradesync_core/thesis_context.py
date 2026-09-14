@@ -22,6 +22,9 @@ CONTEXT_FEATURES: tuple[tuple[str, str], ...] = (
     ("funding_spread_vs_binance_bps", "funding spread vs Binance"),
     ("coinbase_premium_bps", "Coinbase premium"),
     ("gdelt_news_tone", "news tone"),
+    ("hl_resting_liquidity_imbalance", "resting liquidity balance"),
+    ("cex_liquidations_net_1h_usd", "liquidations net 1h (Bybit, Binance)"),
+    ("liq_map_skew_3pct", "estimated liquidation levels skew"),
 )
 
 

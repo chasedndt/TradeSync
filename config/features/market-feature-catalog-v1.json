@@ -1,7 +1,7 @@
 {
   "schema_version": "market_feature_catalog_v1",
   "catalog_id": "tradesync-hyperliquid-market-features",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "status": "paper_shadow",
   "venue": "hyperliquid",
   "purpose": "Define source, unit, comparator, history, normalization, provenance, and scoring authority before a market feature can reach the regime rulebook.",
@@ -31,7 +31,9 @@
       "stale_after_ms": 60000,
       "decision_role": "Base measurement used to derive returns; an absolute price is not a direction score.",
       "missing_data": "Do not calculate return features.",
-      "caveats": ["Current mark price is retained as a base measurement and is the source series for the one-hour return comparator; the price itself remains ineligible to score."]
+      "caveats": [
+        "Current mark price is retained as a base measurement and is the source series for the one-hour return comparator; the price itself remains ineligible to score."
+      ]
     },
     "hl_return_1h_pct": {
       "signal_kind": "directional",
@@ -52,7 +54,10 @@
       "stale_after_ms": 60000,
       "decision_role": "Directional price movement over the intraday decision horizon.",
       "missing_data": "Feature unavailable; price/volatility block loses coverage.",
-      "caveats": ["Requires durable, timestamp-aligned mark-price history; the derivation emits no value when no anchor exists at or before t minus one hour.", "A data gap wider than the anchor tolerance suppresses the feature rather than widening the comparator window."]
+      "caveats": [
+        "Requires durable, timestamp-aligned mark-price history; the derivation emits no value when no anchor exists at or before t minus one hour.",
+        "A data gap wider than the anchor tolerance suppresses the feature rather than widening the comparator window."
+      ]
     },
     "hl_spread_bps": {
       "signal_kind": "suitability",
@@ -73,7 +78,9 @@
       "stale_after_ms": 15000,
       "decision_role": "Wider-than-history spreads reduce liquidity suitability.",
       "missing_data": "Liquidity block loses spread contribution and coverage.",
-      "caveats": ["Polling snapshots can miss brief spread spikes."]
+      "caveats": [
+        "Polling snapshots can miss brief spread spikes."
+      ]
     },
     "hl_depth_25bp_usd": {
       "signal_kind": "suitability",
@@ -94,7 +101,9 @@
       "stale_after_ms": 15000,
       "decision_role": "More nearby two-sided depth improves liquidity suitability.",
       "missing_data": "Liquidity block loses depth contribution and coverage.",
-      "caveats": ["Displayed orders may be cancelled and do not guarantee executable depth."]
+      "caveats": [
+        "Displayed orders may be cancelled and do not guarantee executable depth."
+      ]
     },
     "hl_buy_impact_5k_bps": {
       "signal_kind": "suitability",
@@ -115,7 +124,9 @@
       "stale_after_ms": 15000,
       "decision_role": "Higher estimated buy impact reduces liquidity suitability.",
       "missing_data": "Liquidity block loses impact contribution and coverage.",
-      "caveats": ["Current implementation models buy-side impact only and is an estimate, not a fill promise."]
+      "caveats": [
+        "Current implementation models buy-side impact only and is an estimate, not a fill promise."
+      ]
     },
     "hl_funding_hourly_rate": {
       "signal_kind": "none",
@@ -136,7 +147,9 @@
       "stale_after_ms": 180000,
       "decision_role": "Crowding evidence whose sign must be interpreted with side, OI, and price—not as standalone direction.",
       "missing_data": "Positioning block loses funding evidence and coverage.",
-      "caveats": ["Positive funding means longs pay shorts; it does not automatically mean price will fall."]
+      "caveats": [
+        "Positive funding means longs pay shorts; it does not automatically mean price will fall."
+      ]
     },
     "hl_funding_apr_24h": {
       "signal_kind": "none",
@@ -157,7 +170,9 @@
       "stale_after_ms": 180000,
       "decision_role": "Human-readable simple annualization: mean hourly rate times 24 times 365.",
       "missing_data": "Display unavailable rather than zero.",
-      "caveats": ["Simple annualization is a rate comparison, not a realized or compounded return forecast."]
+      "caveats": [
+        "Simple annualization is a rate comparison, not a realized or compounded return forecast."
+      ]
     },
     "hl_open_interest_4h_pct": {
       "signal_kind": "none",
@@ -178,7 +193,9 @@
       "stale_after_ms": 90000,
       "decision_role": "Leverage build or unwind; direction requires price/funding context.",
       "missing_data": "Positioning block loses OI evidence and coverage.",
-      "caveats": ["USD OI changes with both contract quantity and mark price."]
+      "caveats": [
+        "USD OI changes with both contract quantity and mark price."
+      ]
     },
     "hl_volume_24h_usd": {
       "signal_kind": "none",
@@ -199,7 +216,9 @@
       "stale_after_ms": 90000,
       "decision_role": "Participation intensity; high volume is not direction by itself.",
       "missing_data": "Price/volatility block loses activity evidence and coverage.",
-      "caveats": ["Current 5m, 1h, and 4h volume fields are estimates from 24h volume and are not admitted features."]
+      "caveats": [
+        "Current 5m, 1h, and 4h volume fields are estimates from 24h volume and are not admitted features."
+      ]
     },
     "hl_orderbook_imbalance_1pct": {
       "signal_kind": "suitability",
@@ -220,7 +239,9 @@
       "stale_after_ms": 15000,
       "decision_role": "Short-lived bid/ask depth asymmetry used only as supporting evidence.",
       "missing_data": "Liquidity block loses imbalance contribution and coverage.",
-      "caveats": ["Order-book imbalance can be cancelled or spoofed and must not become a standalone signal."]
+      "caveats": [
+        "Order-book imbalance can be cancelled or spoofed and must not become a standalone signal."
+      ]
     },
     "hl_oracle_premium_bps": {
       "signal_kind": "none",
@@ -241,7 +262,9 @@
       "stale_after_ms": 60000,
       "decision_role": "Perpetual-versus-oracle premium; not Coinbase premium and not independent spot demand.",
       "missing_data": "Positioning block loses premium evidence and coverage.",
-      "caveats": ["Derived from aligned Hyperliquid markPx and oraclePx; it is not Coinbase premium and does not independently prove spot demand."]
+      "caveats": [
+        "Derived from aligned Hyperliquid markPx and oraclePx; it is not Coinbase premium and does not independently prove spot demand."
+      ]
     },
     "hl_liquidation_total_proxy_usd": {
       "signal_kind": "none",
@@ -262,7 +285,9 @@
       "stale_after_ms": 0,
       "decision_role": "Legacy diagnostic only; cannot establish liquidation direction or score a playbook.",
       "missing_data": "Remain unavailable.",
-      "caveats": ["The current 50/50 long-short split is not observed market truth."]
+      "caveats": [
+        "The current 50/50 long-short split is not observed market truth."
+      ]
     },
     "hl_direct_liquidation_flow": {
       "signal_kind": "none",
@@ -283,7 +308,9 @@
       "stale_after_ms": 0,
       "decision_role": "Reserved for observed venue-supported liquidation events.",
       "missing_data": "Show unavailable; never substitute the OI proxy as observed direction.",
-      "caveats": ["No current public adapter supplies direct side-labelled liquidations."]
+      "caveats": [
+        "No current public adapter supplies direct side-labelled liquidations."
+      ]
     },
     "hl_direct_cvd": {
       "signal_kind": "directional",
@@ -304,7 +331,11 @@
       "stale_after_ms": 120000,
       "decision_role": "Observed taker buy/sell flow; sustained aggressive buying is directional evidence.",
       "missing_data": "Show unavailable; never substitute candle or volume estimates.",
-      "caveats": ["Do not present candle or volume estimates as direct CVD.", "Side convention B=aggressive buy, A=aggressive sell was determined empirically against the live order book on 2026-09-08; the venue does not document it.", "Absent rather than zero until trades are observed, since zero is a real reading meaning balanced flow."]
+      "caveats": [
+        "Do not present candle or volume estimates as direct CVD.",
+        "Side convention B=aggressive buy, A=aggressive sell was determined empirically against the live order book on 2026-09-08; the venue does not document it.",
+        "Absent rather than zero until trades are observed, since zero is a real reading meaning balanced flow."
+      ]
     },
     "coinbase_premium_bps": {
       "signal_kind": "directional",
@@ -352,7 +383,9 @@
       "stale_after_ms": 0,
       "decision_role": "Slow context; cannot trigger a trade or create intraday direction alone.",
       "missing_data": "Macro/flows block remains uncovered.",
-      "caveats": ["Publication timing and later revisions must be stored to prevent look-ahead bias."]
+      "caveats": [
+        "Publication timing and later revisions must be stored to prevent look-ahead bias."
+      ]
     },
     "verified_external_event_risk": {
       "signal_kind": "none",
@@ -373,7 +406,9 @@
       "stale_after_ms": 0,
       "decision_role": "May create a risk cap; cannot assign bullish or bearish direction.",
       "missing_data": "No external-risk flag is inferred.",
-      "caveats": ["Event severity and market impact are distinct variables."]
+      "caveats": [
+        "Event severity and market impact are distinct variables."
+      ]
     },
     "gdelt_news_tone": {
       "signal_kind": "directional",
@@ -472,6 +507,174 @@
       "caveats": [
         "A spread is not a prediction; funding can stay skewed for days.",
         "Sampling skew is bounded at 5 minutes so a slow poll cannot present as market structure."
+      ]
+    },
+    "hl_resting_liquidity_imbalance": {
+      "signal_kind": "directional",
+      "block": "liquidity",
+      "availability": "implemented",
+      "provenance": "derived",
+      "source_authority": "authoritative_market_derived",
+      "source": "Hyperliquid l2Book aggregated to 3 significant figures: resting bid against ask notional within 5% of price",
+      "unit": "ratio_minus1_to1",
+      "comparator": "rolling history for the same symbol",
+      "normalization": "robust_zscore",
+      "score_mode": "direct",
+      "scoring_eligible": false,
+      "lookback_points": 240,
+      "minimum_history_points": 60,
+      "sampling_interval_ms": 60000,
+      "fresh_after_ms": 60000,
+      "stale_after_ms": 180000,
+      "decision_role": "Context: which side holds more resting liquidity near price. Weighted only after it earns measured, held-out skill.",
+      "missing_data": "The liquidity block loses this context; nothing else changes.",
+      "caveats": [
+        "Displayed orders can be cancelled or spoofed; resting size is not executable depth.",
+        "Three significant figures cover a different share of price in each market."
+      ]
+    },
+    "hl_bid_wall_distance_bps": {
+      "signal_kind": "none",
+      "block": "liquidity",
+      "availability": "implemented",
+      "provenance": "derived",
+      "source_authority": "authoritative_market_derived",
+      "source": "Hyperliquid l2Book aggregated to 3 significant figures: distance to the largest resting bid within 5% below price",
+      "unit": "bps",
+      "comparator": "rolling history for the same symbol",
+      "normalization": "robust_zscore",
+      "score_mode": "context_only",
+      "scoring_eligible": false,
+      "lookback_points": 240,
+      "minimum_history_points": 60,
+      "sampling_interval_ms": 60000,
+      "fresh_after_ms": 60000,
+      "stale_after_ms": 180000,
+      "decision_role": "Context: where the nearest large resting bid sits, for levels and stops.",
+      "missing_data": "No wall is reported below price.",
+      "caveats": [
+        "Displayed orders can be cancelled or spoofed; resting size is not executable depth.",
+        "Three significant figures cover a different share of price in each market."
+      ]
+    },
+    "hl_ask_wall_distance_bps": {
+      "signal_kind": "none",
+      "block": "liquidity",
+      "availability": "implemented",
+      "provenance": "derived",
+      "source_authority": "authoritative_market_derived",
+      "source": "Hyperliquid l2Book aggregated to 3 significant figures: distance to the largest resting ask within 5% above price",
+      "unit": "bps",
+      "comparator": "rolling history for the same symbol",
+      "normalization": "robust_zscore",
+      "score_mode": "context_only",
+      "scoring_eligible": false,
+      "lookback_points": 240,
+      "minimum_history_points": 60,
+      "sampling_interval_ms": 60000,
+      "fresh_after_ms": 60000,
+      "stale_after_ms": 180000,
+      "decision_role": "Context: where the nearest large resting ask sits, for levels and targets.",
+      "missing_data": "No wall is reported above price.",
+      "caveats": [
+        "Displayed orders can be cancelled or spoofed; resting size is not executable depth.",
+        "Three significant figures cover a different share of price in each market."
+      ]
+    },
+    "cex_liquidations_net_1h_usd": {
+      "signal_kind": "none",
+      "block": "positioning",
+      "availability": "implemented",
+      "provenance": "context_only",
+      "source_authority": "context_only",
+      "source": "Liquidations received from Bybit (BTC, ETH, SOL) and Binance USDT-M in the last hour: long minus short notional",
+      "unit": "usd",
+      "comparator": "rolling history for the same symbol",
+      "normalization": "robust_zscore",
+      "score_mode": "context_only",
+      "scoring_eligible": false,
+      "lookback_points": 240,
+      "minimum_history_points": 60,
+      "sampling_interval_ms": 60000,
+      "fresh_after_ms": 60000,
+      "stale_after_ms": 180000,
+      "decision_role": "Context: whether longs or shorts were being forced out on other venues in the last hour.",
+      "missing_data": "No liquidation tally is available; the absence is not a zero.",
+      "caveats": [
+        "Other venues' liquidations, not Hyperliquid's.",
+        "Binance sends at most one liquidation per market per second, so bursts are undercounted."
+      ]
+    },
+    "liq_map_skew_3pct": {
+      "signal_kind": "directional",
+      "block": "positioning",
+      "availability": "implemented",
+      "provenance": "proxy",
+      "source_authority": "proxy_only",
+      "source": "Estimated liquidation map: short levels within 3% above price against long levels within 3% below",
+      "unit": "ratio_minus1_to1",
+      "comparator": "rolling history for the same symbol",
+      "normalization": "robust_zscore",
+      "score_mode": "context_only",
+      "scoring_eligible": false,
+      "lookback_points": 288,
+      "minimum_history_points": 48,
+      "sampling_interval_ms": 300000,
+      "fresh_after_ms": 600000,
+      "stale_after_ms": 1200000,
+      "decision_role": "Context: which side holds more estimated forced-out positions near price. A proxy, so it cannot score.",
+      "missing_data": "The positioning block loses this context.",
+      "caveats": [
+        "An estimate from Binance open-interest changes and an assumed leverage mix, not observed orders or Hyperliquid positions.",
+        "Binance publishes about 30 days of open-interest history; older positions are not seen."
+      ]
+    },
+    "liq_map_largest_above_pct": {
+      "signal_kind": "none",
+      "block": "positioning",
+      "availability": "implemented",
+      "provenance": "proxy",
+      "source_authority": "proxy_only",
+      "source": "Estimated liquidation map: distance to the largest estimated short-liquidation cluster above price",
+      "unit": "pct",
+      "comparator": "rolling history for the same symbol",
+      "normalization": "none",
+      "score_mode": "context_only",
+      "scoring_eligible": false,
+      "lookback_points": 288,
+      "minimum_history_points": 0,
+      "sampling_interval_ms": 300000,
+      "fresh_after_ms": 600000,
+      "stale_after_ms": 1200000,
+      "decision_role": "Context: a level where estimated short liquidations cluster.",
+      "missing_data": "No cluster above price is reported.",
+      "caveats": [
+        "An estimate from Binance open-interest changes and an assumed leverage mix, not observed orders or Hyperliquid positions.",
+        "Binance publishes about 30 days of open-interest history; older positions are not seen."
+      ]
+    },
+    "liq_map_largest_below_pct": {
+      "signal_kind": "none",
+      "block": "positioning",
+      "availability": "implemented",
+      "provenance": "proxy",
+      "source_authority": "proxy_only",
+      "source": "Estimated liquidation map: distance to the largest estimated long-liquidation cluster below price",
+      "unit": "pct",
+      "comparator": "rolling history for the same symbol",
+      "normalization": "none",
+      "score_mode": "context_only",
+      "scoring_eligible": false,
+      "lookback_points": 288,
+      "minimum_history_points": 0,
+      "sampling_interval_ms": 300000,
+      "fresh_after_ms": 600000,
+      "stale_after_ms": 1200000,
+      "decision_role": "Context: a level where estimated long liquidations cluster.",
+      "missing_data": "No cluster below price is reported.",
+      "caveats": [
+        "An estimate from Binance open-interest changes and an assumed leverage mix, not observed orders or Hyperliquid positions.",
+        "Binance publishes about 30 days of open-interest history; older positions are not seen."
       ]
     }
   }

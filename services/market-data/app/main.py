@@ -38,6 +38,8 @@ from . import liquidation_events
 from .depth_books import AGGREGATIONS as DEPTH_AGGREGATIONS, DepthBooks
 from .depth_stream import run_depth_stream
 from .open_interest_history import OpenInterestHistory
+from . import liquidity_context
+from tradesync_core.liquidation_map import Bar as MapBar
 from .cross_venue import (
     BINANCE_OPEN_INTEREST_URL,
     BINANCE_PREMIUM_INDEX_URL,
@@ -113,6 +115,18 @@ trade_flow = TradeFlowTracker(
 # and Binance open-interest history for the estimated liquidation map.
 depth_books = DepthBooks()
 open_interest_history = OpenInterestHistory()
+
+
+async def fetch_map_bars(symbol: str) -> list:
+    """Hourly Binance open interest joined to Hyperliquid hourly candles, for the estimated liquidation map."""
+    rows = (await open_interest_history.get(symbol, "1h", 500))["rows"]
+    provider = next((p for p in providers if p.venue == "hyperliquid" and p.enabled), None)
+    if not rows or provider is None:
+        return []
+    start_ms, end_ms = rows[0]["time"] * 1000, (rows[-1]["time"] + 3600) * 1000
+    candles = {int(c["time"]): c for c in normalize_candles(await provider.fetch_candles(symbol, "1h", start_ms, end_ms))}
+    return [MapBar(int(c["time"]), float(c["high"]), float(c["low"]), float(c["close"]), float(r["oi_usd"]))
+            for r in rows if (c := candles.get(int(r["time"]) // 3600 * 3600))]
 
 
 async def poll_spot_reference_loop():
@@ -325,7 +339,8 @@ async def resolve_derived_features(payload) -> dict:
         news_tone_reference,
         NEWS_TONE_STALE_AFTER_MS,
     )
-    return attach_cross_venue(enriched, cross_venue_reference, CROSS_VENUE_STALE_AFTER_MS)
+    enriched = attach_cross_venue(enriched, cross_venue_reference, CROSS_VENUE_STALE_AFTER_MS)
+    return liquidity_context.attach(enriched, depth_books.latest(symbol.replace('-PERP', '')))
 
 
 async def store_snapshot_and_features(snapshot):
@@ -536,6 +551,7 @@ async def lifespan(app: FastAPI):
     background_tasks.append(asyncio.create_task(poll_cross_venue_loop()))
     background_tasks.append(asyncio.create_task(liquidation_context.run(redis_client.client)))
     background_tasks.append(asyncio.create_task(binance_liquidations.run(redis_client.client, SYMBOLS)))
+    background_tasks.append(asyncio.create_task(liquidity_context.run(redis_client.client, SYMBOLS, fetch_map_bars)))
     for n_sig_figs in DEPTH_AGGREGATIONS:
         background_tasks.append(
             asyncio.create_task(

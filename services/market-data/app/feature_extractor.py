@@ -92,6 +92,18 @@ FEATURE_METRIC: dict[str, str] = {
     "hl_liquidation_total_proxy_usd": "liquidations",
 }
 
+# Liquidity context features carry the time their own block was computed
+# (app/liquidity_context.py): a book, a liquidation tally or a liquidation map.
+DERIVED_BLOCK: dict[str, str] = {
+    "hl_resting_liquidity_imbalance": "resting_liquidity",
+    "hl_bid_wall_distance_bps": "resting_liquidity",
+    "hl_ask_wall_distance_bps": "resting_liquidity",
+    "cex_liquidations_net_1h_usd": "cex_liquidations_1h",
+    "liq_map_skew_3pct": "liquidation_map",
+    "liq_map_largest_above_pct": "liquidation_map",
+    "liq_map_largest_below_pct": "liquidation_map",
+}
+
 
 def metric_read_times(snapshot: Mapping[str, Any]) -> dict[str, int]:
     """``{metric: last_updated_ms}`` from the snapshot's ``available_metrics``."""
@@ -151,6 +163,15 @@ def extract_feature_observations(snapshot: Mapping[str, Any]) -> list[dict[str, 
         "hl_liquidation_total_proxy_usd": _path(
             snapshot, "liquidations", "horizons", "1h", "total_usd"
         ),
+        # Liquidity and liquidation context: recorded so their skill can be
+        # measured; none scores until it earns a weight.
+        "hl_resting_liquidity_imbalance": _path(snapshot, "derived", "resting_liquidity", "imbalance"),
+        "hl_bid_wall_distance_bps": _path(snapshot, "derived", "resting_liquidity", "bid_wall_bps"),
+        "hl_ask_wall_distance_bps": _path(snapshot, "derived", "resting_liquidity", "ask_wall_bps"),
+        "cex_liquidations_net_1h_usd": _path(snapshot, "derived", "cex_liquidations_1h", "net_usd"),
+        "liq_map_skew_3pct": _path(snapshot, "derived", "liquidation_map", "skew_3pct"),
+        "liq_map_largest_above_pct": _path(snapshot, "derived", "liquidation_map", "largest_above_pct"),
+        "liq_map_largest_below_pct": _path(snapshot, "derived", "liquidation_map", "largest_below_pct"),
     }
 
     observations = []
@@ -159,6 +180,9 @@ def extract_feature_observations(snapshot: Mapping[str, Any]) -> list[dict[str, 
         if value is None:
             continue
         observed_at_ms = min(snapshot_ms, read_times.get(FEATURE_METRIC.get(feature_id, ""), snapshot_ms))
+        block_time = _finite(_path(snapshot, "derived", DERIVED_BLOCK[feature_id], "observed_at_ms")) if feature_id in DERIVED_BLOCK else None
+        if block_time is not None and block_time > 0:
+            observed_at_ms = min(snapshot_ms, int(block_time))
         observations.append(
             {
                 "feature_id": feature_id,

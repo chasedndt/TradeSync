@@ -8,6 +8,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY services/market-data/app/ ./app/
+# Pure shared calculations (liquidity heatmap walls, estimated liquidation map); no signing code is imported.
+COPY libs/tradesync_core/tradesync_core/ ./tradesync_core/
 COPY config/features/market-feature-catalog-v1.json ./config/features/market-feature-catalog-v1.json
 
 # Expose port
