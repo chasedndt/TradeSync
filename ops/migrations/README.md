@@ -16,6 +16,12 @@ Examples:
 
 Current repository migrations:
 
+`027_canvas_drawing_kinds.sql` widens the canvas drawing kind check for the tool
+rail (ray, extended_line, horizontal_ray, vertical, rectangle, fib_retracement,
+pencil, text) and adds a nullable `style` jsonb per version. Not yet applied.
+UP, DOWN and UP again verified on a throwaway PostgreSQL 17 cluster; DOWN keeps
+rows of the newer kinds and restores the narrower check as NOT VALID.
+
 `026_paper_control.sql` proposes default-paused persistent paper entry control and
 an audit trail. Not yet applied; no current runtime control changed.
 
