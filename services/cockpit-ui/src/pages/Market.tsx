@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { LiquidityHistory } from '../components/market/LiquidityHistory'
-import { LiquidationContext } from '../components/market/LiquidationContext'
+import { LiquidationMap } from '../components/market/LiquidationMap'
+import { LiquidationsReceived } from '../components/market/LiquidationsReceived'
+import { LiquidityHeatmap } from '../components/market/LiquidityHeatmap'
 import {
   TrendingUp,
   Percent,
@@ -722,7 +723,7 @@ export function Market() {
                 </div>
               </div>
               <LiquidationsPanel snapshot={activeSnapshot} />
-              <LiquidationContext symbol={activeSnapshot.symbol} />
+              <LiquidationsReceived symbol={activeSnapshot.symbol} />
             </div>
 
             {/* Volume Profile */}
@@ -782,7 +783,8 @@ export function Market() {
             </div>
           </div>
 
-          <LiquidityHistory symbol={activeSnapshot.symbol} />
+          <LiquidityHeatmap symbol={activeSnapshot.symbol} />
+          <LiquidationMap symbol={activeSnapshot.symbol} />
 
           {/* Source Attribution */}
           <div className="card bg-gray-900/30 text-xs text-gray-500">
