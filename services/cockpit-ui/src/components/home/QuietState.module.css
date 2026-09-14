@@ -1,0 +1,13 @@
+.quiet { padding: 10px 17px 14px; display: grid; gap: 6px; min-width: 0; }
+.message, .lead, .sub, .note { margin: 0; font-size: 12px; line-height: 1.5; }
+.message { padding: 10px 17px 14px; color: var(--muted); }
+.lead { color: var(--text); }
+.lead a { color: var(--blue); text-decoration: none; }
+.lead a:hover { text-decoration: underline; }
+.sub { color: var(--muted); }
+.reasons { margin: 4px 0 0; padding: 0; list-style: none; display: grid; }
+.reasons li { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; row-gap: 2px; padding: 6px 0; border-top: 1px solid var(--border-soft); font-size: 12px; }
+.reasonLabel { color: var(--text); min-width: 0; }
+.count { font-family: var(--font-mono); color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.detail { grid-column: 1 / -1; color: var(--dim); font-size: 11px; overflow-wrap: anywhere; }
+.note { color: var(--dim); font-size: 11px; }

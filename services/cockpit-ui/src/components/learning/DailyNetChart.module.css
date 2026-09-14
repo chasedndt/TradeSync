@@ -1,0 +1,18 @@
+.wrap { display: grid; gap: 4px; min-width: 0; }
+.readout { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; min-height: 18px; color: var(--muted); font-size: 11px; }
+.value { color: var(--text); font: 600 12px var(--font-mono); }
+.hint { color: var(--dim); }
+.grid { stroke: var(--border-soft); stroke-width: 1; shape-rendering: crispEdges; }
+.baseline { stroke: var(--border); stroke-width: 1; shape-rendering: crispEdges; }
+.tick { fill: var(--muted); font: 10px var(--font-mono); font-variant-numeric: tabular-nums; }
+.up { fill: #3a8bef; }
+.down { fill: #c28400; }
+.active { filter: brightness(1.25); }
+.hit { fill: transparent; outline: none; }
+.hit:focus-visible { stroke: var(--blue); stroke-width: 1; }
+.empty { margin: 0; padding: 24px 0; color: var(--muted); font-size: 12px; }
+.table summary { cursor: pointer; color: var(--muted); font-size: 11px; }
+.table table { width: 100%; margin-top: 6px; border-collapse: collapse; font-size: 11px; }
+.table th, .table td { padding: 4px 6px; text-align: right; border-bottom: 1px solid var(--border-soft); font-variant-numeric: tabular-nums; }
+.table th:first-child, .table td:first-child { text-align: left; }
+.table th { color: var(--muted); font-weight: 500; }

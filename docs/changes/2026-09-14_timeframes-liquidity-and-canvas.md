@@ -50,7 +50,7 @@ liquidity builds up; nothing liquidity-related fed the thesis; the canvas could 
 
 ## Liquidity and liquidations (deployed)
 
-- Durable history (migration `031_market_history.sql`, `32a4e17`): aggregated Hyperliquid books at 3 and
+- Durable history (migration `029_market_history.sql`, `32a4e17`): aggregated Hyperliquid books at 3 and
   2 significant figures (websockets, one per aggregation), Hyperliquid open interest, and liquidations
   received from Bybit and Binance, recorded once a minute by state-api's `market_recorder`; books kept a
   minute apart for 3 days then every 15 minutes to 90 days. Recording began 14 September 11:38 UTC.

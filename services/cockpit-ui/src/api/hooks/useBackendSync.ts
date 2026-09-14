@@ -5,14 +5,11 @@ import { useExecution } from '../../context'
 /**
  * Syncs ExecutionContext with backend state.
  *
- * State semantics:
- *   isDemo   = ALL venues are unreachable (no connectivity whatsoever).
- *              The system has no real market access. All data is disconnected.
- *   isDryRun = Backend has EXECUTION_ENABLED=false (DRY_RUN mode).
- *              Orders are simulated even if venues are reachable.
- *
- * These are INDEPENDENT states. Both can be true (unreachable + dry-run).
- * Positions will show: DEMO > PAPER > LIVE in priority order.
+ * paperOnly is true whenever the backend execution gate is closed
+ * (EXECUTION_ENABLED is not "true"): any order goes to the paper ledger. Venue
+ * reachability is reported where it is measured (Settings, Autonomy) and never
+ * relabels the rest of the interface; an unknown circuit state says nothing
+ * about what kind of data the Cockpit is showing.
  */
 export function useBackendSync() {
   const { data: status } = useExecutionStatus()
@@ -20,19 +17,7 @@ export function useBackendSync() {
 
   useEffect(() => {
     if (status) {
-      // execution_enabled === "true" means DRY_RUN=false on the backend
-      const isDryRun = status.execution_enabled !== 'true'
-
-      // isDemo = ALL venues are unknown (no exec service responding at all)
-      // A single unreachable venue should NOT flip the entire UI into demo mode;
-      // that would hide valid data from the functioning venue.
-      const allVenuesUnknown =
-        !status.venues?.length ||
-        status.venues.every((v) => v.circuit_open === 'unknown')
-
-      const isDemo = allVenuesUnknown
-
-      setBackendState(isDryRun, isDemo)
+      setBackendState(status.execution_enabled !== 'true')
     }
   }, [status, setBackendState])
 

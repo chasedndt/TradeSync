@@ -45,7 +45,7 @@ export function EvidenceTimeline({ symbol }: { symbol: string }) {
           className={horizon === minutes ? 'chip chip--active' : 'chip'} aria-pressed={horizon === minutes}
           onClick={() => setHorizon(minutes)}>{minutes}m outcome</button>)}
       </div>
-      <p className="metric-sub">Latest {data.entries.length} admitted calls for {symbol}. $ impact below assumes $1,000 unleveraged notional per call; these are independent research observations, not a portfolio simulation.</p>
+      <p className="metric-sub">Latest {data.entries.length} admitted calls for {symbol}. $ impact below assumes $1,000 unleveraged notional per call; these are independent research observations, not portfolio results.</p>
       {data.entries.map((entry) => (
         <TimelineRow key={entry.opportunity_id} entry={entry} horizon={horizon} />
       ))}

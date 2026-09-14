@@ -46,6 +46,8 @@ export interface Opportunity {
   dir: string
   status: string
   snapshot_ts: string
+  /** When the opportunity stops being live; the API reports status "expired" after it. */
+  expires_at?: string | null
   links: Record<string, unknown>
 }
 

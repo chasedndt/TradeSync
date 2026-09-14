@@ -1,0 +1,12 @@
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; min-width: 0; }
+.chip { display: inline-flex; align-items: baseline; gap: 6px; max-width: 100%; padding: 3px 8px; border: 1px solid var(--border); border-radius: 3px; background: var(--panel-muted); color: var(--text); font-size: 11px; line-height: 1.4; }
+.misled { border-color: rgba(255, 65, 77, 0.55); }
+.supported { border-color: rgba(56, 223, 116, 0.5); }
+.neutral { color: var(--muted); }
+.mark { font: 700 11px var(--font-mono); }
+.misled .mark { color: var(--red); }
+.supported .mark { color: var(--green); }
+.neutral .mark { color: var(--dim); }
+.label { overflow-wrap: anywhere; }
+.pull { color: var(--muted); white-space: nowrap; }
+.more { align-self: center; color: var(--muted); font-size: 11px; }

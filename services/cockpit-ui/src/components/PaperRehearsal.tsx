@@ -6,7 +6,7 @@ import type { RehearsalRecord } from '../api/types'
 /**
  * Preview → refuse → journal, with the execution gate shut.
  *
- * Every result here is a simulation priced from the live mark and spread with
+ * Every result here is a paper fill priced from the live mark and spread with
  * the venue's published fees. The endpoint behind it has no path to an
  * execution service; a rehearsal cannot become an order by any sequence of
  * clicks on this page.
@@ -26,9 +26,9 @@ export function PaperRehearsal() {
       <div className="panel-heading">
         <div>
           <h2 id="rehearsal-title">Paper rehearsal</h2>
-          <p>Run the decision path end to end — risk rules, a simulated fill at the live mark, a journal entry — while execution stays disabled.</p>
+          <p>Run the decision path end to end — risk rules, a paper fill at the live mark, a journal entry — with execution not connected.</p>
         </div>
-        <span className="tone-dim">SIMULATED</span>
+        <span className="tone-dim">PAPER LEDGER</span>
       </div>
 
       <form
@@ -54,7 +54,7 @@ export function PaperRehearsal() {
           <input type="number" min={1} max={1000000} step={50} value={sizeUsd} onChange={(e) => setSizeUsd(Number(e.target.value))} className="bg-[#0d1928] p-2 rounded text-sm text-slate-100 w-36" />
         </label>
         <button type="submit" className="chip chip--active" disabled={!opportunityId || rehearse.isPending}>
-          {rehearse.isPending ? 'Rehearsing…' : 'Rehearse (simulated)'}
+          {rehearse.isPending ? 'Rehearsing…' : 'Rehearse on paper'}
         </button>
       </form>
 

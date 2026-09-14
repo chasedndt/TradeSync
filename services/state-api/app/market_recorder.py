@@ -2,7 +2,7 @@
 
 Market-data holds these in memory or a bounded Redis window; the liquidity
 heatmap, the estimated liquidation map and the timeframe records need weeks of
-them, so this loop copies them into Postgres (``ops/migrations/031``). Every
+them, so this loop copies them into Postgres (``ops/migrations/029``). Every
 row is keyed by minute, so a repeated pass inserts nothing twice, and an hourly
 pass downsamples older rows (``tradesync_core.market_history``).
 """

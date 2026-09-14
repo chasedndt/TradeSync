@@ -1,9 +1,11 @@
 """Read regime evidence from the State API.
 
-The regime engine is the single place that normalizes features and evaluates
-the rulebook. This service asks it for that verdict rather than recomputing the
-mathematics, so a live signal and a Regime Lab comparison can never disagree
-about the same window.
+The regime engine is the single place that normalizes features. This service
+asks it for the normalised readings and their evaluation under the rulebook
+file rather than recomputing any of it. When an operator has adopted a learned
+rulebook, app/active_weights.py re-weights those same readings with the shared
+composition, so a live verdict and a Regime Lab comparison of the same window
+differ only by the recorded, declared rulebook.
 
 An unreachable State API is reported as unavailable evidence, never as a zero
 score. A zero would look like a measured neutral reading; unavailable evidence

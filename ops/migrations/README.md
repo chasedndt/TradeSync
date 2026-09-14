@@ -21,17 +21,26 @@ Current repository migrations:
 so the Timeframes page shows each reading's exact time, keeps the last good reading while a new one
 runs, and flags a reading older than the numbers under it.
 
-`031_market_history.sql` adds durable market history for the liquidity heatmap,
+`029_market_history.sql` adds durable market history for the liquidity heatmap,
 the estimated liquidation map and timeframe records: aggregated Hyperliquid order
 books (nSigFigs 2 and 3), Hyperliquid open interest, and liquidations received from
 Bybit and Binance (context only). Written once a minute by state-api's
 `market_recorder`; retention downsamples to 15 minutes (books after 3 days, open
-interest after 7) and drops books after 90 days and liquidations after 180.
+interest after 7) and drops books after 90 days and liquidations after 180. Applied
+14 September as 031 and renumbered to 029 when the parallel branches merged; its UP
+SQL only creates what does not exist, so recording it again as 029 changes nothing.
+
 `027_canvas_drawing_kinds.sql` widens the canvas drawing kind check for the tool
 rail (ray, extended_line, horizontal_ray, vertical, rectangle, fib_retracement,
 pencil, text) and adds a nullable `style` jsonb per version. Not yet applied.
 UP, DOWN and UP again verified on a throwaway PostgreSQL 17 cluster; DOWN keeps
 rows of the newer kinds and restores the narrower check as NOT VALID.
+
+`028_opportunity_learning.sql` adds per-horizon outcome attributions (result after
+costs, classification, reason sentence, per-feature and per-block attribution) and
+weight-learning proposals with walk-forward evidence and the operator's decision.
+Adoption writes to the existing `regime_rulebooks` / `regime_weight_activations`
+tables (002). Not yet applied.
 
 `026_paper_control.sql` proposes default-paused persistent paper entry control and
 an audit trail. Not yet applied; no current runtime control changed.
