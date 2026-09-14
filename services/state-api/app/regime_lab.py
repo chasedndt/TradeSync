@@ -21,6 +21,8 @@ from tradesync_core.regime_lab import (
 )
 from tradesync_core.regime_weights import RegimeRulebook, evaluate_blocks, load_rulebook
 
+from .regime_lab_health import annotate, summarize
+
 
 def _repository_config_path(relative: str, module_file: Path | None = None) -> Path | None:
     """Resolve a checkout-relative config without assuming Docker's depth."""
@@ -65,7 +67,7 @@ def default_rulebook_path() -> Path:
 
 
 class RegimeLabEngine:
-    """Load canonical configs and evaluate source-backed paper challengers."""
+    """Load the canonical catalog and rulebook, normalize live readings and build the overview."""
 
     def __init__(
         self,
@@ -122,23 +124,25 @@ class RegimeLabEngine:
                 "sampling_interval_ms": definition["sampling_interval_ms"],
                 "minimum_history_points": definition["minimum_history_points"],
                 "lookback_points": definition["lookback_points"],
+                "signal_kind": definition["signal_kind"],
+                "scoring_eligible": definition["scoring_eligible"],
+                "score_mode": definition["score_mode"],
             }
             if observation is None:
-                results.append(
-                    {
-                        **common,
-                        "availability": definition["availability"],
-                        "status": "unavailable",
-                        "current_value": None,
-                        "score": None,
-                        "data_quality": 0.0,
-                        "scoring_allowed": False,
-                        "reason": (
-                            f"no current admitted observation; catalog state is "
-                            f"{definition['availability']}"
-                        ),
-                    }
-                )
+                unobserved = {
+                    **common,
+                    "availability": definition["availability"],
+                    "status": "unavailable",
+                    "current_value": None,
+                    "score": None,
+                    "data_quality": 0.0,
+                    "scoring_allowed": False,
+                    "reason": (
+                        f"no current admitted observation; catalog state is "
+                        f"{definition['availability']}"
+                    ),
+                }
+                results.append(annotate(unobserved, definition, None, now_ms))
                 continue
 
             current_ts = int(observation["observed_at_ms"])
@@ -171,12 +175,13 @@ class RegimeLabEngine:
                     "feature_id": feature_id,
                     "status": "unavailable",
                     "current_value": observation.get("value"),
+                    "observed_at_ms": current_ts,
                     "score": None,
                     "data_quality": 0.0,
                     "scoring_allowed": False,
                     "reason": str(exc),
                 }
-            results.append({**common, **result})
+            results.append(annotate({**common, **result}, definition, current_ts, now_ms))
         return results
 
     def build_overview(
@@ -203,6 +208,7 @@ class RegimeLabEngine:
             "block_evidence": evidence.blocks,
             "baseline_evaluation": baseline_evaluation,
             "directional_evidence": directional.to_dict(),
+            "health": summarize(feature_results, source_status, int(time.time() * 1000)),
         }
 
 
