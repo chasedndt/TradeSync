@@ -18,10 +18,12 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 
+from app import statistics_cache
 from app.regime_lab import default_catalog_path
 from app.skill_gate import COSTS
+from app.statistics_cache import StatisticsCache, checked_symbol
 from tradesync_core.entry_features import candidate_features
 from tradesync_core.feature_evidence import (
     FeatureOutcomeRow,
@@ -158,11 +160,22 @@ def _cards_from_rows(symbol: str | None, rows, cov_rows, pending: int) -> dict[s
     )
 
 
+CACHE = StatisticsCache(
+    "evidence_cards",
+    "The evidence cards",
+    lambda pool, symbol: compute_evidence_cards(pool, symbol),
+    "evidence_cards_v1",
+)
+
+
 def register(app, state) -> None:
+    statistics_cache.register(CACHE, state)
+
     @router.get("/state/outcomes/evidence-cards")
-    async def evidence_cards(symbol: str | None = None):
+    async def evidence_cards(response: Response, symbol: str | None = None):
+        """Served from the statistics cache: 200 with computed_at, or 202 while first measured."""
         if not state.pool:
             raise HTTPException(status_code=503, detail="DB Pool not ready")
-        return await compute_evidence_cards(state.pool, symbol)
+        return CACHE.respond(state.pool, checked_symbol(symbol), response)
 
     app.include_router(router)

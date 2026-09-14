@@ -83,5 +83,5 @@ def test_disabled_by_environment(monkeypatch):
 def test_app_registers_its_loops():
     sources = "".join(p.read_text(encoding="utf-8") for p in APP_DIR.glob("*.py"))
     names = set(re.findall(r"background\.add\(\s*\"([a-z_]+)\"", sources))
-    assert {"hermes_link", "event_outlook", "thesis_editions"} <= names
+    assert {"hermes_link", "event_outlook", "thesis_editions", "outcome_statistics_refresh"} <= names
     assert "background.start_all()" in (APP_DIR / "main.py").read_text(encoding="utf-8")

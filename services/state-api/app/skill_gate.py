@@ -23,8 +23,10 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 
+from app import statistics_cache
+from app.statistics_cache import StatisticsCache, checked_symbol
 from tradesync_core.edge_evidence import CostAssumptions, assess_cells
 from tradesync_core.independence import Observation
 from tradesync_core.outcomes import DEFAULT_HORIZONS_MINUTES
@@ -143,11 +145,22 @@ def build_skill_gate(symbol: str | None, rows, unlabelled: int) -> dict[str, Any
     }
 
 
+CACHE = StatisticsCache(
+    "skill_gate",
+    "The skill gate",
+    lambda pool, symbol: compute_skill_gate(pool, symbol),
+    "skill_gate_v2",
+)
+
+
 def register(app, state) -> None:
+    statistics_cache.register(CACHE, state)
+
     @router.get("/state/outcomes/skill-gate")
-    async def skill_gate(symbol: str | None = None):
+    async def skill_gate(response: Response, symbol: str | None = None):
+        """Served from the statistics cache: 200 with computed_at, or 202 while first measured."""
         if not state.pool:
             raise HTTPException(status_code=503, detail="DB Pool not ready")
-        return await compute_skill_gate(state.pool, symbol)
+        return CACHE.respond(state.pool, checked_symbol(symbol), response)
 
     app.include_router(router)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -70,17 +71,41 @@ def test_an_earned_context_feature_points_at_an_operator_decision_not_a_flag_fli
     assert "operator may admit" in tone["next_step"]
 
 
-def test_endpoint_reads_rows_coverage_and_pending_and_filters_by_symbol() -> None:
+def test_endpoint_serves_the_measured_reading_with_computed_at_and_filters_by_symbol() -> None:
     pool = _pool([], [{"feature_id": "gdelt_news_tone", "present": 1, "absent": 0}], 4)
-    with patch.object(state, "pool", pool):
-        r = client.get("/state/outcomes/evidence-cards?symbol=ETH-PERP")
+    module.CACHE.clear()
+    try:
+        # What the background measurement does after the first request for a market.
+        asyncio.run(module.CACHE.refresh(pool, "ETH-PERP"))
+        with patch.object(state, "pool", pool):
+            r = client.get("/state/outcomes/evidence-cards?symbol=eth-perp")
+    finally:
+        module.CACHE.clear()
     assert r.status_code == 200
     body = r.json()
+    assert body["status"] == "ready" and body["computed_at"] and body["cache"]["ttl_s"] == 600
     assert body["symbol"] == "ETH-PERP" and body["entries_pending"] == 4
     assert {c["feature_id"] for c in body["cards"]} >= {"gdelt_news_tone", "coinbase_premium_bps",
                                                         "funding_spread_vs_binance_bps"}
     conn = pool.acquire.return_value.__aenter__.return_value
     assert all(call.args[1] == "ETH-PERP" for call in conn.fetch.call_args_list)
+
+
+def test_a_market_not_yet_measured_answers_computing_without_waiting() -> None:
+    module.CACHE.clear()
+    try:
+        with patch.object(state, "pool", MagicMock()), patch.object(module.CACHE, "ensure_measuring") as start:
+            r = client.get("/state/outcomes/evidence-cards?symbol=SOL-PERP")
+    finally:
+        module.CACHE.clear()
+    assert r.status_code == 202
+    assert r.json()["status"] == "computing" and r.json()["computed_at"] is None
+    start.assert_called_once()
+
+
+def test_endpoint_rejects_a_malformed_symbol() -> None:
+    with patch.object(state, "pool", MagicMock()):
+        assert client.get("/state/outcomes/evidence-cards?symbol=ETH;drop").status_code == 400
 
 
 def test_endpoint_refuses_without_a_pool() -> None:
