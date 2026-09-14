@@ -19,7 +19,7 @@
 .num { font-family: var(--font-mono); white-space: nowrap; }
 .reasonCell { min-width: 220px; }
 .badge { display: inline-block; padding: 1px 6px; border: 1px solid var(--border); border-radius: 3px; color: var(--muted); font: 600 10px/1.5 var(--font-mono); letter-spacing: 0.04em; text-transform: uppercase; }
-.badge[data-reason='fresh'] { border-color: #275f3b; color: var(--green); }
+.badge[data-reason='usable'] { border-color: #275f3b; color: var(--green); }
 .badge[data-reason='stale'],
 .badge[data-reason='flat'],
 .badge[data-reason='collecting_history'] { border-color: #56441f; color: var(--amber); }

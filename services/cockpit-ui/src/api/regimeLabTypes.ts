@@ -1,6 +1,8 @@
 // === Private Regime Lab ===
 
-export type CoverageReason = 'fresh' | 'stale' | 'flat' | 'collecting_history' | 'display_only' | 'unavailable'
+/** Why a feature does or does not add to coverage; "usable" is a fresh reading with a z-score. */
+export type CoverageReason = 'usable' | 'stale' | 'flat' | 'collecting_history' | 'display_only' | 'unavailable'
+/** "Fresh" always means a reading within its feature's stale limit. */
 export type Freshness = 'fresh' | 'stale' | 'missing'
 
 export interface RegimeLabFeatureResult {

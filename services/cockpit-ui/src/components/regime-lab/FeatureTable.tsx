@@ -141,8 +141,8 @@ function groupByBlock(data: RegimeLabOverview): BlockGroup[] {
       if (evidence) {
         parts.push(
           evidence.admitted_feature_ids.length === 0
-            ? 'no admitted features'
-            : `${evidence.ready_features.length} of ${evidence.admitted_feature_ids.length} admitted features scoring`,
+            ? 'no feature here can score'
+            : `scoring ${evidence.ready_features.length} of ${evidence.admitted_feature_ids.length} features that can score`,
           `block score ${signed(evidence.score, 3)}`,
           `quality ${percent(evidence.quality, 0)}`,
         )

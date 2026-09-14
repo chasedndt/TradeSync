@@ -11,7 +11,7 @@
 .reasons { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .reason { display: inline-flex; align-items: baseline; gap: 6px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 3px; color: var(--muted); font-size: 12px; }
 .reason b { color: var(--text); font: 600 12px var(--font-mono); }
-.reason[data-reason='fresh'] b { color: var(--green); }
+.reason[data-reason='usable'] b { color: var(--green); }
 .reason[data-reason='stale'] b,
 .reason[data-reason='flat'] b,
 .reason[data-reason='collecting_history'] b { color: var(--amber); }

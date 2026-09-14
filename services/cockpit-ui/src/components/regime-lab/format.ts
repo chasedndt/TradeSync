@@ -12,15 +12,25 @@ export const BLOCK_LABELS: Record<string, string> = {
 export const blockLabel = (block: string): string => BLOCK_LABELS[block] ?? block.split('_').join(' ')
 
 /** Coverage reasons in the order they are listed, from usable to missing. */
-export const REASON_ORDER: CoverageReason[] = ['fresh', 'stale', 'flat', 'collecting_history', 'display_only', 'unavailable']
+export const REASON_ORDER: CoverageReason[] = ['usable', 'stale', 'flat', 'collecting_history', 'display_only', 'unavailable']
 
 export const REASON_LABELS: Record<CoverageReason, string> = {
-  fresh: 'fresh',
+  usable: 'usable',
   stale: 'stale',
   flat: 'flat values',
   collecting_history: 'collecting history',
   display_only: 'display only',
   unavailable: 'unavailable',
+}
+
+/** What each reason means. "Fresh" always means a reading within its feature's stale limit. */
+export const REASON_HINTS: Record<CoverageReason, string> = {
+  usable: 'A fresh reading with a z-score',
+  stale: 'A reading past its stale limit',
+  flat: 'A fresh reading whose recent values are all identical, so it has no dispersion',
+  collecting_history: 'Fewer prior readings than the catalog minimum',
+  display_only: 'Shown for context; never normalized or scored',
+  unavailable: 'No current reading, or one the normalizer refused',
 }
 
 export const WINDOW_LABELS: Record<ReplayHours, string> = { 24: 'Last 24 hours', 168: 'Last 7 days', 720: 'Last 30 days' }
@@ -37,15 +47,21 @@ export function reading(value: number | null | undefined): string {
   return String(Number(value.toFixed(4)))
 }
 
+/** One decimal below ten unless it would read ".0"; whole numbers otherwise. */
+function short(n: number): string {
+  const tenths = Number(n.toFixed(1))
+  return n < 10 && !Number.isInteger(tenths) ? tenths.toFixed(1) : String(Math.round(n))
+}
+
 /** Milliseconds as seconds, minutes, hours or days. */
 export function duration(ms: number | null | undefined): string {
   if (ms == null || !Number.isFinite(ms)) return '—'
   const seconds = ms / 1000
-  if (seconds < 60) return `${seconds < 10 ? seconds.toFixed(1) : Math.round(seconds)} s`
+  if (seconds < 60) return `${short(seconds)} s`
   const minutes = seconds / 60
-  if (minutes < 60) return `${minutes < 10 ? minutes.toFixed(1) : Math.round(minutes)} min`
+  if (minutes < 60) return `${short(minutes)} min`
   const hours = minutes / 60
-  if (hours < 48) return `${hours < 10 ? hours.toFixed(1) : Math.round(hours)} h`
+  if (hours < 48) return `${short(hours)} h`
   return `${Math.round(hours / 24)} d`
 }
 
@@ -65,7 +81,3 @@ export const points = (delta: number | null | undefined): string =>
   delta == null || !Number.isFinite(delta) ? '—' : `${signed(delta * 100, 1)} pts`
 
 export const count = (n: number | null | undefined): string => (n == null ? '—' : n.toLocaleString('en-GB'))
-
-/** "good" above zero, "bad" below, "" at zero or when unknown: keys of each module's tone classes. */
-export const toneOf = (value: number | null | undefined): 'good' | 'bad' | '' =>
-  value == null || value === 0 ? '' : value > 0 ? 'good' : 'bad'

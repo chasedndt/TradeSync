@@ -22,8 +22,10 @@ Each feature result carries, besides its value, normalization and score:
   adapter);
 - `age_ms`, `fresh_after_ms`, `stale_after_ms` and `freshness` (`fresh`,
   `stale`, `missing`), judged against the feature's own catalog limits;
-- `coverage_reason`, exactly one of `fresh`, `stale`, `flat`,
-  `collecting_history`, `display_only`, `unavailable`.
+- `coverage_reason`, exactly one of `usable` (a fresh reading with a
+  z-score), `stale`, `flat`, `collecting_history`, `display_only`,
+  `unavailable`. "Fresh" always means a reading within its stale limit, so a
+  fresh reading can still be flat, display only or collecting history.
 
 `normalization.method` is the method actually used. A tick-valued feature whose
 median absolute deviation is zero falls back to the ordinary z-score and records

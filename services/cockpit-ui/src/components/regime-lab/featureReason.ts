@@ -5,13 +5,13 @@ import { duration } from './format'
 /** Why a feature row reads as it does, in one short sentence. */
 export function rowReason(feature: RegimeLabFeatureResult): string {
   switch (feature.coverage_reason) {
-    case 'fresh':
+    case 'usable':
       if (feature.scoring_allowed) {
         return feature.normalization?.fallback ? 'Scored; tick values, so the ordinary z-score is used' : 'Scored'
       }
       return feature.score_mode === 'playbook_specific'
         ? 'Context for playbooks; never scored on its own'
-        : 'Fresh, but not admitted to scoring'
+        : 'The catalog does not let this feature score'
     case 'stale':
       return feature.stale_after_ms > 0
         ? `Reading ${duration(feature.age_ms)} old; stale after ${duration(feature.stale_after_ms)}`
@@ -23,7 +23,10 @@ export function rowReason(feature: RegimeLabFeatureResult): string {
     case 'display_only':
       return 'Shown for context; never normalized or scored'
     default:
-      return feature.reason ?? 'No current reading'
+      if (feature.age_ms == null) {
+        return feature.availability ? `No current reading; the catalog lists it as ${feature.availability}` : 'No current reading'
+      }
+      return feature.reason ?? 'The normalizer refused this reading'
   }
 }
 

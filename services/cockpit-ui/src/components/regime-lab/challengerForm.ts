@@ -66,7 +66,7 @@ export function checkWeights(draft: WeightDraft, blocks: string[]): WeightCheck 
 /** Why a block's weight cannot be changed, or null when it can. */
 export function lockedReason(evidence: RegimeLabBlockEvidence | undefined, baseline: number): string | null {
   if (!evidence || evidence.admitted_feature_ids.length > 0) return null
-  return `No admitted features: nothing in this block can score, so its weight stays at the baseline ${baseline.toFixed(2)}.`
+  return `No feature in this block can score, so its weight stays at the baseline ${baseline.toFixed(2)}.`
 }
 
 /** The first reason the action cannot run yet, as a sentence, or null when it can. */
@@ -93,14 +93,13 @@ export function blocker(
   return null
 }
 
-/** What a replay depends on; a saved draft must match the last evaluation. */
+/** What a replay's result depends on; a saved draft must match the last evaluation. Name, version and hypothesis do not. */
 export const settingsKey = (draft: ChallengerDraft, check: WeightCheck): string =>
   JSON.stringify({
     weights: check.weights,
     hours: draft.hours,
     horizon: draft.horizon,
     symbol: draft.symbol,
-    version: draft.version.trim(),
   })
 
 export function replayRequest(draft: ChallengerDraft, weights: Record<string, number>): ReplayRequest {

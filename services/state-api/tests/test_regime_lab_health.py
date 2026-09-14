@@ -33,6 +33,7 @@ def test_age_is_judged_against_the_features_own_stale_limit():
     missing = health.annotate({"status": "unavailable"}, spread, None, NOW)
     future = health.annotate({"status": "ready"}, spread, NOW + 500, NOW)
     assert (fresh["freshness"], fresh["age_ms"], fresh["stale_after_ms"]) == ("fresh", 14_999, 15_000)
+    assert fresh["coverage_reason"] == "usable"
     assert (stale["freshness"], stale["coverage_reason"]) == ("stale", "stale")
     assert (missing["freshness"], missing["age_ms"], missing["coverage_reason"]) == ("missing", None, "unavailable")
     assert future["age_ms"] == 0 and future["freshness"] == "fresh"
@@ -45,14 +46,20 @@ def test_each_reading_gets_exactly_one_reason_in_order():
     assert reason({"status": "not_normalized"}, "stale") == "display_only"
     assert reason({"status": "unavailable", "reason": "flat: every recent value identical"}, "stale") == "stale"
     assert reason({"status": "collecting_history"}, "fresh") == "collecting_history"
-    assert reason({"status": "ready"}, "fresh") == "fresh"
+    assert reason({"status": "ready"}, "fresh") == "usable"
     assert reason({"status": "unavailable", "reason": "flat: every recent value identical"}, "fresh") == "flat"
     assert reason({"status": "unavailable", "reason": "feature is planned in catalog v1.9"}, "fresh") == "unavailable"
 
 
+def test_fresh_names_an_age_never_a_reason():
+    # A fresh reading can be flat, display only or collecting history, so no reason may share the word.
+    assert "fresh" not in health.REASONS
+    assert set(health.REASONS) == {"usable", "stale", "flat", "collecting_history", "display_only", "unavailable"}
+
+
 def test_summary_counts_reasons_and_calls_only_fresh_readings_live():
     results = [
-        {"feed": "Hyperliquid order book", "freshness": "fresh", "coverage_reason": "fresh", "age_ms": 4_000, "stale_after_ms": 15_000},
+        {"feed": "Hyperliquid order book", "freshness": "fresh", "coverage_reason": "usable", "age_ms": 4_000, "stale_after_ms": 15_000},
         {"feed": "Hyperliquid order book", "freshness": "stale", "coverage_reason": "stale", "age_ms": 22_000, "stale_after_ms": 15_000},
         {"feed": "Coinbase", "freshness": "fresh", "coverage_reason": "flat", "age_ms": 4_000, "stale_after_ms": 60_000},
         {"feed": "GDELT", "freshness": "missing", "coverage_reason": "unavailable", "age_ms": None, "stale_after_ms": 3_600_000},
@@ -60,7 +67,7 @@ def test_summary_counts_reasons_and_calls_only_fresh_readings_live():
     summary = health.summarize(results, {"status": "live", "observation_count": 3}, NOW)
     assert summary["live"] is True and summary["fresh_features"] == 2 and summary["feature_count"] == 4
     assert summary["coverage_reasons"] == {
-        "fresh": 1, "stale": 1, "flat": 1, "collecting_history": 0, "display_only": 0, "unavailable": 1,
+        "usable": 1, "stale": 1, "flat": 1, "collecting_history": 0, "display_only": 0, "unavailable": 1,
     }
     feeds = {feed["feed"]: feed for feed in summary["feeds"]}
     book = feeds["Hyperliquid order book"]
@@ -72,7 +79,7 @@ def test_summary_counts_reasons_and_calls_only_fresh_readings_live():
 def test_nothing_is_live_without_a_fresh_reading_or_without_market_data():
     stale_only = [{"feed": "Coinbase", "freshness": "stale", "coverage_reason": "stale", "age_ms": 90_000, "stale_after_ms": 60_000}]
     assert health.summarize(stale_only, {"status": "live"}, NOW)["live"] is False
-    fresh = [{**stale_only[0], "freshness": "fresh", "coverage_reason": "fresh"}]
+    fresh = [{**stale_only[0], "freshness": "fresh", "coverage_reason": "usable"}]
     down = health.summarize(fresh, {"status": "unavailable", "reason": "ConnectError"}, NOW)
     assert down["live"] is False and down["market_data"] == {"status": "unavailable", "reason": "ConnectError", "observation_count": 0}
 
@@ -91,7 +98,7 @@ def test_the_engine_annotates_every_reading_and_the_overview_carries_health():
         "hl_buy_impact_5k_bps": [{"ts": NOW - 400_000 + i * 10_000, "value": 0.06} for i in range(30)],
     }
     results = {r["feature_id"]: r for r in ENGINE.normalize_observations(observations, histories, evaluated_at_ms=NOW)}
-    assert results["hl_spread_bps"]["coverage_reason"] == "fresh"
+    assert results["hl_spread_bps"]["coverage_reason"] == "usable"
     assert results["hl_spread_bps"]["normalization"]["method"] == "ordinary_zscore"
     assert results["hl_depth_25bp_usd"]["coverage_reason"] == "stale" and results["hl_depth_25bp_usd"]["age_ms"] == 40_000
     assert results["hl_mark_price_usd"]["coverage_reason"] == "display_only"

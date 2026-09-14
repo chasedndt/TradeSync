@@ -19,6 +19,12 @@ import styles from './ChallengerPanel.module.css'
 const WINDOWS: ReplayHours[] = [24, 168, 720]
 const HORIZONS: ReplayHorizon[] = [15, 60, 240]
 
+/** Month, day, hour and minute in UTC, so a default version rarely collides with one already saved. */
+function versionStamp(): string {
+  const iso = new Date().toISOString()
+  return `${iso.slice(5, 7)}${iso.slice(8, 10)}-${iso.slice(11, 13)}${iso.slice(14, 16)}`
+}
+
 type Scope = 'all' | 'market'
 
 interface Fields {
@@ -57,7 +63,7 @@ export function ChallengerPanel({ symbol, overview, overviewError }: Props) {
     setFields((current) => (Object.keys(current.weights).length > 0 ? current : {
       ...current,
       weights: draftFrom(baseline.weights),
-      version: current.version || `${baseline.version}-challenger`,
+      version: current.version || `${baseline.version}-c${versionStamp()}`,
     }))
   }, [baseline])
 

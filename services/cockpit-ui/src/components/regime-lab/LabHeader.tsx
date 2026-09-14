@@ -41,7 +41,7 @@ function LivePill({ overview }: { overview: Props['overview'] }) {
   } else if (health) {
     if (health.market_data.status !== 'live') {
       tone = styles.down
-      label = 'Market data unavailable'
+      label = 'Market data offline'
     } else if (health.live) {
       tone = styles.live
       label = `Live · ${health.fresh_features} of ${health.feature_count} readings fresh`

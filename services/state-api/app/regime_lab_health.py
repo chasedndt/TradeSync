@@ -8,9 +8,13 @@ reason, checked in this order:
 - ``display_only``: a value shown for context and never normalized;
 - ``stale``: a reading at or past its stale limit (a limit of zero never counts as fresh);
 - ``collecting_history``: fewer prior readings than the catalog's minimum;
-- ``fresh``: normalized and within its stale limit;
+- ``usable``: normalized and within its stale limit;
 - ``flat``: every recent value identical, so there is no dispersion to score;
 - ``unavailable``: anything else the normalizer refused, with its reason kept.
+
+"Fresh" means only that a reading is within its stale limit, so no reason is
+called fresh: a fresh reading can still be flat, display only or collecting
+history.
 
 The overview's health summary counts those reasons, counts the fresh readings
 (the only ones called live), and gives each feed its newest reading's age set
@@ -21,7 +25,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
 
-REASONS = ("fresh", "stale", "flat", "collecting_history", "display_only", "unavailable")
+REASONS = ("usable", "stale", "flat", "collecting_history", "display_only", "unavailable")
 
 # Matched in order against the catalog's ``source`` text; the first match names the feed.
 FEEDS = (
@@ -52,7 +56,7 @@ def coverage_reason(result: Mapping[str, Any], freshness: str) -> str:
     if status == "collecting_history":
         return "collecting_history"
     if status == "ready":
-        return "fresh"
+        return "usable"
     if str(result.get("reason") or "").startswith("flat:"):
         return "flat"
     return "unavailable"
