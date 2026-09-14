@@ -33,6 +33,11 @@ from .context_series import bucket_series, describe_coverage
 from .depth import summarise_book
 from . import book_history
 from . import liquidation_context
+from . import binance_liquidations
+from . import liquidation_events
+from .depth_books import AGGREGATIONS as DEPTH_AGGREGATIONS, DepthBooks
+from .depth_stream import run_depth_stream
+from .open_interest_history import OpenInterestHistory
 from .cross_venue import (
     BINANCE_OPEN_INTEREST_URL,
     BINANCE_PREMIUM_INDEX_URL,
@@ -104,6 +109,10 @@ SPOT_POLL_INTERVAL_MS = int(os.getenv('SPOT_POLL_INTERVAL_MS', '3000'))
 trade_flow = TradeFlowTracker(
     [s.replace('-PERP', '') for s in SYMBOLS], window_ms=CVD_WINDOW_MS
 )
+# Aggregated order books for the liquidity heatmap (one websocket per aggregation)
+# and Binance open-interest history for the estimated liquidation map.
+depth_books = DepthBooks()
+open_interest_history = OpenInterestHistory()
 
 
 async def poll_spot_reference_loop():
@@ -526,6 +535,13 @@ async def lifespan(app: FastAPI):
     background_tasks.append(asyncio.create_task(poll_news_tone_loop()))
     background_tasks.append(asyncio.create_task(poll_cross_venue_loop()))
     background_tasks.append(asyncio.create_task(liquidation_context.run(redis_client.client)))
+    background_tasks.append(asyncio.create_task(binance_liquidations.run(redis_client.client, SYMBOLS)))
+    for n_sig_figs in DEPTH_AGGREGATIONS:
+        background_tasks.append(
+            asyncio.create_task(
+                run_depth_stream(depth_books, [s.replace('-PERP', '') for s in SYMBOLS], n_sig_figs)
+            )
+        )
     background_tasks.append(
         asyncio.create_task(
             run_trade_stream(trade_flow, [s.replace('-PERP', '') for s in SYMBOLS])
@@ -1032,6 +1048,35 @@ async def get_liquidation_context(symbol: str):
     if symbol not in SYMBOLS:
         return JSONResponse(status_code=404, content={"error": "unsupported_symbol"})
     return await liquidation_context.history(redis_client.client, symbol)
+
+
+@app.get("/depth-books/{symbol}")
+async def get_depth_books(symbol: str):
+    """The latest aggregated Hyperliquid books (nSigFigs 2 and 3) for one market."""
+    if symbol not in SYMBOLS:
+        return JSONResponse(status_code=404, content={"error": "untracked_symbol", "symbol": symbol})
+    return {"venue": "hyperliquid", "symbol": symbol, "books": depth_books.latest(symbol.replace('-PERP', '')),
+            "authority": "display_only",
+            "note": "Resting orders as displayed, aggregated to 2 and 3 significant figures. Orders can be cancelled; not executable depth."}
+
+
+@app.get("/liquidation-events/{symbol}")
+async def get_liquidation_events(symbol: str):
+    """Liquidations received from Bybit and Binance in the last hour, in one shape."""
+    bybit = await liquidation_context.history(redis_client.client, symbol)
+    binance = await binance_liquidations.history(redis_client.client, symbol)
+    return liquidation_events.merged(symbol, bybit, binance)
+
+
+@app.get("/open-interest-history/binance/{symbol}")
+async def get_binance_open_interest_history(symbol: str, period: str = "1h", limit: int = 500):
+    """Binance aggregated open-interest history (context for the estimated liquidation map)."""
+    try:
+        return await open_interest_history.get(symbol, period, limit)
+    except ValueError as exc:
+        return JSONResponse(status_code=400, content={"error": "invalid_request", "detail": str(exc)})
+    except httpx.HTTPError as exc:
+        return JSONResponse(status_code=502, content={"error": "provider_unavailable", "detail": type(exc).__name__})
 
 
 @app.get("/timeseries/{venue}/{symbol}/{metric}")

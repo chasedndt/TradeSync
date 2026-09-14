@@ -16,6 +16,13 @@ Examples:
 
 Current repository migrations:
 
+`031_market_history.sql` adds durable market history for the liquidity heatmap,
+the estimated liquidation map and timeframe records: aggregated Hyperliquid order
+books (nSigFigs 2 and 3), Hyperliquid open interest, and liquidations received from
+Bybit and Binance (context only). Written once a minute by state-api's
+`market_recorder`; retention downsamples to 15 minutes (books after 3 days, open
+interest after 7) and drops books after 90 days and liquidations after 180.
+
 `026_paper_control.sql` proposes default-paused persistent paper entry control and
 an audit trail. Not yet applied; no current runtime control changed.
 

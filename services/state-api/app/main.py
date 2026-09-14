@@ -3825,6 +3825,10 @@ from app.feature_history import register as register_feature_history  # noqa: E4
 
 register_feature_history(app, state, market_data_url=MARKET_DATA_URL)
 
+from app.market_recorder import register as register_market_recorder  # noqa: E402
+
+register_market_recorder(app, state, market_data_url=MARKET_DATA_URL)
+
 from app.mobile_alerts import register as register_mobile_alerts  # noqa: E402
 register_mobile_alerts(app, state)
 
