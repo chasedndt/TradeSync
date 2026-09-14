@@ -7,15 +7,15 @@ export function ModeProgression({ mode }: { mode: ExecutionMode }) {
       <h3 className="text-sm font-medium text-gray-400 mb-4">Mode Progression</h3>
       <div className="flex items-center gap-2">
 
-        {/* Observe */}
+        {/* Read-only */}
         <div className={`flex-1 rounded-lg p-3 border-2 text-center ${
-          mode === 'observe' ? 'border-blue-500 bg-blue-900/10' : 'border-gray-700 opacity-60'
+          mode === 'read_only' ? 'border-blue-500 bg-blue-900/10' : 'border-gray-700 opacity-60'
         }`}>
-          <Eye size={20} className={`mx-auto mb-1 ${mode === 'observe' ? 'text-blue-400' : 'text-gray-600'}`} />
-          <div className={`text-xs font-bold ${mode === 'observe' ? 'text-blue-400' : 'text-gray-500'}`}>
-            Observe
+          <Eye size={20} className={`mx-auto mb-1 ${mode === 'read_only' ? 'text-blue-400' : 'text-gray-600'}`} />
+          <div className={`text-xs font-bold ${mode === 'read_only' ? 'text-blue-400' : 'text-gray-500'}`}>
+            Read-only
           </div>
-          {mode === 'observe' && (
+          {mode === 'read_only' && (
             <div className="text-[9px] text-blue-500 mt-0.5">CURRENT</div>
           )}
         </div>

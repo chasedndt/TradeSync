@@ -111,7 +111,7 @@ export function EvidenceTrail({ evidence }: EvidenceTrailProps) {
                 </div>
                 <div className="text-[10px] text-gray-500 flex justify-between">
                   <span>{order.venue.toUpperCase()}</span>
-                  <span>{order.dry_run ? 'DRY_RUN' : 'LIVE'}</span>
+                  <span>{order.dry_run ? 'PAPER' : 'LIVE'}</span>
                 </div>
               </div>
             ))}

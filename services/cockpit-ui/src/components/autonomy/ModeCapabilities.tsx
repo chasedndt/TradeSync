@@ -12,7 +12,7 @@ export function ModeCapabilities() {
           <thead>
             <tr className="border-b border-gray-800 text-gray-500">
               <th className="text-left py-2 pr-4">Capability</th>
-              <th className="text-center py-2 px-4">Observe</th>
+              <th className="text-center py-2 px-4">Read-only</th>
               <th className="text-center py-2 px-4">Manual</th>
               <th className="text-center py-2 px-4 opacity-50">Autonomous</th>
             </tr>
@@ -20,7 +20,7 @@ export function ModeCapabilities() {
           <tbody className="text-gray-400">
             {[
               ['View opportunities & evidence', true, true, true],
-              ['Run preview simulations', true, true, true],
+              ['Run previews', true, true, true],
               ['Execute trades (manual confirm)', false, true, true],
               ['Autonomous execution (no confirm)', false, false, true],
               ['Global kill switch', true, true, true],

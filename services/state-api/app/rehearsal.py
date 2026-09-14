@@ -3,7 +3,7 @@
 ``/actions/preview`` consults the global execution gate first, so while
 ``EXECUTION_ENABLED`` is false it refuses every plan and records nothing. That
 is correct for execution and useless for practice. This router runs the same
-per-symbol risk rules, prices a simulated fill from the live mark and spread,
+per-symbol risk rules, prices a paper fill from the live mark and spread,
 and writes the result to its own journal. It has no path to an execution
 service: there is nothing in this module that could place an order.
 """
@@ -31,6 +31,15 @@ MARKET_DATA_URL = os.getenv("MARKET_DATA_URL", "http://market-data:8005")
 # history, not a price, and the rehearsal is refused rather than back-dated.
 MAX_SNAPSHOT_AGE_MS = int(os.getenv("REHEARSAL_MAX_SNAPSHOT_AGE_MS", "30000"))
 
+# The Cockpit prints these as they arrive. Rows written before this wording
+# carry the table's original default note, which is replaced when read so every
+# entry in the journal says the same thing.
+PAPER_NOTE = "Paper ledger entry. No order was placed; no wallet or signer exists."
+LIST_NOTE = "Every row is a paper ledger entry. No order, wallet or signer is involved."
+LEGACY_NOTES = {
+    "Simulated. No order was placed; no wallet or signer exists.": PAPER_NOTE,
+}
+
 
 class RehearseRequest(BaseModel):
     opportunity_id: str
@@ -45,6 +54,8 @@ def _row_to_dict(row) -> dict[str, Any]:
     out["id"] = str(out["id"])
     out["opportunity_id"] = str(out["opportunity_id"])
     out["created_at"] = out["created_at"].isoformat()
+    if out.get("note") in LEGACY_NOTES:
+        out["note"] = LEGACY_NOTES[out["note"]]
     return out
 
 
@@ -83,7 +94,7 @@ def register(app, state) -> None:
             direction = opportunity.get("dir")
 
             plan = {
-                "action": "Simulated market order",
+                "action": "Paper market order",
                 "symbol": symbol,
                 "direction": direction,
                 "size_usd": req.size_usd,
@@ -131,13 +142,13 @@ def register(app, state) -> None:
             saved = await conn.fetchrow(
                 """
                 INSERT INTO paper_rehearsals
-                    (opportunity_id, symbol, direction, size_usd, status, plan, risk_verdict, fill, market)
-                VALUES ($1::uuid, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, $9::jsonb)
+                    (opportunity_id, symbol, direction, size_usd, status, plan, risk_verdict, fill, market, note)
+                VALUES ($1::uuid, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, $9::jsonb, $10)
                 RETURNING *
                 """,
                 req.opportunity_id, symbol, direction if direction in ("LONG", "SHORT") else "LONG",
                 req.size_usd, status, json.dumps(plan), json.dumps(reason),
-                json.dumps(fill) if fill else None, json.dumps(market),
+                json.dumps(fill) if fill else None, json.dumps(market), PAPER_NOTE,
             )
             return {"duplicate": False, "rehearsal": _row_to_dict(saved)}
 
@@ -158,7 +169,7 @@ def register(app, state) -> None:
             "rehearsals": [_row_to_dict(r) for r in rows],
             "counts": dict(counts) if counts else {"rehearsed": 0, "refused": 0},
             "execution_authority": False,
-            "note": "Every row is a simulation. No order, wallet or signer is involved.",
+            "note": LIST_NOTE,
         }
 
     app.include_router(router)

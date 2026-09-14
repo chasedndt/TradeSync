@@ -27,7 +27,7 @@ export function RuntimeEnvironment({ systemMode, execStatus, apiUrl }: RuntimeEn
         <div className="flex justify-between">
           <span className="text-gray-500">Backend Execution Gate</span>
           <span className={execStatus?.execution_enabled === 'true' ? 'text-green-400' : 'text-yellow-400'}>
-            {execStatus?.execution_enabled === 'true' ? 'Open (EXECUTION_ENABLED=true)' : 'Closed (DRY_RUN active)'}
+            {execStatus?.execution_enabled === 'true' ? 'Open (EXECUTION_ENABLED=true)' : 'Closed (EXECUTION_ENABLED=false)'}
           </span>
         </div>
         <div className="flex justify-between">

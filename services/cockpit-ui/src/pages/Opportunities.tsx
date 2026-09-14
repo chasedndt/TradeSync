@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useOpportunities } from '../api/hooks'
-import { OpportunityCard, DryRunBanner } from '../components'
+import { OpportunityCard } from '../components'
 import { Search, Filter, Clock } from 'lucide-react'
 
 // Must match fusion-engine OPPORTUNITY_TTL_SECONDS (compose.full.yml)
@@ -59,9 +59,6 @@ export function Opportunities() {
 
   return (
     <div className="space-y-6">
-      {/* Dry Run / Mode Banner */}
-      <DryRunBanner variant="inline" />
-
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h2 className="text-xl font-bold">Market Opportunities</h2>
         <div className="flex flex-wrap gap-2">

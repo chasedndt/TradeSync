@@ -13,7 +13,7 @@ import { ReadinessChecklists } from '../components/autonomy/ReadinessChecklists'
  * page — this page explains the why, not the how.
  */
 export function Autonomy() {
-  const { mode, isDryRun, isDemo } = useExecution()
+  const { mode, paperOnly } = useExecution()
   const { data: status } = useExecutionStatus()
 
   const allVenuesConnected = (status?.venues?.length ?? 0) > 0 &&
@@ -31,7 +31,7 @@ export function Autonomy() {
     {
       label: 'Backend execution gate open',
       met: executionEnabled,
-      note: 'Set EXECUTION_ENABLED=true in environment, DRY_RUN=false'
+      note: 'Set EXECUTION_ENABLED=true and turn paper mode off, with explicit operator approval'
     },
     {
       label: 'No circuit breakers tripped',
@@ -59,8 +59,8 @@ export function Autonomy() {
     },
   ]
 
-  const modeLabel = mode === 'observe' ? 'OBSERVE' : mode === 'manual' ? 'MANUAL' : 'AUTONOMOUS'
-  const modeBadgeColor = mode === 'observe'
+  const modeLabel = mode === 'read_only' ? 'READ-ONLY' : mode === 'manual' ? 'MANUAL' : 'AUTONOMOUS'
+  const modeBadgeColor = mode === 'read_only'
     ? 'bg-blue-900/50 text-blue-400 border-blue-700'
     : mode === 'manual'
       ? 'bg-orange-900/50 text-orange-400 border-orange-700'
@@ -90,19 +90,14 @@ export function Autonomy() {
       {/* Mode capability table */}
       <ModeCapabilities />
 
-      {/* Demo / Dry-run context */}
-      {(isDemo || isDryRun) && (
+      {/* Execution gate closed */}
+      {paperOnly && (
         <div className="card bg-gray-900/30 border-yellow-900/30 text-sm text-gray-400">
           <div className="flex items-start gap-2">
             <AlertTriangle size={14} className="text-yellow-500 mt-0.5 flex-shrink-0" />
             <div>
-              <span className="text-yellow-400 font-medium">
-                {isDemo ? 'Demo Mode' : 'Dry-Run Mode'}:{' '}
-              </span>
-              {isDemo
-                ? 'No venue services are reachable. All execution is disconnected.'
-                : 'Backend DRY_RUN=true. Orders are simulated even in Manual mode.'}
-              {' '}No real capital is at risk.
+              <span className="text-yellow-400 font-medium">Execution: not connected.</span>{' '}
+              Orders are recorded to the paper ledger, including in Manual mode. No capital is at risk.
             </div>
           </div>
         </div>

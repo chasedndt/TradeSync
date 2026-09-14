@@ -19,7 +19,7 @@ export function ExecuteResultCard({ executeResult, onDismiss }: { executeResult:
         </div>
         {executeResult.dry_run && (
           <div className="bg-yellow-900/30 border border-yellow-900/50 p-2 rounded text-center">
-            <span className="text-yellow-500 text-xs font-bold font-mono">DRY_RUN: NO ACTUAL CAPITAL DEPLOYED</span>
+            <span className="text-yellow-500 text-xs font-bold font-mono">PAPER ORDER · NOT SENT TO A VENUE</span>
           </div>
         )}
         {!executeResult.ok && executeResult.error && (

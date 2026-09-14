@@ -18,7 +18,7 @@ export function Settings() {
   const [saved, setSaved] = useState(false)
 
   const { data: execStatus, isLoading: execLoading } = useExecutionStatus()
-  const { isDryRun, isDemo } = useExecution()
+  const { paperOnly } = useExecution()
 
   useEffect(() => {
     // Load from the canonical localStorage keys used by client.ts
@@ -55,12 +55,10 @@ export function Settings() {
     window.location.reload()
   }
 
-  // Three-state system mode — more truthful than binary Live/Demo
-  const systemMode = isDemo
-    ? { label: 'DEMO', color: 'text-gray-400', note: 'No venue connectivity. All data disconnected.' }
-    : isDryRun
-      ? { label: 'PAPER (DRY RUN)', color: 'text-yellow-400', note: 'Orders simulated. DRY_RUN=true on backend.' }
-      : { label: 'LIVE', color: 'text-green-400', note: 'Live execution enabled.' }
+  // What the backend execution gate allows right now
+  const systemMode = paperOnly
+    ? { label: 'PAPER', color: 'text-yellow-400', note: 'Execution: not connected. Orders are recorded to the paper ledger.' }
+    : { label: 'LIVE', color: 'text-green-400', note: 'Live execution enabled.' }
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -86,7 +84,7 @@ export function Settings() {
       {/* Danger Zone */}
       <DangerZone onClearCache={handleClearCache} />
 
-      {/* Environment Info — 3-state truthful display */}
+      {/* Environment Info */}
       <RuntimeEnvironment systemMode={systemMode} execStatus={execStatus} apiUrl={apiUrl} />
     </div>
   )

@@ -3,7 +3,7 @@ import { AlertCircle } from 'lucide-react'
 
 interface ExecuteConfirmProps {
   mode: ExecutionMode
-  isDryRun: boolean
+  paperOnly: boolean
   confirmed: boolean
   onConfirmedChange: (confirmed: boolean) => void
   onExecute: () => void
@@ -11,14 +11,14 @@ interface ExecuteConfirmProps {
   isExecuting: boolean
 }
 
-export function ExecuteConfirm({ mode, isDryRun, confirmed, onConfirmedChange, onExecute: handleExecute, executeDisabled, isExecuting }: ExecuteConfirmProps) {
+export function ExecuteConfirm({ mode, paperOnly, confirmed, onConfirmedChange, onExecute: handleExecute, executeDisabled, isExecuting }: ExecuteConfirmProps) {
   return (
     <div className="pt-4 border-t border-gray-800">
       {/* Mode Warning */}
-      {mode === 'observe' && (
+      {mode === 'read_only' && (
         <div className="bg-blue-900/20 border border-blue-900/50 p-3 rounded mb-4 text-sm text-blue-300 flex items-center gap-2">
           <AlertCircle size={16} />
-          You are in Observe mode. Switch to Manual mode in Execution settings to enable trading.
+          Read-only mode is on. Switch to Manual mode in Execution settings to submit orders.
         </div>
       )}
 
@@ -31,8 +31,8 @@ export function ExecuteConfirm({ mode, isDryRun, confirmed, onConfirmedChange, o
           className="mt-0.5 rounded bg-gray-900 border-gray-700 text-blue-600 focus:ring-blue-500"
         />
         <div className="text-xs text-blue-300 leading-relaxed font-medium">
-          {isDryRun ? (
-            <>I understand this is a <strong>DRY RUN</strong> simulation. No real capital will be deployed.</>
+          {paperOnly ? (
+            <>I understand execution is <strong>not connected</strong>: this order is recorded to the paper ledger and no capital is deployed.</>
           ) : (
             <>I verify that this trade plan aligns with my current strategy and I authorize deployment of capital to the blockchain.</>
           )}
@@ -48,7 +48,9 @@ export function ExecuteConfirm({ mode, isDryRun, confirmed, onConfirmedChange, o
             : 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/20 active:translate-y-0.5'
         }`}
       >
-        {isExecuting ? 'DISPATCHING TO VENUE...' : isDryRun ? 'SIMULATE EXECUTION' : 'CONFIRM & EXECUTE'}
+        {isExecuting
+          ? (paperOnly ? 'RECORDING PAPER ORDER...' : 'DISPATCHING TO VENUE...')
+          : paperOnly ? 'RECORD PAPER ORDER' : 'CONFIRM & EXECUTE'}
       </button>
     </div>
   )

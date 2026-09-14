@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import type { PreviewResponse } from '../api/types'
-import { DryRunBanner } from './DryRunBanner'
 import { useExecution } from '../context'
 import { Shield, Hash } from 'lucide-react'
 import { ExecuteConfirm } from './preview/ExecuteConfirm'
@@ -16,7 +15,7 @@ interface PreviewPanelProps {
 
 export function PreviewPanel({ preview, onExecute, isExecuting }: PreviewPanelProps) {
   const [confirmed, setConfirmed] = useState(false)
-  const { canExecute, mode, isDryRun } = useExecution()
+  const { canExecute, mode, paperOnly } = useExecution()
   const { decision_id, plan, risk_verdict, suggested_adjustments } = preview
 
   // Extract reason_code if available (from updated API)
@@ -49,9 +48,6 @@ export function PreviewPanel({ preview, onExecute, isExecuting }: PreviewPanelPr
         </div>
       </div>
 
-      {/* Dry Run Banner */}
-      <DryRunBanner variant="compact" />
-
       {/* Risk Verdict - Enhanced */}
       <RiskVerdictBox riskVerdict={risk_verdict} reasonCode={reasonCode} reasonExplanation={reasonExplanation} />
 
@@ -61,7 +57,7 @@ export function PreviewPanel({ preview, onExecute, isExecuting }: PreviewPanelPr
       {risk_verdict.allowed && decision_id && (
         <ExecuteConfirm
           mode={mode}
-          isDryRun={isDryRun}
+          paperOnly={paperOnly}
           confirmed={confirmed}
           onConfirmedChange={setConfirmed}
           onExecute={handleExecute}

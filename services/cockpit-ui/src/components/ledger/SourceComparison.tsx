@@ -18,7 +18,7 @@ export function SourceComparison() {
       {data.summary.eligible === 0 && <p>No clean closed managed-paper trades to compare yet. This is not a zero-return result.</p>}
       <div className={styles.scroll}><table><thead><tr><th>Holding style</th><th>Eligible entries</th><th>Context available</th><th>Selected / skipped</th><th>Baseline mean</th><th>Filter mean</th><th>Paired difference</th></tr></thead>
         <tbody>{data.cohorts.map(c => <tr key={c.style}><td>{c.style}</td><td>{c.eligible}</td><td>{c.context_available} / {c.eligible}</td><td>{c.selected} / {c.abstained}</td><td>{value(c.baseline_mean_bps_per_opportunity)}</td><td>{value(c.filter_mean_bps_per_opportunity)}</td><td>{value(c.paired_mean_difference_bps)}</td></tr>)}</tbody></table></div>
-      <p>Both means divide by the same original eligible entry count; skipped entries contribute zero to the filter. 1 basis point (bps) = 0.01%. These are net simulated returns per opportunity, not account returns.</p>
+      <p>Both means divide by the same original eligible entry count; skipped entries contribute zero to the filter. 1 basis point (bps) = 0.01%. These are net paper returns per opportunity, not account returns.</p>
       <details><summary>Rule, exclusions and limits</summary>
         <p>Book alignment = (bid notional − ask notional) / (bid notional + ask notional), with sign reversed for shorts. Fixed experimental threshold: 0.2. Missing context skips a trade; it is not neutral evidence. Only a frozen sample no older than 30 seconds is used.</p>
         <p>Excluded: {Object.entries(data.summary.excluded).map(([reason, count]) => `${reason.replace(/_/g, ' ')}: ${count}`).join(' · ') || 'none in this record window'}.</p>

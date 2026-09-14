@@ -1,20 +1,19 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 
-export type ExecutionMode = 'observe' | 'manual' | 'autonomous'
+export type ExecutionMode = 'read_only' | 'manual' | 'autonomous'
 
 interface ExecutionState {
   mode: ExecutionMode
   globalKillSwitch: boolean
   venueKillSwitches: Record<string, boolean>
-  isDryRun: boolean // From backend
-  isDemo: boolean // No real credentials configured
+  paperOnly: boolean // From backend: the execution gate is closed, so orders go to the paper ledger
 }
 
 interface ExecutionContextValue extends ExecutionState {
   setMode: (mode: ExecutionMode) => void
   toggleGlobalKill: () => void
   toggleVenueKill: (venue: string) => void
-  setBackendState: (dryRun: boolean, demo: boolean) => void
+  setBackendState: (paperOnly: boolean) => void
   canExecute: boolean
 }
 
@@ -23,13 +22,17 @@ const ExecutionContext = createContext<ExecutionContextValue | null>(null)
 const STORAGE_KEY = 'tradesync_execution_state'
 
 const defaultState: ExecutionState = {
-  mode: 'observe',
+  mode: 'read_only',
   globalKillSwitch: false,
   venueKillSwitches: {
     hyperliquid: false
   },
-  isDryRun: true,
-  isDemo: true
+  paperOnly: true
+}
+
+/** A mode stored by any earlier build; anything unrecognised loads as read-only. */
+function storedMode(value: unknown): ExecutionMode {
+  return value === 'manual' || value === 'autonomous' ? value : 'read_only'
 }
 
 export function ExecutionProvider({ children }: { children: ReactNode }) {
@@ -39,7 +42,12 @@ export function ExecutionProvider({ children }: { children: ReactNode }) {
       const stored = localStorage.getItem(STORAGE_KEY)
       if (stored) {
         const parsed = JSON.parse(stored)
-        return { ...defaultState, ...parsed }
+        return {
+          ...defaultState,
+          mode: storedMode(parsed.mode),
+          globalKillSwitch: parsed.globalKillSwitch ?? defaultState.globalKillSwitch,
+          venueKillSwitches: parsed.venueKillSwitches ?? defaultState.venueKillSwitches,
+        }
       }
     } catch (e) {
       console.warn('Failed to load execution state from localStorage:', e)
@@ -80,15 +88,16 @@ export function ExecutionProvider({ children }: { children: ReactNode }) {
     }))
   }
 
-  const setBackendState = (isDryRun: boolean, isDemo: boolean) => {
-    setState(prev => ({ ...prev, isDryRun, isDemo }))
+  const setBackendState = (paperOnly: boolean) => {
+    // Returning the same state when nothing changed lets React skip the render.
+    setState(prev => (prev.paperOnly === paperOnly ? prev : { ...prev, paperOnly }))
   }
 
   // Can only execute if:
-  // - Mode is not 'observe'
+  // - Mode is not read-only
   // - Global kill switch is off
   // - (Per-venue checks happen at execution time)
-  const canExecute = state.mode !== 'observe' && !state.globalKillSwitch
+  const canExecute = state.mode !== 'read_only' && !state.globalKillSwitch
 
   return (
     <ExecutionContext.Provider value={{

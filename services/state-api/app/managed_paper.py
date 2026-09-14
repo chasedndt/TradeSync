@@ -14,6 +14,12 @@ from tradesync_core.research_trial import specification, fingerprint, evaluate
 from app import background
 from app.entry_context import liquidation_snapshot, book_snapshot
 
+# Printed under the paper portfolio in the Cockpit.
+POSITIONS_NOTE = (
+    "Priced from observed quotes, not exchange fills. 100 latest positions. Funding is a frozen scenario, "
+    "not actual settlement. Observation gaps disqualify clean performance evidence."
+)
+
 
 def decode(value):
     return json.loads(value) if isinstance(value, str) else value
@@ -93,7 +99,7 @@ def register(app, state, *, market_data_url):
             rows = await conn.fetch('SELECT id,opportunity_id,symbol,created_at,updated_at,evidence_sha256,position_state FROM managed_paper_positions ORDER BY created_at DESC LIMIT 100')
         return {'positions': [{**dict(r), 'position_state': decode(r['position_state'])} for r in rows],
                 'worker': health, 'execution_authority': False,
-                'note': 'Observed-quote simulation, not exchange fills. 100 latest positions. Funding is a frozen scenario, not actual settlement. Observation gaps disqualify clean performance evidence.'}
+                'note': POSITIONS_NOTE}
 
     @app.get('/state/research-trials')
     async def trials():

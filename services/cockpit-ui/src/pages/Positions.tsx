@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { usePositions, useRiskLimits } from '../api/hooks'
-import { DryRunBanner } from '../components'
 import { useExecution } from '../context/ExecutionContext'
 import { AlertTriangle } from 'lucide-react'
 import { ExposureSummaryCard } from '../components/positions/ExposureSummaryCard'
@@ -13,7 +12,7 @@ export function Positions() {
   const [venue, setVenue] = useState('all')
   const { data: positions, isLoading, error } = usePositions(venue)
   const { data: riskLimits } = useRiskLimits()
-  const { isDryRun, isDemo } = useExecution()
+  const { paperOnly } = useExecution()
 
   const totalPnl = positions?.reduce((sum, p) => sum + p.pnl_usd, 0) || 0
   const totalExposure = positions?.reduce((sum, p) => sum + p.size_usd, 0) || 0
@@ -29,8 +28,8 @@ export function Positions() {
   const maxPositions = riskLimits?.max_open_positions || 0
 
   // Data truth indicator
-  const dataMode = isDemo ? 'DEMO' : isDryRun ? 'PAPER' : 'LIVE'
-  const dataModeColor = isDemo ? 'bg-gray-600' : isDryRun ? 'bg-yellow-600' : 'bg-green-600'
+  const dataMode = paperOnly ? 'PAPER' : 'LIVE'
+  const dataModeColor = paperOnly ? 'bg-yellow-600' : 'bg-green-600'
 
   return (
     <div className="space-y-6">
@@ -57,14 +56,12 @@ export function Positions() {
         </div>
       </div>
 
-      <DryRunBanner variant="compact" />
-
-      {/* Data Truth Warning */}
-      {isDemo && (
+      {/* Where these rows come from */}
+      {paperOnly && (
         <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-3 flex items-center gap-3">
           <AlertTriangle className="w-5 h-5 text-gray-400" />
           <div className="text-sm text-gray-400">
-            <span className="font-medium text-gray-300">Demo Mode:</span> Positions shown are simulated. No real capital is at risk.
+            <span className="font-medium text-gray-300">Execution: not connected.</span> Positions are read from the paper execution service; no venue order has been placed.
           </div>
         </div>
       )}

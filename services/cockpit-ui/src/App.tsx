@@ -26,7 +26,7 @@ import {
 } from './pages'
 
 export default function App() {
-  // Sync ExecutionContext with backend state (isDryRun, isDemo)
+  // Sync ExecutionContext with the backend execution gate (paperOnly)
   useBackendSync()
 
   return (

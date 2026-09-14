@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useEvidence, usePreview, useExecute, useMarketSnapshot } from '../api/hooks'
-import { EvidenceTrail, PreviewPanel, DryRunBanner } from '../components'
+import { EvidenceTrail, PreviewPanel } from '../components'
 import type { PreviewResponse, ExecutionResult, MarketSnapshotWithMicrostructure } from '../api/types'
 import { calculateBiasStrength } from '../utils/metrics'
 import { AlertTriangle } from 'lucide-react'
@@ -87,9 +87,6 @@ export function OpportunityDetail() {
       <Link to="/opportunities" className="text-blue-400 hover:underline text-sm flex items-center gap-1">
         &larr; Back to Opportunities
       </Link>
-
-      {/* Dry Run / Mode Banner */}
-      <DryRunBanner variant="compact" />
 
       {/* Opportunity Header */}
       <OpportunityHeader opportunity={opportunity} biasStrength={biasStrength} ageSec={ageSec} />
