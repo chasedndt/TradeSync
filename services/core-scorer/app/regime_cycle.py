@@ -5,6 +5,7 @@ import asyncpg
 from tradesync_core.paper_signal import AdmissionPolicy, decide_paper_signal
 from tradesync_core.symbols import normalize_symbol
 
+from .active_weights import apply_active_rulebook
 from .paper_producer import (
     direction_hold_max_age_seconds,
     has_active_opportunity,
@@ -55,6 +56,11 @@ async def record_symbol_verdict(symbol: str):
 
     conn = await asyncpg.connect(PG_DSN)
     try:
+        # Read every cycle: an adoption or a revert takes effect on the next
+        # verdict, and anything unreadable falls back to the file weights.
+        evidence, weights = await apply_active_rulebook(conn, evidence)
+        if weights.fell_back:
+            print(f"[RegimePaper] {symbol}: {weights.reason}")
         # A side counts as held only while it is still current. Passing the
         # bound explicitly keeps the cadence and the stickiness in one place.
         previous_direction = await last_admitted_direction(
