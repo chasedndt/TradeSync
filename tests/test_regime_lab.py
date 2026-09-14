@@ -8,7 +8,6 @@ from tradesync_core.regime_lab import (
     aggregate_feature_evidence,
     build_challenger_rulebook,
     challenger_rulebook,
-    compare_experiment,
 )
 from tradesync_core.regime_weights import load_rulebook
 
@@ -105,36 +104,9 @@ class RegimeLabTests(unittest.TestCase):
         )
         self.assertEqual(saved.data["purpose"], "More price weight should admit more trending setups.")
 
-    def test_there_is_no_learning_gate(self):
+    def test_challengers_are_judged_by_replay_not_a_snapshot_comparison(self):
         self.assertFalse(hasattr(regime_lab, "assess_learning_gate"))
-
-    def test_comparison_uses_same_evidence_and_has_no_activation_authority(self):
-        challenger = build_challenger_rulebook(
-            self.baseline,
-            {
-                "price_volatility": 0.25,
-                "liquidity": 0.35,
-                "positioning": 0.20,
-                "spot_premium": 0.10,
-                "macro_flows": 0.10,
-            },
-            "1.0.0-test",
-            "Increasing liquidity emphasis should reduce fragile paper setups.",
-        )
-        evidence = aggregate_feature_evidence(
-            self.catalog,
-            self.baseline,
-            [{
-                "feature_id": "hl_spread_bps",
-                "score": -0.5,
-                "data_quality": 1.0,
-                "scoring_allowed": True,
-            }],
-        )
-        result = compare_experiment(self.baseline, challenger, evidence)
-        self.assertTrue(result["same_market_evidence"])
-        self.assertFalse(result["activation_authority"])
-        self.assertEqual(result["baseline"]["paper_risk_multiplier"], 0.5)
+        self.assertFalse(hasattr(regime_lab, "compare_experiment"))
 
 
 if __name__ == "__main__":

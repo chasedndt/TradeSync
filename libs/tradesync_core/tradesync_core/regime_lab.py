@@ -1,8 +1,9 @@
 """Paper-only Regime Lab calculations shared by API, replay, and tests.
 
-The browser never calculates a score.  It submits operator controls and this
-module validates the draft, aggregates admitted feature evidence, and compares
-the same market inputs under the baseline and challenger rulebooks.
+The browser never calculates a score. It submits operator controls; this module
+validates a challenger draft and aggregates admitted feature evidence into
+rulebook blocks. Challengers are judged by replaying stored decisions
+(``replay_judgement``), not by re-scoring one market snapshot.
 """
 
 from __future__ import annotations
@@ -16,8 +17,6 @@ from .market_features import FeatureCatalog
 from .regime_weights import (
     RegimeRulebook,
     RulebookValidationError,
-    diff_rulebooks,
-    evaluate_blocks,
     validate_rulebook,
 )
 
@@ -254,36 +253,3 @@ def build_challenger_rulebook(
             "hypothesis must contain at least 20 characters"
         )
     return challenger_rulebook(baseline, weights, version, hypothesis)
-
-
-def compare_experiment(
-    baseline: RegimeRulebook,
-    challenger: RegimeRulebook,
-    evidence: AggregatedEvidence,
-    risk_flags: Sequence[str] | None = None,
-) -> dict[str, Any]:
-    """Evaluate one evidence set under baseline and challenger weights."""
-
-    baseline_result = evaluate_blocks(
-        baseline,
-        evidence.block_scores,
-        evidence.data_quality,
-        risk_flags or [],
-    )
-    challenger_result = evaluate_blocks(
-        challenger,
-        evidence.block_scores,
-        evidence.data_quality,
-        risk_flags or [],
-    )
-    return {
-        "baseline": baseline_result,
-        "challenger": challenger_result,
-        "score_delta": round(
-            challenger_result["weighted_score"] - baseline_result["weighted_score"],
-            12,
-        ),
-        "rulebook_diff": diff_rulebooks(baseline, challenger),
-        "same_market_evidence": True,
-        "activation_authority": False,
-    }
