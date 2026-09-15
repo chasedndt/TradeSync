@@ -1,0 +1,66 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(3, 9, 16, 0.72);
+}
+
+.dialog {
+  width: min(460px, 100%);
+  box-sizing: border-box;
+  padding: 18px 20px;
+  border: 1px solid var(--border, rgba(131, 151, 170, 0.3));
+  border-radius: 6px;
+  background: var(--panel-raised, #101d2d);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  color: var(--text, #e8edf5);
+}
+
+.dialog h4 {
+  margin: 0 0 10px;
+  font-size: 16px;
+}
+
+.dialog p {
+  margin: 0 0 12px;
+  color: var(--muted, #93a0b4);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.phrase {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+.phrase input {
+  padding: 9px;
+  border: 1px solid #344154;
+  border-radius: 6px;
+  background: #111e2e;
+  color: #e5edf7;
+  letter-spacing: 0.08em;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.danger {
+  border-color: var(--red, #ff414d);
+  color: var(--red, #ff414d);
+}
+
+@media (max-width: 600px) {
+  .actions > * {
+    flex: 1 1 100%;
+  }
+}

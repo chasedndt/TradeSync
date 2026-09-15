@@ -1,0 +1,86 @@
+.account {
+  margin: 8px 0 20px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.figure {
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border, #344154);
+  border-radius: 6px;
+}
+
+.figure span {
+  color: var(--muted, #a7b5c7);
+  font-size: 12px;
+}
+
+.figure strong {
+  display: block;
+  margin: 6px 0;
+  color: #e5edf7;
+  font-size: 18px;
+  overflow-wrap: anywhere;
+}
+
+.figure p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.good {
+  color: var(--green, #2fd08a) !important;
+}
+
+.warn {
+  color: var(--amber, #f5b942) !important;
+}
+
+.bad {
+  color: var(--red, #ff414d) !important;
+}
+
+.dim {
+  color: var(--muted, #a7b5c7) !important;
+}
+
+.note {
+  font-size: 12px;
+}
+
+.scroll {
+  overflow-x: auto;
+}
+
+.days {
+  width: 100%;
+  min-width: 420px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.days caption {
+  padding-bottom: 8px;
+  color: var(--muted, #a7b5c7);
+  text-align: left;
+}
+
+.days th,
+.days td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #243244;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.days th:first-child,
+.days td:first-child {
+  text-align: left;
+}

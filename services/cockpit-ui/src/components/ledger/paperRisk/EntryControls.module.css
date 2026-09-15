@@ -1,0 +1,55 @@
+.controls {
+  margin: 0 0 20px;
+}
+
+.fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.fields label {
+  display: grid;
+  flex: 1 1 200px;
+  gap: 8px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--muted, #a7b5c7);
+}
+
+.fields label:last-child {
+  flex-basis: 320px;
+}
+
+.fields input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 10px;
+  border: 1px solid #344154;
+  border-radius: 8px;
+  background: #111e2e;
+  color: #e5edf7;
+}
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 12px 0 8px;
+}
+
+.danger {
+  border-color: var(--red, #ff414d);
+  color: var(--red, #ff414d);
+}
+
+.hint {
+  font-size: 12px;
+}
+
+@media (max-width: 600px) {
+  .buttons > * {
+    flex: 1 1 100%;
+  }
+}
