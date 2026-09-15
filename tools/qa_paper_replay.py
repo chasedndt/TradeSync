@@ -71,6 +71,10 @@ async def replay(ctx, opp, style, now):
     history = await candles(ctx.market, symbol, rules.atr_interval, entry_time - (rules.atr_period + 4) * rules.atr_seconds, entry_time)
     try:
         volatility = atr(history, rules.atr_seconds, entry_time, rules.atr_period)
+        # A past entry's funding rows are all received now and excluded, so its planning rate is the declared
+        # floor: the gates can be checked before the slower evidence gathering, with the same answer.
+        floor = funding.planning_bps_hour({}, COMMON.planning_funding_floor_bps_hour)
+        open_position_on_candle(side, style, NOTIONAL, volatility, bars[0], entry_book[1], cost_source=entry_book[2], planning_funding=floor)
         gathered, _ = await paper_entry_sources.gather(ctx.pool, ctx.market, editions.SELF_URL, opp, as_of=entry_time)
         doc = evidence.document(gathered, entry_time, inputs={
             "captured_at": time.time(), "atr": volatility, "entry_cost_book": entry_book[2],
@@ -148,26 +152,32 @@ def verify(checks, label, doc, state, rows, bars, entry_book, books):
 
 
 async def run(ctx, hours):
+    """One real opportunity per tracked symbol from the start of the window; each tries the styles not yet replayed.
+
+    Styles are tried scalp first, so a symbol admissible for a shorter style is not spent on swing. An
+    opportunity backs at most one replay (positions are unique per opportunity).
+    """
     now = time.time()
     start = now - hours * 3600
     universe = await editions.tracked_symbols(ctx.market)
-    opportunities = await ctx.conn.fetch("SELECT * FROM public.opportunities WHERE snapshot_ts BETWEEN to_timestamp($1) AND to_timestamp($2) "
-                                         "AND lower(dir) IN ('long','short') AND symbol = ANY($3::text[]) ORDER BY snapshot_ts", start, start + 1800, universe)
-    results, used = [], set()
-    for style in STYLES:
-        attempts = 0
-        for opp in opportunities:
-            if opp["symbol"] in used or attempts >= ATTEMPTS_PER_STYLE:
-                continue
-            attempts += 1
+    opportunities = await ctx.conn.fetch("SELECT DISTINCT ON (symbol) * FROM public.opportunities WHERE snapshot_ts BETWEEN to_timestamp($1) "
+                                         "AND to_timestamp($2) AND lower(dir) IN ('long','short') AND symbol = ANY($3::text[]) "
+                                         "ORDER BY symbol, snapshot_ts", start, start + 3600, universe)
+    results, covered = [], set()
+    for opp in sorted(opportunities, key=lambda row: row["snapshot_ts"]):
+        for style in [s for s in STYLES if s not in covered]:
             try:
                 outcome = await replay(ctx, dict(opp), style, now)
             except httpx.HTTPError as exc:  # market data unreachable: recorded, never replaced by a guess
                 outcome = {"symbol": opp["symbol"], "style": style, "opportunity": str(opp["id"]), "refused": f"market data unavailable: {type(exc).__name__}"}
             results.append(outcome)
             if "refused" not in outcome:
-                used.add(opp["symbol"])
+                covered.add(style)
                 break
-    ctx.checks("replays: at least two holding styles replayed on real candles", len({r["style"] for r in results if "refused" not in r}) >= 2,
-               [r for r in results if "refused" in r][:6])
-    return results
+    refusals = {}
+    for r in results:
+        if "refused" in r:
+            refusals.setdefault(r["style"], {}).setdefault(r["refused"], []).append(r["symbol"])
+    ctx.checks("replays: at least two holding styles replayed on real candles", len(covered) >= 2, refusals)
+    return {"symbols_tried": [row["symbol"] for row in sorted(opportunities, key=lambda row: row["snapshot_ts"])],
+            "styles_replayed": sorted(covered), "refusals": refusals, "replays": [r for r in results if "refused" not in r]}
