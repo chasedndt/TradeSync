@@ -18,7 +18,8 @@ export function Fleet() {
   const jobs = useFleetJobs()
   const usage = useFleetUsage(7)
   const directives = useFleetDirectives(20)
-  const snapshot = useFleetActivity().data?.snapshot
+  const activity = useFleetActivity().data
+  const snapshot = activity?.snapshot
   const [query, setQuery] = useState('')
   const [onlyEnabled, setOnlyEnabled] = useState(true)
   const [onlyFailed, setOnlyFailed] = useState(false)
@@ -60,6 +61,7 @@ export function Fleet() {
           <span className="metric-sub">Usage snapshot {jobs.data?.snapshot_at ? new Date(jobs.data.snapshot_at).toUTCString().slice(17, 25) : '—'} UTC</span>
           <span className="metric-sub">Run snapshot {when(snapshot?.runs_snapshot_at)} · {span(snapshot?.runs_snapshot_age_s)} old · newest model call {when(snapshot?.usage_newest_at)}</span>
           <span className="metric-sub">Newest output stored {when(snapshot?.outputs_received_at)} · {span(snapshot?.outputs_received_age_s)} ago</span>
+          {activity?.outputs_unavailable && <span className="metric-sub tone-warn">{activity.outputs_unavailable}</span>}
         </div>
       </section>
 

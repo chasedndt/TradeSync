@@ -47,6 +47,7 @@ export function FleetOutputDrawer({ job, onClose }: { job: FleetJob; onClose: ()
         )}
         {outputs.isError && <p className={`${styles.message} tone-bad`}>{(outputs.error as Error).message}</p>}
         {output.isError && <p className={`${styles.message} tone-bad`}>{(output.error as Error).message}</p>}
+        {outputs.data?.outputs_unavailable && <p className={`${styles.message} tone-warn`}>{outputs.data.outputs_unavailable}</p>}
         {outputs.data && !current && <p className={`${styles.message} tone-dim`}>No stored output since {when(outputs.data.indexed_since)}. Silent runs are not stored.</p>}
         {data && (
           <>

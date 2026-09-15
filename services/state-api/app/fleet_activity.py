@@ -48,6 +48,21 @@ OUTPUT_SQL = ("SELECT id, accepted, reasons, observed_at, received_at, payload F
               "WHERE id = $1::uuid AND source = 'chaseos' AND payload->>'kind' = 'hermes_job_output'")
 
 
+async def refresh_outputs(conn, now: datetime | None = None) -> str | None:
+    """Refresh the stored-output index, or say why it could not be read.
+
+    Stored outputs only enrich the page: when the read fails (on 15 September the
+    first call after a deploy failed while startup work held the database), the last
+    index stays in place and runs and usage are still served.
+    """
+    try:
+        await INDEX.refresh(conn, now)
+    except Exception as exc:  # an enrichment must not fail the whole page
+        print(f"[FleetActivity] output index refresh failed: {type(exc).__name__}")
+        return f"Stored outputs could not be read this time ({type(exc).__name__}); runs and usage are current."
+    return None
+
+
 def register(app, state) -> None:
     def pool():
         if not state.pool:
@@ -62,15 +77,21 @@ def register(app, state) -> None:
             running_rows = await conn.fetch(RUNNING_SQL, sorted(view.TERMINAL))
             fire_rows = await conn.fetch(FIRES_SQL)
             snapshot = await conn.fetchrow(SNAPSHOT_SQL)
-            await INDEX.refresh(conn, now)
-        return view.activity_payload(run_rows, running_rows, INDEX.latest, fire_rows, snapshot, now, INDEX.since)
+            outputs_error = await refresh_outputs(conn, now)
+        payload = view.activity_payload(run_rows, running_rows, INDEX.latest, fire_rows, snapshot, now, INDEX.since)
+        if outputs_error:
+            payload["outputs_unavailable"] = outputs_error
+        return payload
 
     @router.get("/state/fleet/jobs/{job_id}/outputs")
     async def job_outputs(job_id: str):
         async with pool().acquire() as conn:
-            await INDEX.refresh(conn)
+            outputs_error = await refresh_outputs(conn)
+        if outputs_error and not INDEX.ids:
+            raise HTTPException(status_code=503, detail=outputs_error)
         return {"job_id": job_id, "outputs": INDEX.outputs_for(job_id), "latest": INDEX.latest.get(job_id),
-                "indexed_since": view.iso(INDEX.since), "note": view.NOTE}
+                "indexed_since": view.iso(INDEX.since), "note": view.NOTE,
+                **({"outputs_unavailable": outputs_error} if outputs_error else {})}
 
     @router.get("/state/fleet/outputs/{output_id}")
     async def output(output_id: str):

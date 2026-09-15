@@ -75,6 +75,8 @@ export interface FleetActivityResponse {
   outputs_indexed_since: string | null
   jobs: Record<string, FleetJobActivity>
   note: string
+  /** Present when stored outputs could not be read this time; runs and usage are still current. */
+  outputs_unavailable?: string
 }
 
 export interface FleetJobOutputs {
@@ -83,4 +85,5 @@ export interface FleetJobOutputs {
   latest: FleetOutputSummary | null
   indexed_since: string | null
   note: string
+  outputs_unavailable?: string
 }

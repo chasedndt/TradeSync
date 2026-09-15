@@ -175,3 +175,21 @@ def test_without_a_database_the_routes_say_so() -> None:
     with patch.object(state, "pool", None):
         assert client.get("/state/fleet/activity").status_code == 503
         assert client.get(f"/state/fleet/outputs/{O2}").status_code == 503
+
+
+class SlowOutputs(Conn):
+    async def fetch(self, sql, *args):
+        if "AS job_id FROM quarantine_intake" in sql:
+            raise asyncio.TimeoutError()
+        return await super().fetch(sql, *args)
+
+
+def test_a_failed_output_read_keeps_the_runs_and_says_why() -> None:
+    with patch.object(state, "pool", fake_pool(SlowOutputs(data()))), patch.object(fleet_activity, "INDEX", OutputIndex()):
+        page = client.get("/state/fleet/activity")
+        listed = client.get(f"/state/fleet/jobs/{JOB}/outputs")
+    body = page.json()
+    assert page.status_code == 200 and "TimeoutError" in body["outputs_unavailable"]
+    assert [r["status"] for r in body["jobs"][JOB]["runs"]] == ["running", "completed", "failed"]
+    assert body["jobs"][JOB].get("latest_output") is None
+    assert listed.status_code == 503 and "TimeoutError" in listed.json()["detail"]
