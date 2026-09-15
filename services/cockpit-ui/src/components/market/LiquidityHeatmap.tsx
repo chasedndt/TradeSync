@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useLiquidityHeatmap, useWindowCandles } from '../../api/hooks/useLiquidity'
 import type { HeatmapWindow, LiquidityHeatmap as Heatmap } from '../../api/liquidityTypes'
 import { price } from '../ledger/format'
+import { coverageLine } from './heatmap/coverage'
 import { HeatmapChart } from './heatmap/HeatmapChart'
 import type { HeatLayer } from './heatmap/HeatmapPrimitive'
 import { gradient, intensity, restingColour } from './heatmap/palette'
@@ -82,7 +83,7 @@ export function LiquidityHeatmap({ symbol }: { symbol: string }) {
               <dt>Bids vs asks within 5%</dt><dd>{usdCompact(walls.bid_usd)} vs {usdCompact(walls.ask_usd)}{walls.imbalance != null ? ` (balance ${walls.imbalance > 0 ? '+' : ''}${walls.imbalance.toFixed(2)})` : ''}</dd>
             </dl>
           ) : <p className={styles.muted}>{heat.isLoading ? 'Loading recorded books…' : 'No recent book recorded.'}</p>}
-          <p className={styles.muted}>Recording since {when(data?.recording_since)}. Longer windows fill in as history builds.</p>
+          {data && <p className={styles.muted}>{coverageLine(data, when)}</p>}
           {data && <p className={styles.note}>{data.note}</p>}
         </aside>
       </div>

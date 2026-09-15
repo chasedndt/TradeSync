@@ -17,6 +17,7 @@
 .mono { font-family: var(--font-mono); white-space: nowrap; }
 .select { background: #0d1a2a; color: var(--text); border: 1px solid #32445a; border-radius: 4px; padding: 4px 6px; font: 11px var(--font-mono); }
 .pending { color: var(--amber); font-size: 10px; font-family: var(--font-mono); }
+.running { color: var(--cyan); font-size: 10.5px; font-family: var(--font-mono); }
 .bars { display: grid; grid-template-columns: repeat(auto-fit, minmax(40px, 1fr)); gap: 4px; align-items: end; height: 90px; padding: 12px 17px 6px; }
 .bar { background: rgba(80, 160, 255, 0.35); border-top: 2px solid #9cc8ff; min-height: 2px; position: relative; }
 .bar span { position: absolute; bottom: -16px; left: 0; right: 0; text-align: center; font: 9px var(--font-mono); color: var(--muted); }

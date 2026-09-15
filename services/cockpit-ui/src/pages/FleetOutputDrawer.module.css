@@ -1,0 +1,9 @@
+.backdrop { position: fixed; inset: 0; z-index: 80; display: flex; justify-content: flex-end; background: rgba(4, 9, 16, 0.55); }
+.drawer { width: min(780px, 100%); height: 100%; display: flex; flex-direction: column; gap: 10px; padding: 16px 18px; overflow: hidden; background: var(--panel, #0b1725); border-left: 1px solid var(--border); box-shadow: -18px 0 40px rgba(0, 0, 0, 0.35); }
+.head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.head h3 { margin: 0; color: #f5f7fb; font-size: 15px; }
+.head p { margin: 4px 0 0; color: var(--muted); font: 11px/1.4 var(--font-mono); }
+.list { display: flex; flex-wrap: wrap; gap: 6px; }
+.message { margin: 0; font-size: 11px; }
+.text { flex: 1; min-height: 0; margin: 0; overflow: auto; padding: 12px 14px; border: 1px solid var(--border); border-radius: 4px; background: #07131f; color: #d7e3f0; font: 12px/1.55 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+.note { margin: 0; color: var(--dim); font-size: 10px; line-height: 1.45; }

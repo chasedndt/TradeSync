@@ -55,6 +55,7 @@ from app.graph_projection import (
     snapshot_directory,
 )
 from app.integration_pipeline import collect_integration_pipeline
+from app import pipeline_feeds
 from app.regime_lab import (
     RegimeLabEngine,
     collect_live_feature_results,
@@ -3060,12 +3061,17 @@ async def _record_and_annotate_states(status: dict) -> dict:
 async def get_integration_pipeline():
     """Return live Tier A probes and honest optional-connector boundaries."""
 
-    status = await collect_integration_pipeline(
-        pool=state.pool,
-        redis_client=await get_redis(),
-        market_data_url=MARKET_DATA_URL,
-        catalog_feature_count=len(regime_lab_engine.catalog.features),
+    status, feeds = await asyncio.gather(
+        collect_integration_pipeline(
+            pool=state.pool,
+            redis_client=await get_redis(),
+            market_data_url=MARKET_DATA_URL,
+            catalog_feature_count=len(regime_lab_engine.catalog.features),
+        ),
+        pipeline_feeds.collect(MARKET_DATA_URL),
     )
+    # Feed heartbeats sit beside the stages as transport evidence; they change no node or readiness.
+    status["feeds"] = feeds
     return await _record_and_annotate_states(status)
 
 
@@ -3261,6 +3267,11 @@ from app.fleet import register as register_fleet  # noqa: E402
 
 register_fleet(app, state)
 
+# Each Hermes job's run progress and stored output for the Fleet page; see app/fleet_activity.py.
+from app.fleet_activity import register as register_fleet_activity  # noqa: E402
+
+register_fleet_activity(app, state)
+
 # The Hermes link: a continuous heartbeat on the gateway; see app/hermes_link.py.
 from app import hermes_link  # noqa: E402
 
@@ -3315,6 +3326,16 @@ register_trade_research(app, state, market_data_url=MARKET_DATA_URL)
 from app.horizons import register as register_horizons  # noqa: E402
 
 register_horizons(app, state, market_data_url=MARKET_DATA_URL)
+
+# Keeps the warm markets' timeframe measurements fresh; see app/horizons_warm.py.
+from app.horizons_warm import register as register_horizons_warm  # noqa: E402
+
+register_horizons_warm(market_data_url=MARKET_DATA_URL)
+
+# Hermes readings of the timeframe outlook on an operator's daily schedule, off by default; see app/reading_schedule.py.
+from app.reading_schedule import register as register_reading_schedule  # noqa: E402
+
+register_reading_schedule(app, state, market_data_url=MARKET_DATA_URL)
 
 # Feature histories for the per-feature charts on Regime Lab; see app/feature_history.py.
 from app.feature_history import register as register_feature_history  # noqa: E402

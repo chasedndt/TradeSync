@@ -17,12 +17,17 @@ from typing import Any
 import httpx
 
 from app import background, editions
+from app.feed_heartbeats import feed
 from tradesync_core.market_history import RETENTION_SQL, depth_rows, liquidation_rows, open_interest_row
 
 RECORD_EVERY_S = 60
 RETENTION_EVERY_S = 3600
 
 _status: dict[str, Any] = {"passes": 0, "last_pass_at": None, "last_error": None, "rows": {}}
+HEARTBEAT = feed("market_recorder", label="Market history recorder", kind="loop", authority="context_only",
+                 influence="Durable history behind the liquidity heatmap, the estimated liquidation map and received "
+                           "liquidations: display and context only, no scoring influence.",
+                 counts=("passes", "rows"))
 
 
 def status() -> dict[str, Any]:
@@ -83,6 +88,23 @@ async def apply_retention(pool) -> None:
             await conn.execute(statement)
 
 
+async def record_pass(pool, client: httpx.AsyncClient, market_data_url: str) -> dict[str, int] | None:
+    """One pass for the tracked markets, kept on the heartbeat: the rows written, or None without a database."""
+    if not pool:
+        HEARTBEAT.failed("the database pool is not ready", state="waiting")
+        return None
+    symbols = await editions.tracked_symbols(market_data_url)
+    rows = await record_once(pool, client, market_data_url, symbols)
+    _status["rows"] = rows
+    _status.update(passes=_status["passes"] + 1, last_pass_at=time.time(), last_error=None)
+    HEARTBEAT.detail.update(markets=len(symbols), rows_last_pass=rows)
+    if symbols:
+        HEARTBEAT.succeeded(passes=1, rows=sum(rows.values()))
+    else:
+        HEARTBEAT.failed("market-data listed no markets to record", state="waiting")
+    return rows
+
+
 def register(app, state, *, market_data_url: str) -> None:
     async def run() -> None:
         await asyncio.sleep(30)  # let market-data's streams fill first
@@ -91,15 +113,13 @@ def register(app, state, *, market_data_url: str) -> None:
             while True:
                 started = time.monotonic()
                 try:
-                    if state.pool:
-                        symbols = await editions.tracked_symbols(market_data_url)
-                        _status["rows"] = await record_once(state.pool, client, market_data_url, symbols)
-                        _status.update(passes=_status["passes"] + 1, last_pass_at=time.time(), last_error=None)
-                        if time.time() - last_retention > RETENTION_EVERY_S:
-                            await apply_retention(state.pool)
-                            last_retention = time.time()
+                    rows = await record_pass(state.pool, client, market_data_url)
+                    if rows is not None and time.time() - last_retention > RETENTION_EVERY_S:
+                        await apply_retention(state.pool)
+                        last_retention = time.time()
                 except Exception as exc:  # the next pass tries again
                     _status["last_error"] = type(exc).__name__
+                    HEARTBEAT.failed(exc)
                     print(f"[MarketRecorder] pass failed: {type(exc).__name__}")
                 await asyncio.sleep(max(5.0, RECORD_EVERY_S - (time.monotonic() - started)))
 

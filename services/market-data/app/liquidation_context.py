@@ -11,10 +11,16 @@ import time
 
 import websockets
 
+from .feed_status import feed
+
 URL = 'wss://stream.bybit.com/v5/public/linear'
 STATUS = 'market:bybit-liquidations:status'
 PREFIX = 'market:bybit-liquidations:received-v2:'
 SYMBOLS = {'BTCUSDT': 'BTC-PERP', 'ETHUSDT': 'ETH-PERP', 'SOLUSDT': 'SOL-PERP'}
+HEARTBEAT = feed('bybit_liquidations', label='Bybit liquidations stream (BTC, ETH, SOL)', kind='websocket', authority='context_only',
+                 influence="Context only: another venue's liquidations, counted into the liquidity context and the recorded "
+                           'history; the feature catalog marks them non-scoring.',
+                 counts=('messages', 'events'))
 
 # Store one original receipt per stable event fingerprint. Replays must never
 # replace its knowledge timestamp. Both indexes expire and are bounded together.
@@ -72,6 +78,7 @@ async def run(redis):
         await redis.set(STATUS, json.dumps({'state': state, 'updated_at': time.time(), **extra}), ex=86400 if terminal else 60)
     while True:
         try:
+            HEARTBEAT.connecting()
             await status('connecting')
             async with websockets.connect(URL, open_timeout=10, max_size=2**20, ping_interval=20) as ws:
                 await ws.send(json.dumps({'op': 'subscribe', 'args': ['allLiquidation.'+s for s in SYMBOLS]}))
@@ -90,25 +97,32 @@ async def run(redis):
                         continue
                     message = json.loads(raw)
                     last_received = time.monotonic()
+                    HEARTBEAT.message()
                     if message.get('op') == 'subscribe':
                         if message.get('success') is not True:
+                            HEARTBEAT.failed('subscription rejected, not retried', state='subscription_rejected')
                             await status('subscription_rejected')
                             return  # Permission / provider denial: no retry workaround.
                         subscribed_at = time.time()
+                        HEARTBEAT.connected()
                     if subscribed_at is None:
                         continue
                     now = time.time()
                     await status('connected', subscribed_at=subscribed_at)
-                    for event in normalize(message, now):
+                    events = normalize(message, now)
+                    for event in events:
                         await store_receipt(redis, event, now)
+                    HEARTBEAT.count('events', len(events), now=now)
         except asyncio.CancelledError:
             raise
         except Exception as exc:
             response = getattr(exc, 'response', None)
             code = getattr(response, 'status_code', getattr(exc, 'status_code', None))
             if code in (401, 403, 451):
+                HEARTBEAT.failed(f'HTTP {code}: access denied, not retried', state='provider_access_denied')
                 await status('provider_access_denied', http_status=code)
                 return  # Do not bypass regional/account/access restrictions.
+            HEARTBEAT.failed(exc, state='disconnected')
             try:
                 await status('disconnected', error_type=type(exc).__name__)
             except Exception:

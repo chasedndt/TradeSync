@@ -14,7 +14,14 @@ from typing import Any
 
 import httpx
 
+from .feed_status import feed
+
 URL = "https://fapi.binance.com/futures/data/openInterestHist"
+HEARTBEAT = feed("binance_open_interest_history", label="Binance open-interest history fetch", kind="fetch",
+                 authority="context_only",
+                 influence="Context only: seeds the estimated liquidation map and its readings, which the feature catalog "
+                           "marks non-scoring.",
+                 counts=("fetches", "rows"))
 PERIODS = ("5m", "15m", "30m", "1h", "2h", "4h", "6h", "12h", "1d")
 MAX_LIMIT = 500
 CACHE_TTL_S = 300
@@ -47,13 +54,18 @@ class OpenInterestHistory:
             rows = cached[1]
         else:
             market = f"{symbol.replace('-PERP', '')}USDT"
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                response = await client.get(URL, params={"symbol": market, "period": period, "limit": limit})
-            if response.status_code == 400:
-                rows = []  # Binance does not list this market
-            else:
-                response.raise_for_status()
-                rows = parse(response.json())
+            try:
+                async with httpx.AsyncClient(timeout=15.0) as client:
+                    response = await client.get(URL, params={"symbol": market, "period": period, "limit": limit})
+                if response.status_code == 400:
+                    rows = []  # Binance does not list this market
+                else:
+                    response.raise_for_status()
+                    rows = parse(response.json())
+            except (httpx.HTTPError, ValueError) as exc:
+                HEARTBEAT.failed(exc)
+                raise
+            HEARTBEAT.succeeded(fetches=1, rows=len(rows))
             self._cache[key] = (time.time(), rows)
         return {"source": "binance", "symbol": symbol, "period": period, "rows": rows,
                 "authority": "context_only",

@@ -1,6 +1,7 @@
 import { useStartHorizonReading } from '../../api/hooks/useHorizons'
 import type { BandKey, BandReading as Reading } from '../../api/horizonTypes'
 import { LinkedText, type LinkTarget } from './LinkedText'
+import { ReadingSchedule } from './ReadingSchedule'
 import { clock } from './timeframeText'
 import styles from './BandReading.module.css'
 
@@ -48,6 +49,7 @@ export function BandReading({ symbol, band, label, reading, measuredAt, targets,
           {running ? 'reading…' : paragraphs.length ? 'read again' : 'ask Hermes'}
         </button>
       </header>
+      <ReadingSchedule symbol={symbol} band={band} label={label} />
       {stale && !running && (
         <p className={styles.stale}>Re-measured at {clock(measuredAt)}, after this reading. Read again to bring it up to date.</p>
       )}

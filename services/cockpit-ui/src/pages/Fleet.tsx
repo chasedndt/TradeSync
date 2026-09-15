@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useFleetDirectives, useFleetJobs, useFleetUsage } from '../api/hooks/useFleet'
+import { useFleetActivity } from '../api/hooks/useFleetActivity'
 import { FleetJobRow } from './FleetJobRow'
+import { span, when } from './fleetActivityText'
 import styles from './Fleet.module.css'
 
 const fmtTokens = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(2)}M` : n >= 1000 ? `${Math.round(n / 1000)}k` : String(n))
@@ -16,6 +18,7 @@ export function Fleet() {
   const jobs = useFleetJobs()
   const usage = useFleetUsage(7)
   const directives = useFleetDirectives(20)
+  const snapshot = useFleetActivity().data?.snapshot
   const [query, setQuery] = useState('')
   const [onlyEnabled, setOnlyEnabled] = useState(true)
   const [onlyFailed, setOnlyFailed] = useState(false)
@@ -55,6 +58,8 @@ export function Fleet() {
           </span>
           <span className="metric-sub">Job state: {jobs.data?.live_state?.source ?? 'bridge'} · {jobs.data?.live_state?.observed_at ? new Date(jobs.data.live_state.observed_at).toLocaleTimeString() : 'live read unavailable'}</span>
           <span className="metric-sub">Usage snapshot {jobs.data?.snapshot_at ? new Date(jobs.data.snapshot_at).toUTCString().slice(17, 25) : '—'} UTC</span>
+          <span className="metric-sub">Run snapshot {when(snapshot?.runs_snapshot_at)} · {span(snapshot?.runs_snapshot_age_s)} old · newest model call {when(snapshot?.usage_newest_at)}</span>
+          <span className="metric-sub">Newest output stored {when(snapshot?.outputs_received_at)} · {span(snapshot?.outputs_received_age_s)} ago</span>
         </div>
       </section>
 

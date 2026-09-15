@@ -21,8 +21,8 @@ _HEX_KEY = re.compile(r"\b0x[a-fA-F0-9]{64}\b")
 _EXCEPTION_LINE = re.compile(r"^[A-Za-z_][\w.]*(?:Error|Exception|Exit|Interrupt|Timeout)\b")
 
 
-def redact(text: object) -> str | None:
-    """The text with secret-shaped substrings replaced, cut to ``MAX_ERROR_CHARS``; None when empty."""
+def redact(text: object, limit: int | None = MAX_ERROR_CHARS) -> str | None:
+    """The text with secret-shaped substrings replaced, cut to ``limit`` characters (None: not cut); None when empty."""
     if text is None or text == "":
         return None
     out = str(text)
@@ -31,7 +31,7 @@ def redact(text: object) -> str | None:
     out = _PREFIXED_KEY.sub("[redacted]", out)
     out = _LABELLED.sub(lambda m: f"{m.group(1)}{m.group(2)}[redacted]", out)
     out = _HEX_KEY.sub("[redacted]", out)
-    return out[:MAX_ERROR_CHARS]
+    return out if limit is None else out[:limit]
 
 
 def diagnose(error: object) -> str | None:

@@ -23,12 +23,19 @@ import logging
 import time
 from typing import Any, Awaitable, Callable, Iterable, Mapping, Sequence
 
+from tradesync_core.feed_heartbeat import describe_error
 from tradesync_core.liquidation_map import Bar, estimate, skew
 from tradesync_core.liquidity_heatmap import walls
 
 from . import binance_liquidations, liquidation_context, liquidation_events
+from .feed_status import feed
 
 logger = logging.getLogger(__name__)
+
+HEARTBEAT = feed("liquidity_context", label="Liquidity context loop", kind="loop", authority="context_only",
+                 influence="Context only: attaches resting liquidity, received liquidations and liquidation-map readings to "
+                           "each snapshot as features the feature catalog marks non-scoring.",
+                 counts=("passes", "map_passes"))
 
 LIQUIDATIONS_EVERY_S = 30
 MAP_EVERY_S = 300
@@ -97,15 +104,19 @@ def attach(payload: dict[str, Any], books: Mapping[str, Mapping[str, Any]], now_
 async def run(redis, symbols: Iterable[str], fetch_bars: Callable[[str], Awaitable[list[Bar]]]) -> None:
     """Keep received-liquidation totals (every 30 s) and liquidation-map context (every 5 min) current per market."""
     markets = list(symbols)
+    HEARTBEAT.detail["markets"] = len(markets)
     last_map = 0.0
     while True:
         started = time.monotonic()
+        failures = 0
         for symbol in markets:
             try:
                 merged = liquidation_events.merged(symbol, await liquidation_context.history(redis, symbol),
                                                    await binance_liquidations.history(redis, symbol))
                 _liquidations[symbol] = liquidation_totals(merged["events"], time.time())
             except Exception as exc:  # context only: a failure leaves the value out
+                failures += 1
+                HEARTBEAT.error(f"{symbol}: {describe_error(exc)}")
                 logger.warning(f"liquidation totals unavailable for {symbol}: {type(exc).__name__}")
         if time.monotonic() - last_map >= MAP_EVERY_S:
             last_map = time.monotonic()
@@ -115,5 +126,11 @@ async def run(redis, symbols: Iterable[str], fetch_bars: Callable[[str], Awaitab
                     if context:
                         _maps[symbol] = context
                 except Exception as exc:
+                    HEARTBEAT.error(f"{symbol} map: {describe_error(exc)}")
                     logger.warning(f"liquidation map unavailable for {symbol}: {type(exc).__name__}")
+            HEARTBEAT.count("map_passes")
+        if markets and failures == len(markets):
+            HEARTBEAT.failed("no market's received liquidations could be read this pass")
+        else:
+            HEARTBEAT.succeeded(passes=1)
         await asyncio.sleep(max(1.0, LIQUIDATIONS_EVERY_S - (time.monotonic() - started)))
