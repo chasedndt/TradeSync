@@ -1,0 +1,5 @@
+.loading {
+  padding: 2rem 1.5rem;
+  color: var(--text-muted, #8b98a9);
+  font-size: 0.875rem;
+}

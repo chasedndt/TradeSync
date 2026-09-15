@@ -23,7 +23,7 @@ import {
   Pipeline,
   SignalLedger,
   Timeframes,
-} from './pages'
+} from './pages/lazyPages'
 
 export default function App() {
   // Sync ExecutionContext with the backend execution gate (paperOnly)
