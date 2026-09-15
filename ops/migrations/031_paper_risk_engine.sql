@@ -31,8 +31,8 @@ CREATE TABLE paper_account (
 CREATE TABLE paper_account_ledger (
  sequence bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
  id uuid NOT NULL UNIQUE,
- kind text NOT NULL CHECK (kind IN ('capital', 'realised')),
- position_id uuid UNIQUE REFERENCES managed_paper_positions(id),
+ kind text NOT NULL CHECK (kind IN ('capital', 'realised', 'funding_adjustment')),
+ position_id uuid REFERENCES managed_paper_positions(id),
  occurred_at timestamptz NOT NULL,
  recorded_at timestamptz NOT NULL DEFAULT clock_timestamp(),
  amount_usdc numeric NOT NULL,
@@ -43,9 +43,13 @@ CREATE TABLE paper_account_ledger (
  balance_after_usdc numeric NOT NULL,
  detail jsonb NOT NULL DEFAULT '{}'::jsonb,
  CHECK ((kind = 'capital') = (position_id IS NULL)),
- CHECK (kind <> 'realised' OR amount_usdc = gross_pnl_usdc - fees_usdc - funding_usdc)
+ CHECK (kind = 'capital' OR amount_usdc = gross_pnl_usdc - fees_usdc - funding_usdc),
+ CHECK (kind <> 'funding_adjustment' OR (gross_pnl_usdc = 0 AND fees_usdc = 0 AND slippage_usdc = 0 AND funding_usdc <> 0))
 );
 CREATE UNIQUE INDEX paper_account_ledger_one_capital ON paper_account_ledger (kind) WHERE kind = 'capital';
+-- One realised entry per position; funding settled after its close arrives as adjustments.
+CREATE UNIQUE INDEX paper_account_ledger_one_realised ON paper_account_ledger (position_id) WHERE kind = 'realised';
+CREATE INDEX paper_account_ledger_position ON paper_account_ledger (position_id);
 CREATE INDEX paper_account_ledger_occurred ON paper_account_ledger (occurred_at);
 CREATE TRIGGER paper_account_ledger_append_only BEFORE UPDATE OR DELETE ON paper_account_ledger
  FOR EACH ROW EXECUTE FUNCTION paper_append_only();

@@ -57,6 +57,18 @@ async def latest_states(conn) -> dict[str, dict[str, Any]]:
     return {pid: latest_state(states) for pid, states in grouped.items()}
 
 
+# The state each position's closed event recorded: what its realised entry is booked from.
+CLOSE_STATES_SQL = """
+SELECT DISTINCT ON (position_id) position_id, payload->'position' AS position
+FROM managed_paper_events WHERE kind = 'closed'
+ORDER BY position_id, created_at
+"""
+
+
+async def close_states(conn) -> dict[str, dict[str, Any]]:
+    return {str(r["position_id"]): decode(r["position"]) for r in await conn.fetch(CLOSE_STATES_SQL)}
+
+
 async def opened_ids(conn) -> set[str]:
     return {str(r["position_id"]) for r in await conn.fetch("SELECT DISTINCT position_id FROM managed_paper_events WHERE kind = 'opened'")}
 

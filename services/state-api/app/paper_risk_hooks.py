@@ -1,10 +1,11 @@
 """The two calls managed_paper.py makes into the paper risk engine, and nothing else.
 
-``admit_entry`` runs inside the entry transaction, after the persistent pause
-check and under the same advisory lock, and raises a 409 naming the refusing
-limit. ``record_position_event`` runs in the transaction that stores a lifecycle
-state; when the state is a close it books the realised result under a savepoint,
-so accounting can never undo or block a close.
+``admit_entry`` runs inside the entry transaction, after the persistent pause check
+and under the same advisory lock, and raises a 409 naming the refusing limit.
+``record_position_event`` runs in the transaction that stores a closed position's
+state, both at the close and when funding settles after it: it books the realised
+result once and any later funding as an adjustment, under a savepoint, so accounting
+can never undo or block a close or a settlement.
 """
 
 from __future__ import annotations
@@ -20,4 +21,4 @@ async def admit_entry(conn, *, symbol: str, plan: Mapping[str, Any]) -> None:
 
 async def record_position_event(conn, position_id: Any, state: Any) -> None:
     if isinstance(state, dict) and state.get("status") == "closed":
-        await paper_account_store.book_close_safely(conn, position_id, state)
+        await paper_account_store.book_position_safely(conn, position_id, state)

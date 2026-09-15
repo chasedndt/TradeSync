@@ -31,6 +31,7 @@ async def collect(pool) -> dict[str, Any]:
             return {
                 "positions": await store.positions(conn),
                 "latest": await store.latest_states(conn),
+                "closes": await store.close_states(conn),
                 "opened": await store.opened_ids(conn),
                 "account": await accounts.load_account(conn),
                 "ledger": await accounts.ledger_rows(conn),
@@ -43,7 +44,7 @@ async def collect(pool) -> dict[str, Any]:
 def assess(data: dict[str, Any], now_s: float) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Mismatches, and gap records carrying the exact stored timestamps they were measured from."""
     mismatches = position_mismatches(data["positions"], data["latest"], data["opened"])
-    closed = [(pid, s) for pid, s in data["latest"].items() if s is not None and s.get("status") == "closed"]
+    closed = [(pid, data["closes"].get(pid), s) for pid, s in data["latest"].items() if s is not None and s.get("status") == "closed"]
     mismatches += account_mismatches(data["account"], data["ledger"], closed, data["peaks"])
     exact: dict[tuple[str, float], Any] = {}
     pairs, seen = [], []

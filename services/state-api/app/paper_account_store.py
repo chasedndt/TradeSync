@@ -1,10 +1,12 @@
 """Paper account storage: the account row, its append-only ledger and recorded equity peaks.
 
-A close is booked inside the transaction that closes the position, under a
-savepoint (``book_close_safely``). If booking fails the close still stands, and
-reconciliation reports a closed position with no ledger entry, which keeps new
-entries paused. The account is created on first need with the configured
-starting capital as its first ledger row.
+A closed position is booked inside the transaction that stores its state, under a
+savepoint (``book_position_safely``): its realised entry once, from the state its
+``closed`` event recorded, then a funding adjustment for any funding settled since the
+ledger last charged it. Booking is idempotent per position, so repeating it with the
+same state appends nothing. If booking fails the close still stands, and reconciliation
+reports what is missing, which keeps new entries paused. The account is created on
+first need with the configured starting capital as its first ledger row.
 """
 
 from __future__ import annotations
@@ -20,12 +22,26 @@ from typing import Any
 from app import paper_risk_signals
 from app.paper_json import decode
 from tradesync_core.paper_account import AccountSnapshot, mark
-from tradesync_core.paper_account_ledger import capital_entry, money, realised_entry
+from tradesync_core.paper_account_ledger import REALISED, ZERO, LedgerEntry, capital_entry, funding_adjustment, money, realised_entry
 from tradesync_core.paper_reconciliation import event_state, latest_state
 
 ACCOUNT_INIT_LOCK_KEY = 230915
 STARTING_CAPITAL_ENV = "PAPER_STARTING_CAPITAL_USDC"
 DEFAULT_STARTING_CAPITAL = "10000"
+
+# Statements tools/qa_paper_risk_sql.py prepares against PostgreSQL as they are.
+POSITION_ENTRIES_SQL = "SELECT kind, funding_usdc FROM paper_account_ledger WHERE position_id = $1"
+CLOSE_STATE_SQL = ("SELECT payload->'position' FROM managed_paper_events WHERE position_id = $1 AND kind = 'closed' "
+                   "ORDER BY created_at LIMIT 1")
+INSERT_ENTRY_SQL = (
+    "INSERT INTO paper_account_ledger (id, kind, position_id, occurred_at, amount_usdc, gross_pnl_usdc, fees_usdc, funding_usdc, "
+    "slippage_usdc, balance_after_usdc, detail) VALUES ($1, $2, $3, to_timestamp($4::float8), $5, $6, $7, $8, $9, $10, $11::jsonb) "
+    "RETURNING sequence")
+UPDATE_BALANCES_SQL = (
+    "UPDATE paper_account SET cash_usdc = $1, realised_pnl_usdc = realised_pnl_usdc + $2, gross_pnl_usdc = gross_pnl_usdc + $3, "
+    "fees_usdc = fees_usdc + $4, funding_usdc = funding_usdc + $5, slippage_usdc = slippage_usdc + $6, "
+    "closed_positions = closed_positions + $7, last_sequence = $8, updated_at = clock_timestamp() "
+    "WHERE singleton AND last_sequence = $9")
 
 booking_status: dict[str, Any] = {"last_error": None, "last_error_at": None}
 
@@ -72,44 +88,54 @@ async def ensure_account(conn, starting_capital: Any = None):
     )
 
 
-async def book_close(conn, position_id: Any, state: dict[str, Any], *, starting_capital: Any = None) -> int | None:
-    """Append one closed position's realised result and move the balances with it; idempotent per position."""
-    identity = as_uuid(position_id)
-    entry = realised_entry(identity, state)
-    account = await ensure_account(conn, starting_capital)
-    if await conn.fetchval("SELECT 1 FROM paper_account_ledger WHERE position_id = $1", identity):
-        return None
+async def _append(conn, account: Any, entry: LedgerEntry) -> tuple[dict[str, Any], int]:
+    """Append one entry and move the balances with it; the account must not have moved since it was read."""
     balance = account["cash_usdc"] + entry.amount_usdc
     sequence = await conn.fetchval(
-        "INSERT INTO paper_account_ledger (id, kind, position_id, occurred_at, amount_usdc, gross_pnl_usdc, fees_usdc, "
-        "funding_usdc, slippage_usdc, balance_after_usdc, detail) "
-        "VALUES ($1, 'realised', $2, to_timestamp($3::float8), $4, $5, $6, $7, $8, $9, $10::jsonb) RETURNING sequence",
-        uuid.uuid4(), identity, entry.occurred_at, entry.amount_usdc, entry.gross_pnl_usdc, entry.fees_usdc,
-        entry.funding_usdc, entry.slippage_usdc, balance, json.dumps(dict(entry.detail), default=str),
+        INSERT_ENTRY_SQL, uuid.uuid4(), entry.kind, as_uuid(entry.position_id), entry.occurred_at, entry.amount_usdc,
+        entry.gross_pnl_usdc, entry.fees_usdc, entry.funding_usdc, entry.slippage_usdc, balance, json.dumps(dict(entry.detail), default=str),
     )
     updated = await conn.execute(
-        "UPDATE paper_account SET cash_usdc = $1, realised_pnl_usdc = realised_pnl_usdc + $2, "
-        "gross_pnl_usdc = gross_pnl_usdc + $3, fees_usdc = fees_usdc + $4, funding_usdc = funding_usdc + $5, "
-        "slippage_usdc = slippage_usdc + $6, closed_positions = closed_positions + 1, last_sequence = $7, "
-        "updated_at = clock_timestamp() WHERE singleton AND last_sequence = $8",
-        balance, entry.amount_usdc, entry.gross_pnl_usdc, entry.fees_usdc, entry.funding_usdc, entry.slippage_usdc,
-        sequence, account["last_sequence"],
+        UPDATE_BALANCES_SQL, balance, entry.amount_usdc, entry.gross_pnl_usdc, entry.fees_usdc, entry.funding_usdc,
+        entry.slippage_usdc, int(entry.kind == REALISED), sequence, account["last_sequence"],
     )
     if updated != "UPDATE 1":
-        raise RuntimeError("Paper account moved while a close was being booked")
-    return sequence
+        raise RuntimeError("Paper account moved while a position was being booked")
+    return {**dict(account), "cash_usdc": balance, "last_sequence": sequence}, sequence
 
 
-async def book_close_safely(conn, position_id: Any, state: dict[str, Any]) -> int | None:
-    """Book under a savepoint; never let accounting undo a close."""
+async def book_position(conn, position_id: Any, state: dict[str, Any], *, starting_capital: Any = None) -> list[int]:
+    """Bring the ledger in line with one closed position; return the sequences appended, none when already in line."""
+    if state.get("status") != "closed":
+        return []
+    identity = as_uuid(position_id)
+    account = await ensure_account(conn, starting_capital)
+    booked = await conn.fetch(POSITION_ENTRIES_SQL, identity)
+    charged = sum((Decimal(str(row["funding_usdc"])) for row in booked), ZERO)
+    appended: list[int] = []
+    if not any(row["kind"] == REALISED for row in booked):
+        recorded = decode(await conn.fetchval(CLOSE_STATE_SQL, identity))
+        entry = realised_entry(identity, recorded if isinstance(recorded, dict) else state)
+        account, sequence = await _append(conn, account, entry)
+        appended.append(sequence)
+        charged += entry.funding_usdc
+    adjustment = funding_adjustment(identity, charged, state, time.time())
+    if adjustment is not None:
+        account, sequence = await _append(conn, account, adjustment)
+        appended.append(sequence)
+    return appended
+
+
+async def book_position_safely(conn, position_id: Any, state: dict[str, Any]) -> list[int]:
+    """Book under a savepoint; never let accounting undo a close or a funding settlement."""
     try:
         async with conn.transaction():
-            return await book_close(conn, position_id, state)
-    except Exception as exc:  # reconciliation reports the missing entry and keeps entries paused
+            return await book_position(conn, position_id, state)
+    except Exception as exc:  # reconciliation reports what is missing and keeps entries paused
         booking_status.update(last_error=f"{type(exc).__name__} booking {position_id}", last_error_at=time.time())
-        print(f"[PaperRisk] close of {position_id} not booked: {type(exc).__name__}")
+        print(f"[PaperRisk] position {position_id} not booked: {type(exc).__name__}")
         paper_risk_signals.request("reconcile")
-        return None
+        return []
 
 
 async def ledger_rows(conn) -> list[dict[str, Any]]:
@@ -157,9 +183,10 @@ async def open_positions(conn) -> list[dict[str, Any]]:
 
 
 async def realised_since(conn, start_s: float) -> list[tuple[float, float]]:
+    """Realised results and funding adjustments booked since ``start_s``, as (time, amount)."""
     rows = await conn.fetch(
         "SELECT extract(epoch FROM occurred_at)::float8 AS at, amount_usdc FROM paper_account_ledger "
-        "WHERE kind = 'realised' AND occurred_at >= to_timestamp($1::float8)", start_s)
+        "WHERE kind <> 'capital' AND occurred_at >= to_timestamp($1::float8)", start_s)
     return [(float(r["at"]), float(r["amount_usdc"])) for r in rows]
 
 

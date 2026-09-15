@@ -111,7 +111,7 @@ def register(app, state, *, market_data_url):
                     return current
                 await conn.execute('UPDATE managed_paper_positions SET position_state=$2::jsonb,updated_at=now() WHERE id=$1', identity, serial(result))
                 await event(conn, identity, kind, {'position': result, 'book': book, 'funding_rows_added': added})
-                if kind == 'closed':  # booked once, at the close; late funding is not yet booked (see the merge change record)
+                if result['status'] == 'closed':  # the close once, then funding settled after it as adjustments
                     await record_position_event(conn, identity, result)
         return result
 

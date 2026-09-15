@@ -29,8 +29,10 @@ is refused by trigger, so a position's funding cannot be rewritten after the fac
 it creates no rows. UP, DOWN and UP again verified in an isolated schema inside a rolled-back
 transaction (see `docs/changes/2026-09-15_managed-paper-positions.md`).
 
-`031_paper_risk_engine.sql` adds the paper risk engine: an append-only account ledger with
-stored balances and equity peaks, operator-editable limits with audit rows (seeded conservative),
+`031_paper_risk_engine.sql` adds the paper risk engine: an append-only account ledger (starting
+capital, one realised entry per closed managed paper position, and a funding adjustment for each
+settlement published after a close) with stored balances and equity peaks, operator-editable limits
+with audit rows (seeded conservative),
 a persistent kill switch (seeded disengaged) with audit rows, restart reconciliation runs,
 observation gaps and measured correlation snapshots, and an `operator` column on pause audit rows.
 Not yet applied; isolated, rolled-back UP/DOWN/UP acceptance is recorded in
