@@ -148,7 +148,7 @@ CREATE TABLE paper_correlation_measurements (
  window_bars integer NOT NULL CHECK (window_bars > 1),
  symbols jsonb NOT NULL,
  matrix jsonb NOT NULL,
- overlaps jsonb NOT NULL,
+ overlap_counts jsonb NOT NULL,
  unmeasured jsonb NOT NULL DEFAULT '[]'::jsonb,
  source text NOT NULL
 );
