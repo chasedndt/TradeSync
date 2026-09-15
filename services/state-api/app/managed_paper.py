@@ -1,23 +1,36 @@
-"""Durable operator-opened paper positions; observed quotes, never real orders."""
+"""Durable operator-opened paper positions; observed order books, never real orders.
+
+An entry gathers its evidence before the entry quote (``paper_entry_sources``), cuts
+it off at the entry time (``tradesync_core.paper_entry_evidence``) and freezes it with
+the plan. ``admit_entry`` holds every check that can refuse an entry once its plan
+exists. The observer advances open positions on fresh books every 15 seconds and
+stores settled funding as Hyperliquid publishes it (``paper_funding_store``).
+"""
 import asyncio
 import hashlib
 import json
 import time
 import uuid
-from datetime import datetime, timezone
+from types import SimpleNamespace
 import httpx
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
-from tradesync_core.managed_paper import PROFILES, atr, open_position, advance
+from tradesync_core import paper_eligibility as eligibility
+from tradesync_core import paper_entry_evidence as entry_evidence
+from tradesync_core.managed_paper import PROFILES, atr, open_position, advance, settle_funding
+from tradesync_core.paper_depth import MODEL as FILL_MODEL
+from tradesync_core.paper_funding import MODEL as FUNDING_MODEL, planning_from_records
+from tradesync_core.paper_lifecycle_rules import COMMON, RULES, catalog
+from tradesync_core.paper_rehearsal import HYPERLIQUID_BASE_FEES
 from tradesync_core.source_comparison import compare
 from tradesync_core.research_trial import specification, fingerprint, evaluate
-from app import background
-from app.entry_context import liquidation_snapshot, book_snapshot
+from app import background, editions, paper_candidates, paper_entry_sources, paper_funding_store
 
 # Printed under the paper portfolio in the Cockpit.
 POSITIONS_NOTE = (
-    "Priced from observed quotes, not exchange fills. 100 latest positions. Funding is a frozen scenario, "
-    "not actual settlement. Observation gaps disqualify clean performance evidence."
+    "Priced from observed order books, not exchange fills: each fill walks the displayed depth for the position's size. "
+    "Fees are Hyperliquid's published base taker rate; funding is Hyperliquid's settled hourly funding, and an hour not yet "
+    "published is listed as missing. 100 latest positions. Observation gaps disqualify clean performance evidence."
 )
 
 
@@ -44,6 +57,21 @@ class PaperControlRequest(BaseModel):
     reason: str = Field(min_length=5, max_length=240)
 
 
+async def admit_entry(conn, symbol, plan, captured_at):
+    """Every check that can refuse a paper entry once its plan exists; the one place to add another.
+
+    Runs inside the entry transaction after the portfolio advisory lock and the
+    duplicate check, just before the insert. Raise HTTPException to refuse.
+    """
+    paused = await conn.fetchval('SELECT entries_paused FROM managed_paper_control WHERE singleton=true')
+    if paused is not False:
+        raise HTTPException(409, 'New paper entries paused or control unavailable; existing observations and closes remain active')
+    active = await conn.fetch("SELECT symbol,position_state FROM managed_paper_positions WHERE position_state->>'status'='open'")
+    if len(active) >= 3 or any(r['symbol']==symbol for r in active):
+        raise HTTPException(409, 'Paper portfolio cap: three positions, one per symbol')
+    if time.time()-captured_at > 30: raise HTTPException(409, 'Entry evidence expired while waiting for portfolio lock')
+
+
 def register(app, state, *, market_data_url):
     health = {'last_tick': None, 'last_error': None}
     def pool():
@@ -62,16 +90,28 @@ def register(app, state, *, market_data_url):
     async def update(identity, manual=False):
         async with pool().acquire() as conn:
             row = await conn.fetchrow('SELECT symbol,position_state FROM managed_paper_positions WHERE id=$1', identity)
-        if row is None: raise HTTPException(404, 'Paper position not found')
-        book = await fetch('/depth/hyperliquid/'+row['symbol'])
+            if row is None: raise HTTPException(404, 'Paper position not found')
+            symbol, current = row['symbol'], decode(row['position_state'])
+            try: hours = await paper_funding_store.outstanding(conn, identity, current, time.time())
+            except Exception: hours = []
+        book = await fetch('/depth/hyperliquid/'+symbol) if current['status'] == 'open' else None
+        try: rates, received = await paper_funding_store.published(market_data_url, symbol, hours) if hours else ({}, None)
+        except Exception: rates, received = {}, None  # funding stays listed as missing; exits never wait for it
         async with pool().acquire() as conn:
             async with conn.transaction():
                 row = await conn.fetchrow('SELECT position_state FROM managed_paper_positions WHERE id=$1 FOR UPDATE', identity)
                 current = decode(row['position_state'])
-                if current['status'] != 'open': return current
-                result = advance(current, book, time.time(), manual_close=manual)
+                now = time.time()
+                added, settled = await paper_funding_store.settle_rows(conn, identity, symbol, current, rates, received, now)
+                if current['status'] == 'open':
+                    result = advance(current, book, now, manual_close=manual, funding_rows=settled)
+                    kind = 'closed' if result['status']=='closed' else 'observed'
+                elif added:
+                    result, kind = settle_funding(current, settled), 'funding_settled'
+                else:
+                    return current
                 await conn.execute('UPDATE managed_paper_positions SET position_state=$2::jsonb,updated_at=now() WHERE id=$1', identity, serial(result))
-                await event(conn, identity, 'closed' if result['status']=='closed' else 'observed', {'position': result, 'book': book})
+                await event(conn, identity, kind, {'position': result, 'book': book, 'funding_rows_added': added})
         return result
 
     @app.get('/state/paper-control')
@@ -100,6 +140,11 @@ def register(app, state, *, market_data_url):
         return {'positions': [{**dict(r), 'position_state': decode(r['position_state'])} for r in rows],
                 'worker': health, 'execution_authority': False,
                 'note': POSITIONS_NOTE}
+
+    @app.get('/state/paper-positions/rules')
+    async def rules():
+        return {**catalog(), 'fees': HYPERLIQUID_BASE_FEES.to_dict(), 'fill_model': FILL_MODEL, 'funding_model': FUNDING_MODEL,
+                'evidence_schema': entry_evidence.SCHEMA_VERSION, 'authority': 'paper_only'}
 
     @app.get('/state/research-trials')
     async def trials():
@@ -155,7 +200,10 @@ def register(app, state, *, market_data_url):
         async with pool().acquire() as conn:
             row = await conn.fetchrow('SELECT entry_evidence,evidence_sha256,initial_plan FROM managed_paper_positions WHERE id=$1', identity)
         if row is None: raise HTTPException(404, 'Paper position not found')
-        return {k: decode(v) if k != 'evidence_sha256' else v for k,v in dict(row).items()}
+        document = decode(row['entry_evidence'])
+        recomputed = entry_evidence.digest(document) if 'schema_version' in document else hashlib.sha256(serial(document).encode()).hexdigest()
+        return {'entry_evidence': document, 'evidence_sha256': row['evidence_sha256'], 'initial_plan': decode(row['initial_plan']),
+                'digest_verified': recomputed == row['evidence_sha256']}
 
     @app.post('/state/paper-positions')
     async def opening(body: OpenRequest):
@@ -165,60 +213,35 @@ def register(app, state, *, market_data_url):
             row = await conn.fetchrow('SELECT * FROM opportunities WHERE id=$1', body.opportunity_id)
         if row is None: raise HTTPException(404, 'Opportunity not found')
         opportunity = dict(row)
-        symbol, direction = opportunity['symbol'], str(opportunity.get('dir', '')).lower()
-        if symbol not in ('BTC-PERP','ETH-PERP','SOL-PERP') or direction not in ('long','short'):
-            raise HTTPException(422, 'Only directional BTC/ETH/SOL paper opportunities are supported')
-        at = opportunity.get('snapshot_ts')
-        if not isinstance(at, datetime) or not 0 <= (datetime.now(timezone.utc)-at).total_seconds() <= 300:
-            raise HTTPException(409, 'Opportunity older than five minutes or timestamp unavailable')
-        profile = PROFILES[body.style]
-        # Optional context is captured before executable-side entry observations.
-        # Failure is frozen explicitly and cannot become a dependency for trading.
+        symbol, direction = opportunity['symbol'], eligibility.direction(opportunity)
+        refusal = eligibility.opportunity_refusal(opportunity, time.time())
+        refusal = refusal or eligibility.universe_refusal(symbol, await editions.tracked_symbols(market_data_url))
+        if refusal: raise HTTPException(*refusal)
+        rules = RULES[body.style]
+        # Evidence is received before the entry quote is requested; nothing later enters the entry.
+        gathered, context = await paper_entry_sources.gather(pool(), market_data_url, editions.SELF_URL, opportunity)
         try:
-            context_payload = await asyncio.wait_for(fetch('/liquidation-context/'+symbol), timeout=3)
-            context_cutoff = time.time()
-            if context_payload.get('symbol') != symbol or context_payload.get('venue') != 'bybit':
-                raise ValueError('Context source or symbol mismatch')
-            external_context = liquidation_snapshot(context_payload, context_cutoff)
-        except Exception as exc:
-            external_context = {'status': 'unavailable', 'reason': type(exc).__name__,
-                                'cutoff': time.time(), 'events': [], 'authority': 'context_only', 'scoring_influence': False}
-        try:
-            history_payload = await asyncio.wait_for(fetch('/book-history/'+symbol), timeout=3)
-            liquidity_context = book_snapshot(history_payload, time.time(), symbol)
-        except Exception as exc:
-            liquidity_context = {'status': 'unavailable', 'reason': type(exc).__name__,
-                                 'cutoff': time.time(), 'samples': [], 'authority': 'context_only', 'scoring_influence': False}
-        try:
-            book, candles = await asyncio.gather(fetch('/depth/hyperliquid/'+symbol), fetch(f"/candles/hyperliquid/{symbol}?interval={profile['interval']}&limit=100"))
+            book, candles = await asyncio.gather(fetch('/depth/hyperliquid/'+symbol), fetch(f"/candles/hyperliquid/{symbol}?interval={rules.atr_interval}&limit=100"))
             now = time.time()
-            volatility = atr(candles['candles'], profile['seconds'], now)
-            plan = open_position(direction, body.style, body.notional, volatility, book, now)
+            gathered['resting_liquidity'] = paper_entry_sources.with_entry_book(gathered.get('resting_liquidity'), book, now)
+            volatility = atr(candles['candles'], rules.atr_seconds, now, rules.atr_period)
+            captured = entry_evidence.document(gathered, now, inputs={
+                'captured_at': now, 'entry_book': book, 'atr_candles': candles, 'atr': volatility, 'external_context': context})
+            planning = planning_from_records(captured['items']['funding']['records'], COMMON.planning_funding_floor_bps_hour)
+            plan = open_position(direction, body.style, body.notional, volatility, book, now, planning_funding=planning)
         except Exception as exc:
             raise HTTPException(409, 'Paper entry refused: '+(str(exc) if isinstance(exc, ValueError) else type(exc).__name__))
-        # Save exactly what was received now; no later claim is backfilled into entry.
-        captured = {'captured_at': now, 'opportunity': opportunity, 'entry_book': book,
-                    'atr_candles': candles, 'atr': volatility,
-                    'authority': 'paper_only', 'external_context': {'bybit_liquidations': external_context, 'hyperliquid_book_history': liquidity_context},
-                    'external_evidence': 'Bybit receipts and Hyperliquid book history captured before entry; context only, no scoring influence. Other sources remain limited to the opportunity snapshot.'}
-        encoded = serial(captured)
-        digest = hashlib.sha256(encoded.encode()).hexdigest()
+        digest = entry_evidence.digest(captured)
         identity = uuid.uuid4()
         async with pool().acquire() as conn:
             async with conn.transaction():
                 await conn.execute('SELECT pg_advisory_xact_lock(230914)')
                 existing = await conn.fetchval('SELECT id FROM managed_paper_positions WHERE opportunity_id=$1', body.opportunity_id)
                 if existing: return {'id': str(existing), 'duplicate': True}
-                paused = await conn.fetchval('SELECT entries_paused FROM managed_paper_control WHERE singleton=true')
-                if paused is not False:
-                    raise HTTPException(409, 'New paper entries paused or control unavailable; existing observations and closes remain active')
-                active = await conn.fetch("SELECT symbol,position_state FROM managed_paper_positions WHERE position_state->>'status'='open'")
-                if len(active) >= 3 or any(r['symbol']==symbol for r in active):
-                    raise HTTPException(409, 'Paper portfolio cap: three positions, one per symbol')
-                if time.time()-now > 30: raise HTTPException(409, 'Entry evidence expired while waiting for portfolio lock')
+                await admit_entry(conn, symbol, plan, now)
                 await conn.execute('''INSERT INTO managed_paper_positions
                     (id,opportunity_id,symbol,entry_evidence,evidence_sha256,initial_plan,position_state)
-                    VALUES($1,$2,$3,$4::jsonb,$5,$6::jsonb,$6::jsonb)''', identity, body.opportunity_id, symbol, encoded, digest, serial(plan))
+                    VALUES($1,$2,$3,$4::jsonb,$5,$6::jsonb,$6::jsonb)''', identity, body.opportunity_id, symbol, entry_evidence.canonical_json(captured), digest, serial(plan))
                 await event(conn, identity, 'opened', plan)
         return {'id': str(identity), 'duplicate': False, 'position': plan, 'evidence_sha256': digest, 'execution_authority': False}
 
@@ -232,7 +255,10 @@ def register(app, state, *, market_data_url):
         while True:
             try:
                 async with pool().acquire() as conn:
-                    ids = await conn.fetch("SELECT id FROM managed_paper_positions WHERE position_state->>'status'='open' ORDER BY created_at LIMIT 3")
+                    # Open positions, and closed ones whose last settlements are not stored yet (for a day after exit).
+                    ids = await conn.fetch("""SELECT id FROM managed_paper_positions WHERE position_state->>'status'='open'
+                        OR (position_state->'funding'->>'status'='awaiting_rows' AND (position_state->>'exit_time')::float8 > $1)
+                        ORDER BY created_at LIMIT 20""", time.time()-86400)
                 errors = []
                 for row in ids:
                     try: await update(row['id'])
@@ -242,3 +268,6 @@ def register(app, state, *, market_data_url):
             except Exception as exc: health.update(last_tick=time.time(), last_error=type(exc).__name__)
             await asyncio.sleep(15)
     background.add('managed_paper', loop)
+    paper_candidates.register(app, pool, market_data_url=market_data_url)
+    paper_funding_store.register(app, pool)
+    return SimpleNamespace(update=update, loop=loop)
