@@ -3267,6 +3267,11 @@ from app.fleet import register as register_fleet  # noqa: E402
 
 register_fleet(app, state)
 
+# Each Hermes job's run progress and stored output for the Fleet page; see app/fleet_activity.py.
+from app.fleet_activity import register as register_fleet_activity  # noqa: E402
+
+register_fleet_activity(app, state)
+
 # The Hermes link: a continuous heartbeat on the gateway; see app/hermes_link.py.
 from app import hermes_link  # noqa: E402
 

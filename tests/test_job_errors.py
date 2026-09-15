@@ -17,6 +17,13 @@ def test_redacts_token_shapes_webhooks_and_labelled_secrets() -> None:
     assert len(redact("z " * 5000)) == MAX_ERROR_CHARS
 
 
+def test_redaction_can_leave_long_text_uncut() -> None:
+    text = "keep " * 1000 + "api_key=supersecretvalue1"
+    out = redact(text, limit=None)
+    assert len(out) > MAX_ERROR_CHARS and out.startswith("keep keep") and out.endswith("api_key=[redacted]")
+    assert redact(text, limit=20) == "keep keep keep keep "
+
+
 def test_windows_line_endings_are_named() -> None:
     shell = ("Script exited with code 2\nstderr:\n/home/x/scripts/strikezone_health_watchdog.sh: line 14: "
              "set: pipefail\r: invalid option name\n/home/x/s.sh: line 15: $'\\r': command not found")
