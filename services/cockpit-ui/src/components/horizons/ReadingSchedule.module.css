@@ -1,0 +1,9 @@
+.schedule { display: grid; gap: 4px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: rgba(255, 255, 255, 0.015); }
+.row { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.on { color: var(--cyan); font-size: 12px; }
+.off { color: var(--muted); font-size: 12px; }
+.meta { margin: 0; color: var(--muted); font-size: 11px !important; line-height: 1.45 !important; }
+.form { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 12px; }
+.check, .time { display: inline-flex; align-items: center; gap: 6px; color: var(--text, #d7e3f0); }
+.time input { background: #0d1a2a; color: var(--text, #d7e3f0); border: 1px solid #32445a; border-radius: 4px; padding: 3px 6px; font: 12px var(--font-mono); }
+.warn { margin: 0; color: var(--amber); font-size: 12px !important; }
