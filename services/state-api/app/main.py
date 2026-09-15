@@ -3332,6 +3332,11 @@ from app.horizons_warm import register as register_horizons_warm  # noqa: E402
 
 register_horizons_warm(market_data_url=MARKET_DATA_URL)
 
+# Hermes readings of the timeframe outlook on an operator's daily schedule, off by default; see app/reading_schedule.py.
+from app.reading_schedule import register as register_reading_schedule  # noqa: E402
+
+register_reading_schedule(app, state, market_data_url=MARKET_DATA_URL)
+
 # Feature histories for the per-feature charts on Regime Lab; see app/feature_history.py.
 from app.feature_history import register as register_feature_history  # noqa: E402
 

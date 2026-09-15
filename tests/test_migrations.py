@@ -7,12 +7,13 @@ from ops.migrate import migration_files, up_sql
 ROOT = Path(__file__).resolve().parents[1]
 
 # Numbers reserved by migrations being written on parallel branches
-# (2026-09-14: 027, 029, 030 and 031 elsewhere; 028 on this branch). Until the
+# (2026-09-14: 027, 029, 030 and 031 elsewhere; 028 on this branch;
+# 2026-09-15: 031 and 032 elsewhere, 033 on the ops refinements branch). Until the
 # branches merge, each sees gaps where the others' numbers belong. A gap at a
 # reserved number is allowed; any other gap still fails. The runner applies
 # pending versions in order and skips applied ones, so a gap is safe to deploy.
 # Empty this set once those branches have merged.
-RESERVED_BY_PARALLEL_BRANCHES = {"027", "029", "030", "031"}
+RESERVED_BY_PARALLEL_BRANCHES = {"027", "029", "030", "031", "032"}
 
 
 class MigrationRunnerTests(unittest.TestCase):

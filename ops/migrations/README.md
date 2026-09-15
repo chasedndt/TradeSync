@@ -16,6 +16,12 @@ Examples:
 
 Current repository migrations:
 
+`033_horizon_reading_schedule.sql` adds an operator's daily schedule for Hermes readings of the
+timeframe outlook, per market and band, with an enabled flag and a UTC time, and an audit row for
+every change (who, when, the value replaced). Off unless an operator turns it on: it creates no
+schedule. State-api's schedule loop records each slot it handles before starting anything. Numbered
+033 on a parallel branch (031 and 032 belong to other branches); not yet applied.
+
 `030_horizon_readings.sql` stores every Hermes reading of the timeframe outlook, one per band
 (short term, lower, medium, higher), with its start and finish times and the measurement it read,
 so the Timeframes page shows each reading's exact time, keeps the last good reading while a new one
