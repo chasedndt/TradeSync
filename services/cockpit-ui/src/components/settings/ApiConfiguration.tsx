@@ -29,24 +29,25 @@ export function ApiConfiguration({
       </h3>
 
       <div className="space-y-4">
-        {/* API Key */}
+        {/* Mobile alert control key */}
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">
-            TradeSync Cockpit API Key
+            Mobile alert control key
           </label>
           <div className="flex gap-2">
             <input
               type="password"
+              autoComplete="off"
               value={apiKeyInput}
               onChange={(e) => onApiKeyInputChange(e.target.value)}
-              placeholder="Enter your API key..."
+              placeholder="Enter the mobile alert control key..."
               className="input flex-1"
             />
             {hasApiKey && (
               <button
                 onClick={handleClearKey}
                 className="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded text-gray-400"
-                title="Clear API Key"
+                title="Clear the mobile alert control key"
               >
                 <Trash2 size={16} />
               </button>
@@ -55,8 +56,8 @@ export function ApiConfiguration({
           <p className="mt-2 text-xs text-gray-500 flex items-start gap-1">
             <Info size={12} className="mt-0.5 flex-shrink-0" />
             <span>
-              Required for /actions/* endpoints (Preview/Execute).
-              Stored locally in your browser only. Never sent to third parties.
+              Sent as X-API-Key to this Cockpit&apos;s state-api, which checks it only on the mobile alert controls
+              (MOBILE_ALERTS_CONTROL_KEY). Kept for this browser session only.
             </span>
           </p>
           <div className="mt-2">
@@ -80,7 +81,8 @@ export function ApiConfiguration({
           />
           <p className="mt-2 text-xs text-gray-500">
             The base URL for the TradeSync state-api. Default is <code className="text-gray-400">/api</code> (proxied by nginx inside Docker).
-            Override only if accessing the API directly (e.g. <code className="text-gray-400">http://localhost:8000</code>).
+            Only a path on this site or a loopback address such as <code className="text-gray-400">http://127.0.0.1:8000</code> is used;
+            anything else falls back to <code className="text-gray-400">/api</code>, so credentials never go to another host.
           </p>
         </div>
 

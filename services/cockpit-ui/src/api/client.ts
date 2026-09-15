@@ -1,22 +1,11 @@
-const DEFAULT_BASE_URL = '/api'
+import { credentialHeaders, getApiBaseUrl } from './credentials'
 
-export function getApiBaseUrl(): string {
-  return localStorage.getItem('apiBaseUrl') || DEFAULT_BASE_URL
-}
-
-export function setApiBaseUrl(url: string): void {
-  localStorage.setItem('apiBaseUrl', url)
-}
-
-function getApiKey(): string | null {
-  return localStorage.getItem('apiKey') || import.meta.env.VITE_API_KEY || null
-}
+// Views that build URLs themselves (chart images, Settings) read the base URL through the client.
+export { getApiBaseUrl, setApiBaseUrl } from './credentials'
 
 function getHeaders(): HeadersInit {
-  const headers: HeadersInit = { 'Content-Type': 'application/json' }
-  const apiKey = getApiKey()
-  if (apiKey) headers['X-API-Key'] = apiKey
-  return headers
+  // Only what the operator entered this session; nothing is compiled into the build.
+  return { 'Content-Type': 'application/json', ...credentialHeaders() }
 }
 
 /** A failed request: the server's own explanation as the message, and the HTTP status. */
@@ -97,12 +86,4 @@ export async function apiDelete<T>(path: string): Promise<T> {
   })
   if (!res.ok) throw await responseError(res)
   return res.json()
-}
-
-export function setApiKey(key: string): void {
-  localStorage.setItem('apiKey', key)
-}
-
-export function clearApiKey(): void {
-  localStorage.removeItem('apiKey')
 }

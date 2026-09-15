@@ -35,6 +35,7 @@ from tradesync_core.discord_evidence import (
     parse_channel_config,
     to_submission,
 )
+from tradesync_core.state_api_access import operator_headers
 
 DISCORD_API = "https://discord.com/api/v10"
 STATE_API_URL = os.getenv("STATE_API_URL", "http://state-api:8000").rstrip("/")
@@ -108,7 +109,9 @@ async def fetch_new_messages(
 
 async def submit(client: httpx.AsyncClient, submission: dict[str, Any]) -> bool:
     try:
-        response = await client.post(f"{STATE_API_URL}/state/quarantine", json=submission, timeout=15.0)
+        response = await client.post(
+            f"{STATE_API_URL}/state/quarantine", json=submission, timeout=15.0, headers=operator_headers()
+        )
         response.raise_for_status()
         return bool(response.json().get("accepted"))
     except (httpx.HTTPError, ValueError) as exc:

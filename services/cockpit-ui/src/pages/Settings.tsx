@@ -2,12 +2,11 @@ import { useState, useEffect } from 'react'
 import { MobileAlerts } from '../components/MobileAlerts'
 import { useExecutionStatus } from '../api/hooks'
 import { useExecution } from '../context'
-// Import client helpers so Settings and the HTTP client use the SAME localStorage keys.
-// Previously Settings wrote to 'tradesync_api_key'/'tradesync_api_url' while client.ts
-// read 'apiKey'/'apiBaseUrl' — configured keys were silently ignored by all API calls.
-import { setApiKey, clearApiKey, setApiBaseUrl, getApiBaseUrl } from '../api/client'
+// The same module the HTTP client reads, so a key entered here is the key requests carry.
+import { clearMobileControlKey, getApiBaseUrl, getMobileControlKey, setApiBaseUrl, setMobileControlKey } from '../api/credentials'
 import { ApiConfiguration } from '../components/settings/ApiConfiguration'
 import { DangerZone } from '../components/settings/DangerZone'
+import { OperatorAccess } from '../components/settings/OperatorAccess'
 import { RuntimeEnvironment } from '../components/settings/RuntimeEnvironment'
 import { VenueStatus } from '../components/settings/VenueStatus'
 
@@ -21,30 +20,27 @@ export function Settings() {
   const { paperOnly } = useExecution()
 
   useEffect(() => {
-    // Load from the canonical localStorage keys used by client.ts
-    const storedKey = localStorage.getItem('apiKey')
-    const storedUrl = getApiBaseUrl()
-    if (storedKey) {
+    if (getMobileControlKey()) {
       setApiKeyInput('••••••••') // Mask — never show actual key
       setHasApiKey(true)
     }
-    setApiUrl(storedUrl)
+    setApiUrl(getApiBaseUrl())
   }, [])
 
   const handleSave = () => {
-    // Persist via client helpers so keys are consistent across the app
     if (apiKeyInput && apiKeyInput !== '••••••••') {
-      setApiKey(apiKeyInput)
+      setMobileControlKey(apiKeyInput)
       setApiKeyInput('••••••••')
       setHasApiKey(true)
     }
-    setApiBaseUrl(apiUrl)
+    // Shows the base URL that will actually be used; one pointing at another host is not kept.
+    setApiUrl(setApiBaseUrl(apiUrl))
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
 
   const handleClearKey = () => {
-    clearApiKey()
+    clearMobileControlKey()
     setApiKeyInput('')
     setHasApiKey(false)
   }
@@ -65,6 +61,9 @@ export function Settings() {
       <h2 className="text-xl font-bold">Settings</h2>
 
       <MobileAlerts />
+
+      {/* Operator token and the access policy state-api enforces */}
+      <OperatorAccess />
 
       {/* API Configuration */}
       <ApiConfiguration

@@ -46,10 +46,11 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "libs" / "tradesync_core"))
 
 from tradesync_core.job_errors import redact  # noqa: E402
+from tradesync_core.state_api_access import HOST_STATE_API_URL, host_operator_headers  # noqa: E402
 
 HERMES_HOME = Path(os.getenv("HERMES_HOME_WINDOWS", r"\\wsl.localhost\Ubuntu\home\chaseos\runtimes\hermes-home"))
 CRON = HERMES_HOME / "cron"
-STATE_API = os.getenv("STATE_API_URL", "http://localhost:8000").rstrip("/")
+STATE_API = os.getenv("STATE_API_URL", HOST_STATE_API_URL).rstrip("/")
 USAGE_TAIL_LINES = 2000
 RUNS_LIMIT = 1500
 DESCRIPTION_CHARS = 400
@@ -71,7 +72,7 @@ def describe(job: dict) -> str:
     """A short description: the prompt's first sentences, or the script it runs."""
     prompt = str(job.get("prompt") or "").strip()
     if prompt:
-        return " ".join(prompt.split())[:DESCRIPTION_CHARS]
+        return redact(" ".join(prompt.split()), limit=DESCRIPTION_CHARS) or ""
     script = job.get("script")
     return f"script job: {script}" if script else ""
 
@@ -118,7 +119,7 @@ def read_runs() -> list[dict]:
             except ValueError:
                 duration = None
         out.append({"id": rid, "job_id": job_id, "status": status, "claimed_at": _iso(claimed), "started_at": _iso(started),
-                    "finished_at": _iso(finished), "duration_ms": duration, "error": (error or None) and str(error)[:500]})
+                    "finished_at": _iso(finished), "duration_ms": duration, "error": redact(error, limit=500)})
     return out
 
 
@@ -139,7 +140,8 @@ def read_usage() -> list[dict]:
             "fire_id": u["fire_id"], "job_id": u["job_id"], "ts": _iso(u["ts"]), "model": u.get("model"),
             "prompt_tokens": int(u.get("prompt_tokens") or 0), "completion_tokens": int(u.get("completion_tokens") or 0),
             "total_tokens": int(u.get("total_tokens") or 0), "duration_ms": u.get("duration_ms"),
-            "deliver_target": u.get("deliver_target"), "response_silent": u.get("response_silent"), "error": u.get("error"),
+            "deliver_target": u.get("deliver_target"), "response_silent": u.get("response_silent"),
+            "error": redact(u.get("error"), limit=None),
         })
     return out
 
@@ -192,7 +194,7 @@ def write_registry(data: dict) -> Path:
 def run_pass(dry_run: bool = False) -> None:
     data, jobs = read_jobs()
     snapshot = {"jobs": jobs, "runs": read_runs(), "usage": read_usage(), "gateway": read_gateway()}
-    with httpx.Client(timeout=60.0, trust_env=False) as client:
+    with httpx.Client(timeout=60.0, trust_env=False, headers=host_operator_headers()) as client:
         if dry_run:
             print(f"[FleetBridge] would post {len(jobs)} jobs, {len(snapshot['runs'])} runs, {len(snapshot['usage'])} usage rows")
         else:

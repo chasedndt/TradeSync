@@ -13,6 +13,9 @@ name: tradesync-full
 x-market-symbols: &market_symbols "BTC-PERP,ETH-PERP,HYPE-PERP,ZEC-PERP,SOL-PERP,XRP-PERP,NEAR-PERP,PUMP-PERP,LINK-PERP,UNI-PERP"
 
 services:
+  # Every published port is bound to 127.0.0.1, so the stack answers this
+  # machine only. Do not widen a binding to reach it remotely; see
+  # docs/security/2026-09-15_local-access-review.md.
   # --- Infra (same as compose.infra.yml) ---
   postgres:
     image: postgres:16
@@ -22,7 +25,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./sql:/docker-entrypoint-initdb.d:ro
@@ -37,7 +40,7 @@ services:
     restart: unless-stopped
     command: [ "redis-server", "--appendonly", "yes" ]
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     healthcheck:
       test: [ "CMD", "redis-cli", "ping" ]
       interval: 5s
@@ -48,7 +51,7 @@ services:
     image: qdrant/qdrant:latest
     restart: unless-stopped
     ports:
-      - "${QDRANT_PORT:-6333}:6333"
+      - "127.0.0.1:${QDRANT_PORT:-6333}:6333"
     volumes:
       - qdrantdata:/qdrant/storage
     healthcheck:
@@ -98,7 +101,7 @@ services:
       MAX_EVENT_AGE_SECONDS: "3600"
       MIN_QUALITY: "1.0"
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
 
   core-scorer:
     build:
@@ -113,8 +116,10 @@ services:
       PG_DSN: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       SCORING_INTERVAL: 10
       REDIS_URL: redis://redis:6379
+      # Sent with each harness ask when state-api requires an operator token.
+      STATE_API_OPERATOR_TOKEN: ${STATE_API_OPERATOR_TOKEN:-}
     ports:
-      - "8001:8000"
+      - "127.0.0.1:8001:8000"
 
 
   exec-hl-svc:
@@ -122,7 +127,7 @@ services:
       context: ../services/exec-hl-svc
     image: tradesync/exec-hl-svc:dev
     ports:
-      - "8004:8004"
+      - "127.0.0.1:8004:8004"
     environment:
       DRY_RUN: "true"
       EXECUTION_ENABLED: "false" # Fail closed; activation requires a separate approved change
@@ -152,7 +157,7 @@ services:
       - 1.1.1.1
       - 8.8.8.8
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
 
   fusion-engine:
     build:
@@ -179,7 +184,7 @@ services:
       STREAM_READ_COUNT: 50
       STREAM_BLOCK_MS: 5000
     ports:
-      - "8002:8002"
+      - "127.0.0.1:8002:8002"
     healthcheck:
       test: [ "CMD", "curl", "-sf", "http://localhost:8002/healthz" ]
       interval: 5s
@@ -193,7 +198,7 @@ services:
     depends_on:
       - state-api
     ports:
-      - "3000:80"
+      - "127.0.0.1:3000:80"
     healthcheck:
       test: [ "CMD", "curl", "-sf", "http://localhost:80" ]
       interval: 10s
@@ -224,7 +229,7 @@ services:
       - 8.8.8.8
       - 1.1.1.1
     ports:
-      - "8005:8005"
+      - "127.0.0.1:8005:8005"
     healthcheck:
       # /readyz, not /healthz: the container must report unhealthy when the
       # pollers stop, not merely when the process dies. On 2026-09-07 a

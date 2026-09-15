@@ -45,13 +45,15 @@ from tradesync_core.hermes_output import (  # noqa: E402
     parse_markdown_run,
     to_submission,
 )
+from tradesync_core.job_errors import redact  # noqa: E402
+from tradesync_core.state_api_access import HOST_STATE_API_URL, host_operator_headers  # noqa: E402
 
 HERMES_HOME = Path(os.getenv("HERMES_HOME_WINDOWS", r"\\wsl.localhost\Ubuntu\home\chaseos\runtimes\hermes-home"))
 OUTPUT_DIR = HERMES_HOME / "cron" / "output"
 JOBS_FILE = HERMES_HOME / "cron" / "jobs.json"
 CHANNELS_FILE = REPO / "config" / "chaseos" / "discord-channels.json"
 STATE_FILE = Path(os.getenv("HERMES_BRIDGE_STATE", r"E:\Projects\TradeSync\dashboard-runtime\hermes-bridge-state.json"))
-STATE_API = os.getenv("STATE_API_URL", "http://localhost:8000").rstrip("/")
+STATE_API = os.getenv("STATE_API_URL", HOST_STATE_API_URL).rstrip("/")
 MAX_PER_PASS = 200
 
 
@@ -129,7 +131,7 @@ def run_pass(dry_run: bool = False) -> dict[str, int]:
 
     jobs, channels = load_jobs(), load_channels()
     counts = {"read": 0, "accepted": 0, "refused": 0, "silent": 0}
-    with httpx.Client(timeout=20.0, trust_env=False) as client:
+    with httpx.Client(timeout=20.0, trust_env=False, headers=host_operator_headers()) as client:
         for path, mtime_ns, output in new_files(cursor):
             try:
                 content = path.read_text(encoding="utf-8", errors="replace")
@@ -144,7 +146,10 @@ def run_pass(dry_run: bool = False) -> dict[str, int]:
                 if not dry_run:
                     save_state(state)
                 continue
-            submission = to_submission(output, content, jobs.get(output.job_id), channels, observed_at_ms=mtime_ns // 1_000_000)
+            # A job can print anything: token-, key- and webhook-shaped text is removed before it leaves the host.
+            submission = to_submission(
+                output, redact(content, limit=None) or "", jobs.get(output.job_id), channels, observed_at_ms=mtime_ns // 1_000_000
+            )
             if dry_run:
                 print(f"[HermesBridge] would submit {path.name} as '{submission['payload']['agent']}'")
                 continue

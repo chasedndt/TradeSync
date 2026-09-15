@@ -23,6 +23,7 @@ import httpx
 
 from tradesync_core.claim_extraction import NoClaim
 from tradesync_core.claim_proposals import EXTRACTOR, INTENT, parse_proposals, proposal_prompt
+from tradesync_core.state_api_access import operator_headers
 
 from .claims_store import harness_candidates, record_harness_extraction
 
@@ -58,6 +59,7 @@ async def ask(client: httpx.AsyncClient, prompt: str) -> dict[str, Any] | None:
             f"{STATE_API_URL}/state/agents/harness/ask",
             json={"intent": INTENT, "prompt": prompt},
             timeout=ASK_TIMEOUT_S,
+            headers=operator_headers(),
         )
     except httpx.HTTPError as exc:
         print(f"[Claims/harness] ask failed: {type(exc).__name__}")

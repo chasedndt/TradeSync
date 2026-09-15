@@ -41,6 +41,9 @@ if sys.stdout is None or sys.stderr is None:
 
 import httpx  # noqa: E402
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "libs" / "tradesync_core"))
+from tradesync_core.state_api_access import HOST_STATE_API_URL, host_operator_headers  # noqa: E402
+
 HERMES_HOME = Path(os.getenv("HERMES_HOME_WINDOWS", r"\\wsl.localhost\Ubuntu\home\chaseos\runtimes\hermes-home"))
 LAB = HERMES_HOME / "runtime" / "strikezone" / "quant_eval"
 LEDGERS = {"signals": LAB / "signals.ndjson", "outcomes": LAB / "outcomes.ndjson"}
@@ -53,7 +56,7 @@ DOCUMENTS = {
 }
 CHARTS_OUT = Path(os.getenv("STRIKEZONE_CHARTS_HOST_DIR", r"E:\Projects\TradeSync\dashboard-runtime\strikezone-charts"))
 STATE_FILE = Path(os.getenv("STRIKEZONE_BRIDGE_STATE", r"E:\Projects\TradeSync\dashboard-runtime\strikezone-bridge-state.json"))
-STATE_API = os.getenv("STATE_API_URL", "http://localhost:8000").rstrip("/")
+STATE_API = os.getenv("STATE_API_URL", HOST_STATE_API_URL).rstrip("/")
 BATCH = 500
 RECENT_IDS = 200
 MAX_CHART_COPIES = 60
@@ -163,7 +166,7 @@ def run_pass(dry_run: bool = False) -> str:
     cursors = state.setdefault("cursors", {})
     mtimes = state.setdefault("mtimes", {})
     parts = []
-    with httpx.Client(timeout=120.0, trust_env=False) as client:
+    with httpx.Client(timeout=120.0, trust_env=False, headers=host_operator_headers()) as client:
         for kind, path in LEDGERS.items():
             lines, next_offset = read_appended(path, int(cursors.get(kind, 0)))
             rows = parse_lines(lines)

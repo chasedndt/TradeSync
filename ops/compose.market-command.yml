@@ -101,6 +101,13 @@ services:
       # Separate control authorization for mobile enrollment/test sends.
       # Empty means disabled. Never use a wallet key here.
       MOBILE_ALERTS_CONTROL_KEY: ${MOBILE_ALERTS_CONTROL_KEY:-}
+      # Operator token for every change (POST/PUT/PATCH/DELETE); empty keeps
+      # today's behaviour. See docs/changes/2026-09-15_local-access-hardening.md
+      # before setting it: core-scorer and discord-reader read the same value.
+      STATE_API_OPERATOR_TOKEN: ${STATE_API_OPERATOR_TOKEN:-}
+      # Browser origins allowed to make changes beyond the Cockpit on
+      # http://127.0.0.1:3000 and http://localhost:3000, comma-separated.
+      STATE_API_ALLOWED_ORIGINS: ${STATE_API_ALLOWED_ORIGINS:-}
       # FRED (free key from https://fredaccount.stlouisfed.org/apikeys). Set both
       # in runtime.env; the key is read here only, never printed. Enables the
       # macro-reference provider and adds official release dates to the
@@ -223,6 +230,7 @@ services:
     cpus: 0.10
     environment:
       STATE_API_URL: http://state-api:8000
+      STATE_API_OPERATOR_TOKEN: ${STATE_API_OPERATOR_TOKEN:-}
       REDIS_URL: redis://redis:6379
       DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}
       DISCORD_READER_CHANNELS: ${DISCORD_READER_CHANNELS:-}

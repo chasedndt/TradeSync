@@ -36,6 +36,7 @@ from tradesync_core.market_outlook import compose_outlook
 from tradesync_core.outlook_render import outlook_narration, outlook_text
 from tradesync_core.thesis import build_thesis
 from tradesync_core.thesis_edition import EDITIONS, compose
+from tradesync_core.state_api_access import operator_headers
 
 router = APIRouter(tags=["thesis"])
 
@@ -107,7 +108,8 @@ async def hermes_briefing(outlook: dict[str, Any]) -> dict[str, Any]:
     started = time.monotonic()
     try:
         async with httpx.AsyncClient(timeout=BRIEFING_TIMEOUT_S, trust_env=False) as client:
-            r = await client.post(f"{SELF_URL}/state/agents/harness/ask", json={"intent": "summarise", "prompt": prompt})
+            r = await client.post(f"{SELF_URL}/state/agents/harness/ask", json={"intent": "summarise", "prompt": prompt},
+                                  headers=operator_headers())
     except httpx.HTTPError as exc:
         return {"status": "unavailable", "detail": type(exc).__name__}
     if r.status_code == 422:
