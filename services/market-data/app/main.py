@@ -39,6 +39,7 @@ from .depth_books import AGGREGATIONS as DEPTH_AGGREGATIONS, DepthBooks
 from .depth_stream import run_depth_stream
 from .open_interest_history import OpenInterestHistory
 from .funding_history_route import router_for as funding_history_router
+from .feed_status_route import router as feed_status_router
 from . import liquidity_context
 from tradesync_core.liquidation_map import Bar as MapBar
 from .cross_venue import (
@@ -1097,6 +1098,7 @@ async def get_binance_open_interest_history(symbol: str, period: str = "1h", lim
 
 
 app.include_router(funding_history_router(providers, SYMBOLS))
+app.include_router(feed_status_router)
 
 
 @app.get("/timeseries/{venue}/{symbol}/{metric}")

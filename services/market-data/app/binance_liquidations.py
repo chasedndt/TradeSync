@@ -20,11 +20,16 @@ from typing import Any, Iterable
 
 import websockets
 
+from .feed_status import feed
 from .liquidation_context import STORE_RECEIPT
 
 URL = "wss://fstream.binance.com/market/ws/!forceOrder@arr"
 STATUS = "market:binance-liquidations:status"
 PREFIX = "market:binance-liquidations:received-v1:"
+HEARTBEAT = feed("binance_liquidations", label="Binance USDⓈ-M liquidations stream", kind="websocket", authority="context_only",
+                 influence="Context only: another venue's liquidations, counted into the liquidity context and the recorded "
+                           "history; the feature catalog marks them non-scoring.",
+                 counts=("messages", "events"))
 
 
 def symbol_map(symbols: Iterable[str]) -> dict[str, str]:
@@ -77,8 +82,10 @@ async def run(redis, symbols: Iterable[str]) -> None:
     delay = 5
     while True:
         try:
+            HEARTBEAT.connecting()
             await status("connecting")
             async with websockets.connect(URL, open_timeout=10, max_size=2**20, ping_interval=60) as ws:
+                HEARTBEAT.connected()
                 await status("connected", subscribed_at=time.time())
                 delay = 5
                 last_status = time.monotonic()
@@ -93,10 +100,13 @@ async def run(redis, symbols: Iterable[str]) -> None:
                         message = json.loads(raw)
                     except ValueError:
                         continue
-                    for event in normalize(message, now, markets):
+                    HEARTBEAT.message(now=now)
+                    events = normalize(message, now, markets)
+                    for event in events:
                         key = PREFIX + event["symbol"]
                         await redis.eval(STORE_RECEIPT, 2, key, key + ":payloads", event["id"],
                                          event["event_time"], json.dumps(event, sort_keys=True), now - 3600)
+                    HEARTBEAT.count("events", len(events), now=now)
                     if time.monotonic() - last_status > 30:
                         await status("connected", subscribed_at=time.time())
                         last_status = time.monotonic()
@@ -105,8 +115,10 @@ async def run(redis, symbols: Iterable[str]) -> None:
         except Exception as exc:
             code = getattr(getattr(exc, "response", None), "status_code", getattr(exc, "status_code", None))
             if code in (401, 403, 451):
+                HEARTBEAT.failed(f"HTTP {code}: access denied, not retried", state="provider_access_denied")
                 await redis.set(STATUS, json.dumps({"state": "provider_access_denied", "http_status": code, "updated_at": time.time()}), ex=86400)
                 return  # never work around a regional or access restriction
+            HEARTBEAT.failed(exc, state="disconnected")
             try:
                 await status("disconnected", error_type=type(exc).__name__)
             except Exception:
