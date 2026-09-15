@@ -72,7 +72,7 @@ def describe(job: dict) -> str:
     """A short description: the prompt's first sentences, or the script it runs."""
     prompt = str(job.get("prompt") or "").strip()
     if prompt:
-        return " ".join(prompt.split())[:DESCRIPTION_CHARS]
+        return redact(" ".join(prompt.split()), limit=DESCRIPTION_CHARS) or ""
     script = job.get("script")
     return f"script job: {script}" if script else ""
 
@@ -119,7 +119,7 @@ def read_runs() -> list[dict]:
             except ValueError:
                 duration = None
         out.append({"id": rid, "job_id": job_id, "status": status, "claimed_at": _iso(claimed), "started_at": _iso(started),
-                    "finished_at": _iso(finished), "duration_ms": duration, "error": (error or None) and str(error)[:500]})
+                    "finished_at": _iso(finished), "duration_ms": duration, "error": redact(error, limit=500)})
     return out
 
 
@@ -140,7 +140,8 @@ def read_usage() -> list[dict]:
             "fire_id": u["fire_id"], "job_id": u["job_id"], "ts": _iso(u["ts"]), "model": u.get("model"),
             "prompt_tokens": int(u.get("prompt_tokens") or 0), "completion_tokens": int(u.get("completion_tokens") or 0),
             "total_tokens": int(u.get("total_tokens") or 0), "duration_ms": u.get("duration_ms"),
-            "deliver_target": u.get("deliver_target"), "response_silent": u.get("response_silent"), "error": u.get("error"),
+            "deliver_target": u.get("deliver_target"), "response_silent": u.get("response_silent"),
+            "error": redact(u.get("error"), limit=None),
         })
     return out
 

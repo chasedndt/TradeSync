@@ -45,6 +45,7 @@ from tradesync_core.hermes_output import (  # noqa: E402
     parse_markdown_run,
     to_submission,
 )
+from tradesync_core.job_errors import redact  # noqa: E402
 from tradesync_core.state_api_access import HOST_STATE_API_URL, host_operator_headers  # noqa: E402
 
 HERMES_HOME = Path(os.getenv("HERMES_HOME_WINDOWS", r"\\wsl.localhost\Ubuntu\home\chaseos\runtimes\hermes-home"))
@@ -145,7 +146,10 @@ def run_pass(dry_run: bool = False) -> dict[str, int]:
                 if not dry_run:
                     save_state(state)
                 continue
-            submission = to_submission(output, content, jobs.get(output.job_id), channels, observed_at_ms=mtime_ns // 1_000_000)
+            # A job can print anything: token-, key- and webhook-shaped text is removed before it leaves the host.
+            submission = to_submission(
+                output, redact(content, limit=None) or "", jobs.get(output.job_id), channels, observed_at_ms=mtime_ns // 1_000_000
+            )
             if dry_run:
                 print(f"[HermesBridge] would submit {path.name} as '{submission['payload']['agent']}'")
                 continue
