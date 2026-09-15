@@ -59,6 +59,8 @@ def main() -> int:
         print(json.dumps({"rows": len(rows), "cells_tested": result["cells_tested"], "decision": result["decision"]}, indent=2))
         return 0
     result = json.loads((args.data / "assessment.json").read_text(encoding="utf-8"))
+    # A redirected Windows console writes the locale code page; the tables are UTF-8 markdown.
+    sys.stdout.reconfigure(encoding="utf-8")
     print(report.render(result))
     return 0
 
