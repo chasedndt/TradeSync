@@ -10,7 +10,7 @@ import json
 import time
 import uuid
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi import FastAPI, HTTPException
@@ -80,7 +80,9 @@ def test_entry_freezes_evidence_cut_off_at_entry_with_a_verifiable_digest(market
     conn = FakeConn(entry_handlers(opp))
     client, _ = build(conn)
     started = time.time()
-    response = post_entry(client, opp)
+    risk_gate = AsyncMock()  # the paper risk engine's admission; tests/test_paper_risk_gate.py covers its refusals
+    with patch("app.managed_paper.admit_entry", risk_gate):
+        response = post_entry(client, opp)
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["duplicate"] is False and body["execution_authority"] is False
@@ -110,6 +112,7 @@ def test_entry_freezes_evidence_cut_off_at_entry_with_a_verifiable_digest(market
     assert all(not any(n in url for n in ("/features/", "/funding-history/", "/liquidation-context/", "/book-history/", "/horizons"))
                for url in FakeMarket.requested[depth_at:])
     plan = json.loads(plan_text)
+    assert risk_gate.await_args.kwargs == {"symbol": SYMBOL, "plan": plan}
     assert plan["version"] == LIFECYCLE_VERSION and plan["side"] == "short" and plan["rules"]["style"] == "intraday"
     assert plan["slippage"]["entry"]["snapshot"]["source"] == "hyperliquid_l2_book"
     assert plan["planning"]["funding"]["rows"] == 3 and plan["fees"]["rate"] == 0.00045
@@ -237,9 +240,17 @@ def test_admission_refuses_paused_entries_the_portfolio_cap_and_stale_evidence()
         with pytest.raises(HTTPException) as caught:
             asyncio.run(managed_paper.entry_admission(conn, SYMBOL, {}, captured_at))
         return caught.value
-    assert "paused" in refused(FakeConn([("SELECT entries_paused", True)]), time.time()).detail
-    busy = FakeConn([("SELECT entries_paused", False), ("position_state->>'status'='open'", [{"symbol": SYMBOL, "position_state": "{}"}])])
-    assert "cap" in refused(busy, time.time()).detail
-    quiet = [("SELECT entries_paused", False), ("position_state->>'status'='open'", [])]
-    assert "expired" in refused(FakeConn(quiet), time.time() - 31).detail
-    assert asyncio.run(managed_paper.entry_admission(FakeConn(quiet), SYMBOL, {}, time.time())) is None
+    risk_gate = AsyncMock()
+    with patch("app.managed_paper.admit_entry", risk_gate):
+        assert "paused" in refused(FakeConn([("SELECT entries_paused", True)]), time.time()).detail
+        risk_gate.assert_not_awaited()  # a paused control refuses before the paper risk engine is asked
+        busy = FakeConn([("SELECT entries_paused", False), ("position_state->>'status'='open'", [{"symbol": SYMBOL, "position_state": "{}"}])])
+        assert "cap" in refused(busy, time.time()).detail
+        quiet = [("SELECT entries_paused", False), ("position_state->>'status'='open'", [])]
+        assert "expired" in refused(FakeConn(quiet), time.time() - 31).detail
+        assert asyncio.run(managed_paper.entry_admission(FakeConn(quiet), SYMBOL, {}, time.time())) is None
+    assert risk_gate.await_count == 3 and risk_gate.await_args.kwargs == {"symbol": SYMBOL, "plan": {}}
+    # A risk refusal stops admission before the portfolio is read: this connection has no answer for that query.
+    refusal = HTTPException(409, "Paper entry refused [KILL_SWITCH_ACTIVE]: Kill switch engaged by chase: review")
+    with patch("app.managed_paper.admit_entry", AsyncMock(side_effect=refusal)):
+        assert refused(FakeConn([("SELECT entries_paused", False)]), time.time()) is refusal

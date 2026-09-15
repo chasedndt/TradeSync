@@ -1,19 +1,18 @@
 import asyncio
-import uuid
-from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi import HTTPException
-from fastapi.testclient import TestClient
 
 from app import paper_risk_gate as gate
 from app import paper_risk_signals
-from app.main import app, state
-from paper_risk_fakes import pool_of
+from paper_fakes import SYMBOL, FakeMarket, market_routes
+from paper_fakes import FakeConn as PositionsConn
+from test_paper_positions_routes import build, entry_handlers, opportunity, post_entry
 from tradesync_core.paper_account import Mark, snapshot
 from tradesync_core.paper_correlation import BucketView
+from tradesync_core.paper_lifecycle_rules import LIFECYCLE_VERSION
 from tradesync_core.paper_limits import Code
 
 NOW = paper_risk_signals.PROCESS_STARTED_AT + 3600
@@ -105,72 +104,52 @@ def test_unreadable_state_refuses_rather_than_admits(world, monkeypatch):
     assert 'RuntimeError' in refused(Code.ACCOUNT_UNAVAILABLE)
 
 
-# The hook inside the real entry route: after the lock and pause check, before the insert.
+# The hook inside the real entry route: under the lock, after the pause check, before the insert.
 
-client = TestClient(app)
-ROUTE_PLAN = {'status': 'open', 'notional': 250.0, 'planned_risk_usdc': 10.0, 'entry_quote_time': 0.0, 'entry_time': 0.0}
+class OrderedConn(PositionsConn):
+    """The positions route fake, recording the order of the statements these tests care about."""
 
+    def __init__(self, handlers, order):
+        super().__init__(handlers)
+        self.order = order
 
-class Response:
-    def raise_for_status(self):
-        pass
+    async def fetchval(self, sql, *args, timeout=None):
+        self.order.append(sql.strip())
+        return await super().fetchval(sql, *args, timeout=timeout)
 
-    def json(self):
-        return {'candles': [], 'symbol': 'BTC-PERP', 'venue': 'bybit'}
-
-
-class Client:
-    def __init__(self, *args, **kwargs):
-        pass
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, *args):
-        return False
-
-    async def get(self, url):
-        return Response()
+    async def execute(self, sql, *args, timeout=None):
+        self.order.append(sql.strip())
+        return await super().execute(sql, *args, timeout=timeout)
 
 
-def entry_attempt(admit_outcome):
+def entry_attempt(outcome):
+    FakeMarket.routes, FakeMarket.requested = market_routes(), []
     order = []
-    conn = MagicMock()
-    conn.fetchval = AsyncMock(side_effect=lambda sql, *a: False if 'entries_paused' in sql else None)
-    conn.fetchrow = AsyncMock(return_value={'symbol': 'BTC-PERP', 'dir': 'LONG', 'snapshot_ts': datetime.now(timezone.utc)})
-    conn.fetch = AsyncMock(return_value=[])
-    conn.execute = AsyncMock(side_effect=lambda sql, *a: order.append(sql.strip()))
-
-    @asynccontextmanager
-    async def transaction():
-        yield
-
-    conn.transaction = transaction
+    opp = opportunity()
+    conn = OrderedConn(entry_handlers(opp), order)
 
     async def admit(conn_, *, symbol, plan):
-        order.append(f'admit {symbol} {plan["notional"]}')
-        if isinstance(admit_outcome, Exception):
-            raise admit_outcome
+        order.append(f"admit {symbol} {plan['version']}")
+        if isinstance(outcome, Exception):
+            raise outcome
 
-    with patch.object(state, 'pool', pool_of(conn)), patch('app.managed_paper.httpx.AsyncClient', Client), \
-            patch('app.managed_paper.atr', return_value=1.0), patch('app.managed_paper.open_position', return_value=dict(ROUTE_PLAN)), \
-            patch('app.managed_paper.liquidation_snapshot', return_value={}), patch('app.managed_paper.book_snapshot', return_value={}), \
-            patch('app.managed_paper.admit_entry', side_effect=admit):
-        response = client.post('/state/paper-positions', json={'opportunity_id': str(uuid.uuid4()), 'notional': 250})
-    return response, order
+    with patch('httpx.AsyncClient', FakeMarket), patch('app.managed_paper.admit_entry', side_effect=admit):
+        client, _ = build(conn)
+        response = post_entry(client, opp)
+    return response, order, conn
 
 
 def test_risk_refusal_in_the_entry_route_inserts_nothing():
-    response, order = entry_attempt(HTTPException(409, 'Paper entry refused [DAILY_LOSS_LIMIT]: breached'))
-    assert response.status_code == 409
-    assert response.json()['detail'] == 'Paper entry refused [DAILY_LOSS_LIMIT]: breached'
-    assert not any(step.startswith('INSERT') for step in order)
+    response, _, conn = entry_attempt(HTTPException(409, 'Paper entry refused [DAILY_LOSS_LIMIT]: breached'))
+    assert response.status_code == 409 and response.json()['detail'] == 'Paper entry refused [DAILY_LOSS_LIMIT]: breached'
+    assert conn.statements('INSERT INTO managed_paper_positions') == [] and conn.statements('INSERT INTO managed_paper_events') == []
 
 
-def test_admission_runs_under_the_lock_before_the_insert():
-    response, order = entry_attempt(None)
+def test_admission_runs_under_the_lock_after_the_pause_check_and_before_the_insert():
+    response, order, _ = entry_attempt(None)
     assert response.status_code == 200, response.text
     lock = order.index('SELECT pg_advisory_xact_lock(230914)')
-    admit = order.index('admit BTC-PERP 250.0')
+    paused = next(i for i, step in enumerate(order) if step.startswith('SELECT entries_paused'))
+    admit = order.index(f'admit {SYMBOL} {LIFECYCLE_VERSION}')
     insert = next(i for i, step in enumerate(order) if step.startswith('INSERT INTO managed_paper_positions'))
-    assert lock < admit < insert
+    assert lock < paused < admit < insert

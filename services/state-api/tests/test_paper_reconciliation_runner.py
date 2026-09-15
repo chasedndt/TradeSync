@@ -10,8 +10,12 @@ import pytest
 
 from app import paper_reconciliation_runner as runner
 from paper_risk_fakes import FakeConn, FakePool
-from tradesync_core.managed_paper import advance, open_position
+from tradesync_core import paper_funding as funding
+from tradesync_core.managed_paper import advance, open_position, settle_funding
 from tradesync_core.paper_account_ledger import balances, expected_entries, money
+
+H = 3600
+ENTRY = 10 * H + 600
 
 
 def book(at, bid=99.99, ask=100.01):
@@ -19,26 +23,35 @@ def book(at, bid=99.99, ask=100.01):
             'bids': [{'price': bid, 'size': 100}], 'asks': [{'price': ask, 'size': 100}]}
 
 
-def restart_data(now):
-    """One position still open from before a 10-minute outage, one closed and booked."""
-    open_id, closed_id = uuid.uuid4(), uuid.uuid4()
-    observed = advance(open_position('long', 'scalp', 1000, 1, book(1000), 1000), book(1015, bid=100.2, ask=100.21), 1015)
-    closed = advance(open_position('short', 'scalp', 1000, 1, book(1000), 1000), book(1020, bid=99.9, ask=99.91), 1020, manual_close=True)
-    entries = expected_entries(10_000, 0.0, [(closed_id, closed)])
-    ledger, running = [], Decimal(0)
+def ledger_for(entries):
+    rows, running = [], Decimal(0)
     for sequence, e in enumerate(entries, start=1):
         running += e.amount_usdc
-        ledger.append({'sequence': sequence, 'kind': e.kind, 'position_id': e.position_id, 'occurred_at': e.occurred_at,
-                       'amount_usdc': e.amount_usdc, 'gross_pnl_usdc': e.gross_pnl_usdc, 'fees_usdc': e.fees_usdc,
-                       'funding_usdc': e.funding_usdc, 'slippage_usdc': e.slippage_usdc, 'balance_after_usdc': running})
+        rows.append({'sequence': sequence, 'kind': e.kind, 'position_id': e.position_id, 'occurred_at': e.occurred_at,
+                     'amount_usdc': e.amount_usdc, 'gross_pnl_usdc': e.gross_pnl_usdc, 'fees_usdc': e.fees_usdc,
+                     'funding_usdc': e.funding_usdc, 'slippage_usdc': e.slippage_usdc, 'balance_after_usdc': running})
+    account = {'starting_capital_usdc': money(10_000), 'last_sequence': len(rows), 'peak_equity_usdc': money(10_000), **balances(entries)}
+    return rows, account
+
+
+def restart_data(now, *, late_funding=False, book_late_funding=True):
+    """One position open since before a 10-minute outage; one closed and booked, its last settlement perhaps published late."""
+    open_id, closed_id = uuid.uuid4(), uuid.uuid4()
+    observed = advance(open_position('long', 'scalp', 1000, 1, book(ENTRY), ENTRY), book(ENTRY + 15, bid=100.2, ask=100.22), ENTRY + 15)
+    short = open_position('short', 'scalp', 1000, 1, book(ENTRY), ENTRY)
+    at_close = advance(short, book(11 * H + 300, bid=99.9, ask=99.92), 11 * H + 300, manual_close=True, funding_rows=[])
+    row = funding.settle('short', at_close['quantity'], 11 * H, {'funding_rate': 1e-4}, {'value': 100.0, 'source': 'test'})
+    latest = settle_funding(at_close, [row]) if late_funding else at_close
+    entries = expected_entries(10_000, 0.0, [(closed_id, at_close, latest)])
+    rows, account = ledger_for([e for e in entries if book_late_funding or e.kind != 'funding_adjustment'])
     last_at = datetime.fromtimestamp(now - 600, timezone.utc)
     data = {
         'positions': [{'id': open_id, 'symbol': 'BTC-PERP', 'position_state': observed},
-                      {'id': closed_id, 'symbol': 'ETH-PERP', 'position_state': closed}],
-        'latest': {str(open_id): observed, str(closed_id): closed},
+                      {'id': closed_id, 'symbol': 'ETH-PERP', 'position_state': latest}],
+        'latest': {str(open_id): observed, str(closed_id): latest},
+        'closes': {str(closed_id): at_close},
         'opened': {str(open_id), str(closed_id)},
-        'account': {'starting_capital_usdc': money(10_000), 'last_sequence': len(ledger), 'peak_equity_usdc': money(10_000), **balances(entries)},
-        'ledger': ledger, 'peaks': [], 'pairs': [],
+        'account': account, 'ledger': rows, 'peaks': [], 'pairs': [],
         'last_seen': [{'id': open_id, 'symbol': 'BTC-PERP', 'last_at': last_at, 'last_s': last_at.timestamp()}],
     }
     return data, open_id, last_at
@@ -101,6 +114,17 @@ def test_an_unbooked_close_is_reported_not_repaired(world, monkeypatch):
                        'fees_usdc': money(0), 'funding_usdc': money(0), 'slippage_usdc': money(0), 'closed_positions': 0, 'last_sequence': 1}
     run = reconcile(monkeypatch, data)
     assert [m['code'] for m in run['mismatches']] == ['LEDGER_MISSING_ENTRY']
+    world.pause.assert_awaited_once()
+
+
+def test_funding_settled_after_the_close_reconciles_clean_once_booked_and_pauses_entries_until_then(world, monkeypatch):
+    data, _, _ = restart_data(time.time(), late_funding=True)
+    assert data['latest'] != data['closes'] and reconcile(monkeypatch, data)['status'] == 'clean'
+    world.pause.assert_not_awaited()
+
+    data, _, _ = restart_data(time.time(), late_funding=True, book_late_funding=False)
+    run = reconcile(monkeypatch, data)
+    assert [m['code'] for m in run['mismatches']] == ['LEDGER_FUNDING_ADJUSTMENT_DIFFERS']
     world.pause.assert_awaited_once()
 
 
