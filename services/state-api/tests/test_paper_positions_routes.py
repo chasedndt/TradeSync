@@ -235,11 +235,11 @@ def test_rules_catalog_names_versions_and_cost_sources():
 def test_admission_refuses_paused_entries_the_portfolio_cap_and_stale_evidence():
     def refused(conn, captured_at):
         with pytest.raises(HTTPException) as caught:
-            asyncio.run(managed_paper.admit_entry(conn, SYMBOL, {}, captured_at))
+            asyncio.run(managed_paper.entry_admission(conn, SYMBOL, {}, captured_at))
         return caught.value
     assert "paused" in refused(FakeConn([("SELECT entries_paused", True)]), time.time()).detail
     busy = FakeConn([("SELECT entries_paused", False), ("position_state->>'status'='open'", [{"symbol": SYMBOL, "position_state": "{}"}])])
     assert "cap" in refused(busy, time.time()).detail
     quiet = [("SELECT entries_paused", False), ("position_state->>'status'='open'", [])]
     assert "expired" in refused(FakeConn(quiet), time.time() - 31).detail
-    assert asyncio.run(managed_paper.admit_entry(FakeConn(quiet), SYMBOL, {}, time.time())) is None
+    assert asyncio.run(managed_paper.entry_admission(FakeConn(quiet), SYMBOL, {}, time.time())) is None

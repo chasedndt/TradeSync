@@ -2,7 +2,7 @@
 
 An entry gathers its evidence before the entry quote (``paper_entry_sources``), cuts
 it off at the entry time (``tradesync_core.paper_entry_evidence``) and freezes it with
-the plan. ``admit_entry`` holds every check that can refuse an entry once its plan
+the plan. ``entry_admission`` holds every check that can refuse an entry once its plan
 exists. The observer advances open positions on fresh books every 15 seconds and
 stores settled funding as Hyperliquid publishes it (``paper_funding_store``).
 """
@@ -57,15 +57,18 @@ class PaperControlRequest(BaseModel):
     reason: str = Field(min_length=5, max_length=240)
 
 
-async def admit_entry(conn, symbol, plan, captured_at):
+async def entry_admission(conn, symbol, plan, captured_at):
     """Every check that can refuse a paper entry once its plan exists; the one place to add another.
 
     Runs inside the entry transaction after the portfolio advisory lock and the
-    duplicate check, just before the insert. Raise HTTPException to refuse.
+    duplicate check, just before the insert. Raise HTTPException to refuse. Named
+    apart from the paper risk engine's ``paper_risk_hooks.admit_entry`` so importing
+    that hook here can never shadow this function.
     """
     paused = await conn.fetchval('SELECT entries_paused FROM managed_paper_control WHERE singleton=true')
     if paused is not False:
         raise HTTPException(409, 'New paper entries paused or control unavailable; existing observations and closes remain active')
+    # The paper risk engine's admit_entry(conn, symbol=symbol, plan=plan) call belongs here, after the pause check.
     active = await conn.fetch("SELECT symbol,position_state FROM managed_paper_positions WHERE position_state->>'status'='open'")
     if len(active) >= 3 or any(r['symbol']==symbol for r in active):
         raise HTTPException(409, 'Paper portfolio cap: three positions, one per symbol')
@@ -238,7 +241,7 @@ def register(app, state, *, market_data_url):
                 await conn.execute('SELECT pg_advisory_xact_lock(230914)')
                 existing = await conn.fetchval('SELECT id FROM managed_paper_positions WHERE opportunity_id=$1', body.opportunity_id)
                 if existing: return {'id': str(existing), 'duplicate': True}
-                await admit_entry(conn, symbol, plan, now)
+                await entry_admission(conn, symbol, plan, now)
                 await conn.execute('''INSERT INTO managed_paper_positions
                     (id,opportunity_id,symbol,entry_evidence,evidence_sha256,initial_plan,position_state)
                     VALUES($1,$2,$3,$4::jsonb,$5,$6::jsonb,$6::jsonb)''', identity, body.opportunity_id, symbol, entry_evidence.canonical_json(captured), digest, serial(plan))
