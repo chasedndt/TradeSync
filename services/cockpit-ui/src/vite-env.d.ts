@@ -1,9 +1,5 @@
 /// <reference types="vite/client" />
 
-interface ImportMetaEnv {
-  readonly VITE_API_KEY: string | undefined
-}
-
-interface ImportMeta {
-  readonly env: ImportMetaEnv
-}
+// No build-time variable carries a credential: every value Vite inlines is in the
+// bundle served to anyone who can load the Cockpit. Credentials are entered in
+// Settings and kept for the browser session (src/api/credentials.ts).

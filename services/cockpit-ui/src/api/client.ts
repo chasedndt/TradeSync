@@ -1,12 +1,11 @@
-import { getApiBaseUrl, getApiKey } from './credentials'
+import { credentialHeaders, getApiBaseUrl } from './credentials'
 
-export { clearApiKey, getApiBaseUrl, setApiBaseUrl, setApiKey } from './credentials'
+// Views that build URLs themselves (chart images, Settings) read the base URL through the client.
+export { getApiBaseUrl, setApiBaseUrl } from './credentials'
 
 function getHeaders(): HeadersInit {
-  const headers: HeadersInit = { 'Content-Type': 'application/json' }
-  const apiKey = getApiKey()
-  if (apiKey) headers['X-API-Key'] = apiKey
-  return headers
+  // Only what the operator entered this session; nothing is compiled into the build.
+  return { 'Content-Type': 'application/json', ...credentialHeaders() }
 }
 
 /** A failed request: the server's own explanation as the message, and the HTTP status. */
