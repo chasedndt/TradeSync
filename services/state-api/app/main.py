@@ -3335,6 +3335,10 @@ register_mobile_alerts(app, state)
 from app.managed_paper import register as register_managed_paper  # noqa: E402
 register_managed_paper(app, state, market_data_url=MARKET_DATA_URL)
 
+# The paper risk engine: account, limits, kill switch and restart reconciliation; see app/paper_risk_routes.py.
+from app.paper_risk_routes import register as register_paper_risk  # noqa: E402
+register_paper_risk(app, state, market_data_url=MARKET_DATA_URL)
+
 # Market Canvas drawings, versioned server-side; see app/canvas_drawings.py.
 from app.canvas_drawings import register as register_canvas_drawings  # noqa: E402
 
