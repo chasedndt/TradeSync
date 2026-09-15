@@ -116,6 +116,8 @@ services:
       PG_DSN: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       SCORING_INTERVAL: 10
       REDIS_URL: redis://redis:6379
+      # Sent with each harness ask when state-api requires an operator token.
+      STATE_API_OPERATOR_TOKEN: ${STATE_API_OPERATOR_TOKEN:-}
     ports:
       - "127.0.0.1:8001:8000"
 

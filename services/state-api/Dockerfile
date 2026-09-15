@@ -19,4 +19,5 @@ COPY config/features/market-feature-catalog-v1.json /app/config/features/market-
 COPY config/regime/regime-rulebook-v1.json /app/config/regime/regime-rulebook-v1.json
 
 EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# app.asgi is every route in app.main behind the access guard (app/access_guard.py).
+CMD ["uvicorn", "app.asgi:app", "--host", "0.0.0.0", "--port", "8000"]
