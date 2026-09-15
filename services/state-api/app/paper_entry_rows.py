@@ -75,15 +75,18 @@ async def liquidations(conn, symbol: str, as_of: float) -> dict[str, Any]:
     rows = await conn.fetch(
         "SELECT source, event_id, event_time, received_at, position_side, price, size, notional_usd, price_kind "
         "FROM market_liquidation_events WHERE symbol=$1 AND event_time >= to_timestamp($2) AND received_at <= to_timestamp($3) "
-        "ORDER BY event_time DESC LIMIT $4", symbol, as_of - LIQUIDATION_WINDOW_S, as_of, LIQUIDATION_ROWS, timeout=TIMEOUT_S)
+        "ORDER BY event_time DESC LIMIT $4", symbol, as_of - LIQUIDATION_WINDOW_S, as_of, LIQUIDATION_ROWS + 1, timeout=TIMEOUT_S)
+    truncated = len(rows) > LIQUIDATION_ROWS
     records = [{"id": f"{r['source']}:{r['event_id']}", "venue": r["source"], "side": r["position_side"], "price": r["price"],
                 "size": r["size"], "notional_usd": r["notional_usd"], "price_kind": r["price_kind"],
-                "observed_at": epoch(r["event_time"]), "received_at": epoch(r["received_at"])} for r in rows]
-    return {"source": SOURCES["liquidations"], "records": records,
+                "observed_at": epoch(r["event_time"]), "received_at": epoch(r["received_at"])} for r in rows[:LIQUIDATION_ROWS]]
+    kept = (f"More than {LIQUIDATION_ROWS} liquidations were received in the hour before entry; only the newest {LIQUIDATION_ROWS} "
+            "are kept, so totals from these records undercount. " if truncated else "")
+    return {"source": SOURCES["liquidations"], "records": records, "truncated": truncated,
             "reason": None if records else "no liquidation received in the hour before entry",
-            "coverage": (f"Liquidations received from Bybit and Binance USDT-M in the hour before entry, at most {LIQUIDATION_ROWS}, "
-                         "recorded once a minute; not every market is covered by both. Hyperliquid publishes no market-wide "
-                         "liquidation feed. Empty is not zero liquidations.")}
+            "coverage": kept + (f"Liquidations received from Bybit and Binance USDT-M in the hour before entry, at most {LIQUIDATION_ROWS}, "
+                                "recorded once a minute; not every market is covered by both. Hyperliquid publishes no market-wide "
+                                "liquidation feed. Empty is not zero liquidations.")}
 
 
 async def open_interest(conn, symbol: str, as_of: float) -> dict[str, Any]:
