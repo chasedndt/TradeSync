@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { EvidenceCombinationPanel } from './combination/EvidenceCombinationPanel'
 import { FailureList } from './FailureList'
 import { ProposalList } from './ProposalList'
 import { Scoreboard } from './Scoreboard'
@@ -55,6 +56,7 @@ export function LearningView() {
       <ProposalList operator={operator} horizon={horizon} />
       <FailureList horizon={horizon} />
       <VerdictTable horizon={horizon} days={days} />
+      <EvidenceCombinationPanel horizon={horizon} />
     </div>
   )
 }
