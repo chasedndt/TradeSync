@@ -1,16 +1,6 @@
-const DEFAULT_BASE_URL = '/api'
+import { getApiBaseUrl, getApiKey } from './credentials'
 
-export function getApiBaseUrl(): string {
-  return localStorage.getItem('apiBaseUrl') || DEFAULT_BASE_URL
-}
-
-export function setApiBaseUrl(url: string): void {
-  localStorage.setItem('apiBaseUrl', url)
-}
-
-function getApiKey(): string | null {
-  return localStorage.getItem('apiKey') || import.meta.env.VITE_API_KEY || null
-}
+export { clearApiKey, getApiBaseUrl, setApiBaseUrl, setApiKey } from './credentials'
 
 function getHeaders(): HeadersInit {
   const headers: HeadersInit = { 'Content-Type': 'application/json' }
@@ -97,12 +87,4 @@ export async function apiDelete<T>(path: string): Promise<T> {
   })
   if (!res.ok) throw await responseError(res)
   return res.json()
-}
-
-export function setApiKey(key: string): void {
-  localStorage.setItem('apiKey', key)
-}
-
-export function clearApiKey(): void {
-  localStorage.removeItem('apiKey')
 }
