@@ -1,8 +1,9 @@
-# 2026-09-15 — Community Server minimum chain (Hermes compute)
+# 2026-09-15 — Community Server jobs at their once-daily minimum (Hermes compute)
 
-Operator instruction: cut the ChaseOS Community Server's Hermes cron jobs to the minimum daily chain.
-Operator decision the same night: the StrikeZone material-change watch and director-thesis runs, and
-core-scorer's harness claim reading, stay on because TradeSync uses both. Nothing else was changed.
+Operator instruction: every ChaseOS Community Server Hermes job keeps running at its minimum daily
+recurring loop, at most once a day, and none is paused. Operator decision the same night: the StrikeZone
+material-change watch and director-thesis runs, and core-scorer's harness claim reading, stay on because
+TradeSync uses both.
 
 ## Measured before the change (24 hours to 14 September 23:10 UTC)
 
@@ -12,16 +13,18 @@ core-scorer's harness claim reading, stay on because TradeSync uses both. Nothin
 
 ## Applied (fleet directives through the Hermes gateway's jobs API; each keeps the value it replaced)
 
-- 14 September 23:35 UTC, paused 15 Community and Growth agent jobs: Growth Manager daily social
-  orchestration, final campaign review, ChaseInTech social orchestrator, ChaseOS and ChaseInTech X
-  curators, ChaseOS and founder LinkedIn curators, ChaseOS.ai blog campaign curator, ChaseOS and
-  ChaseInTech combined post previews, acquisition campaign planner, growth funnel review,
-  evidence-to-poster campaign studio, Growth Manager research and policy scout, weekly community recap
-  draft. Together they used 5.9M tokens in the measured 24 hours.
-- 15 September, the announcement chain runs once a day, each stage reading the one before: evidence drop
-  08:30 (was 08:30 and 15:30), intake 08:40 (was 08:40 and 15:40), announcement draft 08:45, campaign
-  control 09:15, server announcement draft 09:33, publisher 10:05 (was 10:05 and 17:05).
-- Expected saving: about 5M to 7M agent tokens a day (the higher figure on days the weekly jobs ran).
+- 15 September, the announcement chain's twice-daily stages run once a day, each stage reading the one
+  before: evidence drop 08:30 (was 08:30 and 15:30), intake 08:40 (was 08:40 and 15:40), announcement
+  draft 08:45, campaign control 09:15, server announcement draft 09:33, publisher 10:05 (was 10:05 and 17:05).
+- 14 September 23:35 UTC, 15 other Community and Growth agent jobs were paused, which was not the
+  instruction. The operator corrected it and all 15 were resumed on 15 September at 00:17 UTC on their own
+  schedules: ten daily (orchestrators, X and LinkedIn curators, blog curator, combined previews, final
+  campaign review), the acquisition planner (Monday, Wednesday, Friday), the poster studio (Monday and
+  Thursday), the research scout (Monday), the growth funnel review and the weekly recap (Friday).
+- Eleven jobs that were already paused before this work (commercial-ops lanes, campaign adapters, visual
+  proof, admin approval summary) were left as found.
+- Expected saving: about 1M agent tokens a day, from the intake's and publisher's second daily runs;
+  every other Community job already ran at most once a day.
 
 ## Code (state-api, deployed)
 
@@ -32,7 +35,7 @@ core-scorer's harness claim reading, stay on because TradeSync uses both. Nothin
 
 ## Side effects and undo
 
-- The social automation health watchdog monitors ten of the paused stages. When it next runs it posts one
-  "workflow stage is disabled" card to the Community workflow status channel, then stays silent while the
-  set of findings is unchanged.
+- While the 15 jobs were paused, the social automation health watchdog posted one "Action Required" card
+  (00:57 BST) listing ten disabled stages. With them resumed, its next run posts "Social Automation Health
+  Restored" and then stays silent.
 - Any job can be resumed, and any schedule set back, from the Fleet page.
