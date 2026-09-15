@@ -3382,3 +3382,8 @@ get_opportunities = register_opportunities(app, state, OpportunityResponse)
 from app.learning_routes import register as register_learning  # noqa: E402
 
 register_learning(app, state, regime_lab_engine.baseline)
+
+# Evidence combination by measured likelihood ratios; research reading only. See app/evidence_combination.py.
+from app.evidence_combination import register as register_evidence_combination  # noqa: E402
+
+register_evidence_combination(app, state)
