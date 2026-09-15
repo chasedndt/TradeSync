@@ -16,6 +16,13 @@ Examples:
 
 Current repository migrations:
 
+`031_paper_risk_engine.sql` adds the paper risk engine: an append-only account ledger with
+stored balances and equity peaks, operator-editable limits with audit rows (seeded conservative),
+a persistent kill switch (seeded disengaged) with audit rows, restart reconciliation runs,
+observation gaps and measured correlation snapshots, and an `operator` column on pause audit rows.
+Not yet applied; isolated, rolled-back UP/DOWN/UP acceptance is recorded in
+[the change record](../../docs/changes/2026-09-15_paper-risk-engine.md).
+
 `030_horizon_readings.sql` stores every Hermes reading of the timeframe outlook, one per band
 (short term, lower, medium, higher), with its start and finish times and the measurement it read,
 so the Timeframes page shows each reading's exact time, keeps the last good reading while a new one
