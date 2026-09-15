@@ -25,9 +25,9 @@ schedule. State-api's schedule loop records each slot it handles before starting
 `032_managed_paper_funding.sql` stores the settled Hyperliquid funding behind each managed paper
 position: one row per position per hourly settlement it took part in, with the published rate, the
 recorded oracle price it was valued at and that price's source, and the payment. An update or delete
-is refused by trigger, so a position's funding cannot be rewritten after the fact. Not yet applied;
-it creates no rows. UP, DOWN and UP again verified in an isolated schema inside a rolled-back
-transaction (see `docs/changes/2026-09-15_managed-paper-positions.md`).
+is refused by trigger, so a position's funding cannot be rewritten after the fact. Applied on
+15 September; it creates no rows. UP, DOWN and UP again verified in an isolated schema inside a
+rolled-back transaction (see `docs/changes/2026-09-15_managed-paper-positions.md`).
 
 `031_paper_risk_engine.sql` adds the paper risk engine: an append-only account ledger (starting
 capital, one realised entry per closed managed paper position, and a funding adjustment for each
@@ -35,7 +35,8 @@ settlement published after a close) with stored balances and equity peaks, opera
 with audit rows (seeded conservative),
 a persistent kill switch (seeded disengaged) with audit rows, restart reconciliation runs,
 observation gaps and measured correlation snapshots, and an `operator` column on pause audit rows.
-Not yet applied; isolated, rolled-back UP/DOWN/UP acceptance is recorded in
+Applied on 15 September, after the stale `031` record left by the 14 September renumbering of the
+market history migration was removed; isolated, rolled-back UP/DOWN/UP acceptance is recorded in
 [the change record](../../docs/changes/2026-09-15_paper-risk-engine.md).
 
 `030_horizon_readings.sql` stores every Hermes reading of the timeframe outlook, one per band

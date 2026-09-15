@@ -4,8 +4,12 @@ This folder is the documentation system of record for the Hyperliquid-only Trade
 
 ## Start here
 
-15 September paper risk engine: [Kill switch, capital ledger, limits, restart reconciliation and Paper risk panel — source and isolated acceptance, migration 031 not applied](changes/2026-09-15_paper-risk-engine.md).
-15 September managed paper positions: [Versioned lifecycles with trailing stops, depth-walked fills, settled funding, entry evidence cut off at entry, and live-data acceptance](changes/2026-09-15_managed-paper-positions.md).
+15 September programme summary: [Paper safety, managed positions, opportunity evidence, local access security and refinements — merged, deployed and verified](changes/2026-09-15_paper-safety-and-quant-programme.md).
+15 September paper risk engine: [Kill switch, capital ledger with late-funding adjustments, limits, restart reconciliation and Paper risk panel — migration 031 applied](changes/2026-09-15_paper-risk-engine.md).
+15 September managed paper positions: [Versioned lifecycles with trailing stops, depth-walked fills, settled funding, entry evidence cut off at entry, and live-data acceptance — migration 032 applied](changes/2026-09-15_managed-paper-positions.md).
+15 September local access: [Loopback-only ports, cross-site change refusal, optional operator token, session-only Cockpit credentials and bridge redaction](changes/2026-09-15_local-access-hardening.md), [security review](security/2026-09-15_local-access-review.md).
+15 September opportunity evidence: [One-hour return restart gap closed; positioning candidates tested, none admitted](changes/2026-09-15_restart-gap-and-candidates.md), [candidate results](research/2026-09-15_positioning-candidates.md); [sources combined by track record, shadow only](changes/2026-09-15_evidence-combination.md), [design and worked examples](research/2026-09-15_evidence-combination.md).
+15 September operations: [Fleet run progress and output, pipeline feed heartbeats, off-by-default reading schedule, heatmap coverage](changes/2026-09-15_fleet-pipeline-reading-schedule.md); [Community Server jobs at their once-daily minimum](changes/2026-09-15_community-minimum-chain.md).
 
 14 September paper safety: [Persistent entry-pause foundation — source only pending SQL/UI acceptance](changes/2026-09-14_paper-control.md).
 
