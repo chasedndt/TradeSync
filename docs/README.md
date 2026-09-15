@@ -4,6 +4,8 @@ This folder is the documentation system of record for the Hyperliquid-only Trade
 
 ## Start here
 
+15 September managed paper positions: [Versioned lifecycles with trailing stops, depth-walked fills, settled funding, entry evidence cut off at entry, and live-data acceptance](changes/2026-09-15_managed-paper-positions.md).
+
 14 September paper safety: [Persistent entry-pause foundation — source only pending SQL/UI acceptance](changes/2026-09-14_paper-control.md).
 
 Consolidated current handover: [14 September integration state, verification limits and next safety work](HANDOVER_2026-09-14_INTEGRATION_STATE.md).
