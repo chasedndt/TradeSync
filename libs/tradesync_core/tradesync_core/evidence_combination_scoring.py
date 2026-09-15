@@ -16,7 +16,9 @@ For a forecast p that the market rises and an outcome y (1 rose, 0 fell):
   rate (higher is sharper); uncertainty is y_bar (1 - y_bar), which no
   forecaster controls. Exact when every forecast in a bin is the same.
 - Calibration error: the count-weighted mean |forecast - share that rose| over
-  the bins, in probability units.
+  the bins, in probability units. Whether a gap is *detectable* is a separate
+  question: ``bins_within_interval`` counts the bins whose 95% interval still
+  contains their forecast.
 
 A difference between two forecasters is taken decision by decision (paired), and
 its mean carries an interval at the test window's effective windows
@@ -111,6 +113,18 @@ class ForecastScore:
     calibration_error: float
     bins: tuple[ReliabilityBin, ...]
 
+    @property
+    def bins_within_interval(self) -> int:
+        """Bins whose 95% interval for the share that rose contains the bin's mean forecast."""
+        return sum(
+            1 for b in self.bins
+            if b.low is not None and b.high is not None and b.low <= b.mean_probability <= b.high
+        )
+
+    @property
+    def miscalibration_detectable(self) -> bool:
+        return self.bins_within_interval < len(self.bins)
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "decisions": self.decisions,
@@ -122,6 +136,8 @@ class ForecastScore:
             "resolution": round(self.resolution, 6),
             "uncertainty": round(self.uncertainty, 6),
             "calibration_error": round(self.calibration_error, 6),
+            "bins_within_interval": self.bins_within_interval,
+            "miscalibration_detectable": self.miscalibration_detectable,
             "bins": [item.to_dict() for item in self.bins],
         }
 

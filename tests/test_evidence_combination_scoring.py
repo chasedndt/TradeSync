@@ -49,6 +49,14 @@ def test_worked_example_reliability_and_resolution() -> None:
     assert score.calibration_error == pytest.approx(0.20)
 
 
+def test_a_gap_is_detectable_only_when_a_bin_interval_excludes_its_forecast() -> None:
+    worked = score_forecast([0.40] * 5 + [0.60] * 5, [1, 0, 0, 0, 0] + [1, 1, 1, 1, 0], hourly(10), 60, bins=2)
+    assert worked.bins_within_interval == 2 and not worked.miscalibration_detectable  # 20 points, five windows a bin
+    wrong = score_forecast([0.5] * 20, [1] * 20, hourly(20), 60)
+    assert wrong.bins_within_interval == 0 and wrong.miscalibration_detectable
+    assert wrong.to_dict()["miscalibration_detectable"] is True and wrong.to_dict()["bins_within_interval"] == 0
+
+
 def test_identical_forecasts_are_never_split_across_bins() -> None:
     assert equal_count_bins([0.5] * 10, 5) == [list(range(10))]
     assert equal_count_bins([0.1, 0.2, 0.2, 0.2, 0.3, 0.4], 3) == [[0, 1, 2, 3], [4, 5]]

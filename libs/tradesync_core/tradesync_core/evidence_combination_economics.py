@@ -88,6 +88,15 @@ class Clearance:
         }
 
 
+def side_cleared(probability: float, threshold: Breakeven) -> str | None:
+    """'long' above the long threshold, 'short' below the short one, None in between."""
+    if threshold.long_above is not None and probability > threshold.long_above:
+        return "long"
+    if threshold.short_below is not None and probability < threshold.short_below:
+        return "short"
+    return None
+
+
 def clearance(
     decisions: Sequence[Decision],
     probabilities: Sequence[float],
@@ -101,10 +110,11 @@ def clearance(
     opened: list[int] = []
     long_calls = short_calls = 0
     for decision, probability in zip(decisions, probabilities):
-        if threshold.long_above is not None and probability > threshold.long_above:
+        side = side_cleared(probability, threshold)
+        if side == "long":
             long_calls += 1
             nets.append(decision.forward_return_pct - threshold.cost_pct)
-        elif threshold.short_below is not None and probability < threshold.short_below:
+        elif side == "short":
             short_calls += 1
             nets.append(-decision.forward_return_pct - threshold.cost_pct)
         else:

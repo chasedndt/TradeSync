@@ -10,7 +10,14 @@ from tradesync_core.evidence_combination_economics import (
     breakeven,
     breakeven_probabilities,
     clearance,
+    side_cleared,
 )
+
+
+def test_side_cleared_names_the_side_or_none() -> None:
+    threshold = Breakeven(0.12, 0.3, 0.3, 0.70, 0.30)
+    assert [side_cleared(p, threshold) for p in (0.71, 0.70, 0.5, 0.30, 0.29)] == ["long", None, None, None, "short"]
+    assert side_cleared(0.99, Breakeven(0.12, None, None, None, None)) is None
 
 
 def test_worked_example_equal_moves() -> None:

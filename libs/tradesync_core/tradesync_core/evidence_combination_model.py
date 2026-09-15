@@ -222,9 +222,11 @@ def fit_model(
         )
         for source_id in ids
     }
+    # A source with no fitting record never contributes, so its pairs would only be noise in the report.
+    recorded = [source_id for source_id in ids if sources[source_id].has_record]
     pairs: dict[tuple[str, str], PairDependence] = {}
-    for index, first in enumerate(ids):
-        for second in ids[index + 1:]:
+    for index, first in enumerate(recorded):
+        for second in recorded[index + 1:]:
             polarity = polarity_of(sources[first].pooled.swing) * polarity_of(sources[second].pooled.swing)
             pairs[(first, second)] = pair_dependence(
                 decisions, first, second, horizon_minutes, polarity, prior_windows

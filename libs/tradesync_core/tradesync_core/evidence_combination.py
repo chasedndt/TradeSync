@@ -29,7 +29,7 @@ from .evidence_combination_data import (
     effective_windows,
     window_summary,
 )
-from .evidence_combination_economics import breakeven, clearance
+from .evidence_combination_economics import breakeven, clearance, side_cleared
 from .evidence_combination_likelihood import DEFAULT_PRIOR_WINDOWS
 from .evidence_combination_model import DEFAULT_MIN_REGIME_EFFECTIVE, CombinationModel, fit_model
 from .evidence_combination_odds import Combined
@@ -53,7 +53,13 @@ RULEBOOK = "rulebook_score"
 COMBINED = "combined"
 NAIVE = "combined_without_dependence_adjustment"
 METRICS = ("brier", "log_loss")
-COMPARISONS = ((COMBINED, BASE_RATE), (COMBINED, RULEBOOK), (RULEBOOK, BASE_RATE), (NAIVE, COMBINED))
+COMPARISONS = (
+    (COMBINED, BASE_RATE),
+    (COMBINED, RULEBOOK),
+    (RULEBOOK, BASE_RATE),
+    (NAIVE, BASE_RATE),
+    (NAIVE, COMBINED),
+)
 
 METHOD: dict[str, Any] = {
     "version": METHOD_VERSION,
@@ -222,6 +228,10 @@ def assess_combination(
         "dependence": _dependence(model, adjusted, independent),
         "forecasts": forecast_report,
         "comparisons": [c.to_dict() for c in comparisons],
-        "economics": {**threshold.to_dict(), "test": cleared.to_dict()},
-        "reading": plain_reading(horizon_minutes, scores, comparisons, threshold, cleared),
+        "economics": {
+            **threshold.to_dict(),
+            "base_rate_clears": side_cleared(prior, threshold),
+            "test": cleared.to_dict(),
+        },
+        "reading": plain_reading(horizon_minutes, scores, comparisons, threshold, cleared, prior),
     }

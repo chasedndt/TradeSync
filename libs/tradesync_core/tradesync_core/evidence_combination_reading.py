@@ -1,17 +1,18 @@
 """The plain-language reading of an evidence-combination result.
 
 Written for the operator scanning the Learning view: whether combined sources
-were better or worse calibrated than the base rate, whether their scores differ
-from both baselines by more than the test window can resolve, and whether any
-combined probability was high enough to pay for the round trip. Every sentence
-is built from numbers already in the report and judges nothing beyond them.
+were better or worse calibrated than the base rate and whether that gap is even
+detectable, whether their scores differ from both baselines by more than the
+test window can resolve, and whether any combined probability was high enough to
+pay for the round trip. Every sentence is built from numbers already in the
+report and judges nothing beyond them.
 """
 
 from __future__ import annotations
 
 from typing import Mapping, Sequence
 
-from .evidence_combination_economics import Breakeven, Clearance
+from .evidence_combination_economics import Breakeven, Clearance, side_cleared
 from .evidence_combination_scoring import ForecastScore, PairedDifference
 
 NAMES = {
@@ -44,11 +45,21 @@ def _calibration_sentence(horizon_minutes: int, combined: ForecastScore, base: F
         judged = "worse calibrated than"
     else:
         judged = "as well calibrated as"
-    return (
+    sentence = (
         f"At {horizon_words(horizon_minutes)}, combined sources would have been {judged} the base rate on the "
         f"newest {combined.decisions:,} decisions: their forecasts sat {_points(combined.calibration_error)} from "
         f"what happened on average, against {_points(base.calibration_error)} for the base rate."
     )
+    flagged = [
+        name for name, score in (("combined sources", combined), ("the base rate", base))
+        if score.miscalibration_detectable
+    ]
+    if not flagged:
+        return sentence + (
+            " Every reliability bin's 95% interval still contains its forecast, so neither gap is detectable "
+            "at this sample size."
+        )
+    return sentence + f" For {' and '.join(flagged)}, at least one reliability bin's 95% interval excludes its forecast."
 
 
 def difference_phrase(difference: PairedDifference) -> str:
@@ -81,7 +92,7 @@ def _score_sentence(scores: Mapping[str, ForecastScore], comparisons: Sequence[P
     return f"Log loss was {scores['combined'].log_loss:.4f} for combined sources, against " + "; and ".join(parts) + "."
 
 
-def _economics_sentence(threshold: Breakeven, cleared: Clearance) -> str:
+def _economics_sentence(threshold: Breakeven, cleared: Clearance, prior: float) -> str:
     if threshold.long_above is None:
         return "The fitting window had too few rises or falls to state the probability a call needs to cover costs."
     levels = f"above {_percent(threshold.long_above)} for a long"
@@ -96,10 +107,17 @@ def _economics_sentence(threshold: Breakeven, cleared: Clearance) -> str:
         detail = f"; the implied calls averaged {cleared.mean_net_return_pct:+.3f}% after costs"
         if cleared.low is not None and cleared.high is not None:
             detail += f" (95% interval {cleared.low:+.3f}% to {cleared.high:+.3f}%)"
-    return (
+    sentence = (
         f"{calls:,} of {cleared.decisions:,} test decisions had a combined probability {levels}, "
         f"the levels needed to cover {cost}{detail}."
     )
+    side = side_cleared(prior, threshold)
+    if side is not None:
+        sentence += (
+            f" The base rate alone ({_percent(prior)}) already clears the {side} level, so this reflects the "
+            "fitting period's drift and move sizes rather than any source."
+        )
+    return sentence
 
 
 def plain_reading(
@@ -108,11 +126,12 @@ def plain_reading(
     comparisons: Sequence[PairedDifference],
     threshold: Breakeven,
     cleared: Clearance,
+    prior: float,
 ) -> str:
     sentences = [
         _calibration_sentence(horizon_minutes, scores["combined"], scores["base_rate"]),
         _score_sentence(scores, comparisons),
-        _economics_sentence(threshold, cleared),
+        _economics_sentence(threshold, cleared, prior),
         "Research reading only: nothing here changes scoring, weights or gates.",
     ]
     return " ".join(sentence for sentence in sentences if sentence)

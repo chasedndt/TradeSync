@@ -85,6 +85,17 @@ def test_a_source_that_abstains_or_has_no_record_contributes_nothing() -> None:
     assert set(stranger.contributions) == {"a"} and stranger.evidence == pytest.approx(only_a.evidence)
 
 
+def test_pairs_leave_out_sources_with_no_fitting_record() -> None:
+    decisions = []
+    for i in range(100):
+        rose, call = skilled_call(i)
+        decisions.append(decision(i, rose, {"a": call, "b": uninformative_call(i)}))
+    model = fit_model(decisions, 60, source_ids=["a", "b", "later"])
+    assert not model.sources["later"].has_record
+    assert set(model.pairs) == {("a", "b")}
+    assert model.redundancy("a", "later") == 1.0  # never measured together; it contributes nothing anyway
+
+
 def test_a_source_with_no_information_leaves_the_forecast_at_the_base_rate() -> None:
     decisions = [decision(i, i % 2 == 0, {"coin": uninformative_call(i)}) for i in range(200)]
     model = fit_model(decisions, 60)

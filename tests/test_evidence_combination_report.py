@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from evidence_combination_fixtures import decision, skilled_call, uninformative_call
+from evidence_combination_fixtures import T0, decision, skilled_call, uninformative_call
 from tradesync_core.evidence_combination import METHOD, assess_combination, method_digest
 from tradesync_core.evidence_combination_data import call_from_reading, chronological_split
+from tradesync_core.evidence_combination_economics import Breakeven, Clearance
+from tradesync_core.evidence_combination_reading import plain_reading
+from tradesync_core.evidence_combination_scoring import score_forecast
 
 
 def skilled_market(count: int = 1000):
@@ -97,3 +100,29 @@ def test_sources_that_know_nothing_leave_every_forecast_at_the_base_rate() -> No
     assert report["sources"][0]["likelihood_ratio"]["up_call"]["estimate"] == pytest.approx(1.0)
     assert not report["sources"][0]["interval_excludes_one"]
     assert "No test decision" in report["reading"]
+    assert "neither gap is detectable" in report["reading"]
+
+
+def test_when_the_base_rate_alone_clears_a_threshold_the_reading_says_so() -> None:
+    """Falls four times the size of rises put the short level at 68%: a 50% base rate clears it by itself."""
+    decisions = []
+    for i in range(200):
+        rose = i % 2 == 0
+        decisions.append(decision(i, rose, {"coin": uninformative_call(i)}, move=0.2 if rose else 0.8))
+    report = assess_combination(decisions, 60, cost_pct=0.12)
+    economics = report["economics"]
+    assert economics["short_below"] == pytest.approx(0.68) and economics["base_rate_clears"] == "short"
+    assert economics["test"]["short_calls"] == report["split"]["test"]["decisions"] == 60
+    assert "The base rate alone (50.0%) already clears the short level" in report["reading"]
+
+
+def test_the_reading_says_when_a_calibration_gap_is_detectable() -> None:
+    opened = [T0 + i * 3600 for i in range(20)]
+    flagged = score_forecast([0.5] * 20, [1] * 20, opened, 60)
+    quiet = score_forecast([0.5] * 20, [1, 0] * 10, opened, 60)
+    text = plain_reading(
+        60, {"combined": flagged, "base_rate": quiet}, [],
+        Breakeven(0.12, 0.3, 0.3, 0.7, 0.3), Clearance(20, 0, 0, None, None, None, 0.0), 0.5,
+    )
+    assert "would have been worse calibrated than the base rate" in text
+    assert "For combined sources, at least one reliability bin's 95% interval excludes its forecast." in text
