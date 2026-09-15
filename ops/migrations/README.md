@@ -16,6 +16,13 @@ Examples:
 
 Current repository migrations:
 
+`032_managed_paper_funding.sql` stores the settled Hyperliquid funding behind each managed paper
+position: one row per position per hourly settlement it took part in, with the published rate, the
+recorded oracle price it was valued at and that price's source, and the payment. An update or delete
+is refused by trigger, so a position's funding cannot be rewritten after the fact. Not yet applied;
+it creates no rows. UP, DOWN and UP again verified in an isolated schema inside a rolled-back
+transaction (see `docs/changes/2026-09-15_managed-paper-positions.md`).
+
 `030_horizon_readings.sql` stores every Hermes reading of the timeframe outlook, one per band
 (short term, lower, medium, higher), with its start and finish times and the measurement it read,
 so the Timeframes page shows each reading's exact time, keeps the last good reading while a new one
