@@ -3316,6 +3316,11 @@ from app.horizons import register as register_horizons  # noqa: E402
 
 register_horizons(app, state, market_data_url=MARKET_DATA_URL)
 
+# Keeps the warm markets' timeframe measurements fresh; see app/horizons_warm.py.
+from app.horizons_warm import register as register_horizons_warm  # noqa: E402
+
+register_horizons_warm(market_data_url=MARKET_DATA_URL)
+
 # Feature histories for the per-feature charts on Regime Lab; see app/feature_history.py.
 from app.feature_history import register as register_feature_history  # noqa: E402
 

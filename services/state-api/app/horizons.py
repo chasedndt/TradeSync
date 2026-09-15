@@ -28,7 +28,7 @@ from typing import Any
 import httpx
 from fastapi import APIRouter, HTTPException, Query
 
-from app import background, horizon_reading
+from app import horizon_reading
 from tradesync_core.horizon_bars import Bars, with_funding
 from tradesync_core.horizon_chart import chart_payload
 from tradesync_core.horizon_evaluation import evaluate_all
@@ -272,18 +272,4 @@ def register(app, state, *, market_data_url: str) -> None:
         return await horizon_reading.start(getattr(state, "pool", None), symbol, scope, entry["outlook"], entry["evaluation"],
                                            datetime.fromtimestamp(entry["at"], timezone.utc))
 
-    async def warm() -> None:
-        await asyncio.sleep(120)  # let market-data settle after a restart
-        while True:
-            for symbol in WARM_SYMBOLS:
-                for part in PARTS:
-                    entry = _cache.get((symbol, part))
-                    if entry is None or time.time() - entry["at"] >= PART_TTL_S[part] - 30:
-                        try:
-                            await measured(market_data_url, symbol, part, force=True)
-                        except Exception as exc:  # the next pass retries; a request still measures on demand
-                            print(f"[Horizons] {symbol} {part} not measured: {type(exc).__name__}")
-            await asyncio.sleep(60)
-
-    background.add("horizons_warm", warm)
     app.include_router(router)
