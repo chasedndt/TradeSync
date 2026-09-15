@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app import paper_reconciliation_runner as runner
-from paper_fakes import FakeConn, FakePool
+from paper_risk_fakes import FakeConn, FakePool
 from tradesync_core.managed_paper import advance, open_position
 from tradesync_core.paper_account_ledger import balances, expected_entries, money
 

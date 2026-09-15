@@ -12,7 +12,7 @@ from app import paper_account_store as accounts
 from app import paper_risk_hooks as hooks
 from app import paper_risk_signals
 from app.main import app, state
-from paper_fakes import FakeConn, pool_of
+from paper_risk_fakes import FakeConn, pool_of
 from tradesync_core.managed_paper import advance, open_position
 from tradesync_core.paper_account_ledger import realised_entry
 

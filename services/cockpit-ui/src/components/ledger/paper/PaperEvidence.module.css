@@ -1,0 +1,4 @@
+.evidence { min-width: 0; overflow-wrap: anywhere; }
+.evidence p { color: var(--text-muted, #a7b5c7); line-height: 1.6; }
+.items { list-style: none; margin: 12px 0; padding: 0; display: grid; gap: 8px; }
+.evidence pre { max-height: 350px; overflow: auto; padding: 12px; background: #08131f; font-size: 12px; }

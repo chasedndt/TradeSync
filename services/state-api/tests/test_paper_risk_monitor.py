@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app import paper_risk_monitor as monitor
-from paper_fakes import FakeConn, FakePool
+from paper_risk_fakes import FakeConn, FakePool
 from tradesync_core.paper_account import snapshot
 
 NOW = 1_800_000_000.0

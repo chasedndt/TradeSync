@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 # reserved number is allowed; any other gap still fails. The runner applies
 # pending versions in order and skips applied ones, so a gap is safe to deploy.
 # Empty this set once those branches have merged.
-RESERVED_BY_PARALLEL_BRANCHES = {"027", "029", "030", "031", "032"}
+RESERVED_BY_PARALLEL_BRANCHES: set[str] = set()
 
 
 class MigrationRunnerTests(unittest.TestCase):

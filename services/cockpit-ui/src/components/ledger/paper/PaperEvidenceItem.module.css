@@ -1,0 +1,5 @@
+.item { border: 1px solid #344154; border-radius: 8px; padding: 10px 12px; min-width: 0; }
+.item summary { cursor: pointer; color: #e5edf7; line-height: 1.5; overflow-wrap: anywhere; }
+.item p { margin: 8px 0 0; font-size: 13px; }
+.missing { border-style: dashed; }
+.record { border-top: 1px solid #1f2b3b; padding-top: 6px; }

@@ -22,6 +22,13 @@ every change (who, when, the value replaced). Off unless an operator turns it on
 schedule. State-api's schedule loop records each slot it handles before starting anything. Applied on
 15 September.
 
+`032_managed_paper_funding.sql` stores the settled Hyperliquid funding behind each managed paper
+position: one row per position per hourly settlement it took part in, with the published rate, the
+recorded oracle price it was valued at and that price's source, and the payment. An update or delete
+is refused by trigger, so a position's funding cannot be rewritten after the fact. Not yet applied;
+it creates no rows. UP, DOWN and UP again verified in an isolated schema inside a rolled-back
+transaction (see `docs/changes/2026-09-15_managed-paper-positions.md`).
+
 `031_paper_risk_engine.sql` adds the paper risk engine: an append-only account ledger with
 stored balances and equity peaks, operator-editable limits with audit rows (seeded conservative),
 a persistent kill switch (seeded disengaged) with audit rows, restart reconciliation runs,

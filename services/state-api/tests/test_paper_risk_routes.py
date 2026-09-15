@@ -8,7 +8,7 @@ from app import background
 from app import paper_risk_readmodel as readmodel
 from app import paper_risk_routes as routes
 from app.main import app, state
-from paper_fakes import FakeConn, FakePool
+from paper_risk_fakes import FakeConn, FakePool
 from tradesync_core.paper_account import snapshot
 from tradesync_core.paper_correlation import BucketView
 

@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from app import paper_risk_gate as gate
 from app import paper_risk_signals
 from app.main import app, state
-from paper_fakes import pool_of
+from paper_risk_fakes import pool_of
 from tradesync_core.paper_account import Mark, snapshot
 from tradesync_core.paper_correlation import BucketView
 from tradesync_core.paper_limits import Code

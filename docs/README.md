@@ -5,6 +5,7 @@ This folder is the documentation system of record for the Hyperliquid-only Trade
 ## Start here
 
 15 September paper risk engine: [Kill switch, capital ledger, limits, restart reconciliation and Paper risk panel — source and isolated acceptance, migration 031 not applied](changes/2026-09-15_paper-risk-engine.md).
+15 September managed paper positions: [Versioned lifecycles with trailing stops, depth-walked fills, settled funding, entry evidence cut off at entry, and live-data acceptance](changes/2026-09-15_managed-paper-positions.md).
 
 14 September paper safety: [Persistent entry-pause foundation — source only pending SQL/UI acceptance](changes/2026-09-14_paper-control.md).
 

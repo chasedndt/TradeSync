@@ -30,7 +30,7 @@ async def main():
             initial = (await client.get('/state/paper-control')).json()
             assert initial['entries_paused'] is True
             for paused in (False, True):
-                result = await client.post('/state/paper-control',json={'entries_paused':paused,'reason':'Isolated QA control check'})
+                result = await client.post('/state/paper-pause',json={'entries_paused':paused,'reason':'Isolated QA control check','operator':'isolated-qa'})
                 assert result.status_code == 200, result.text
                 assert (await client.get('/state/paper-control')).json()['entries_paused'] is paused
             # API changes acquired the production admission lock in this outer
@@ -44,7 +44,7 @@ async def main():
             assert await conn.fetchval('SELECT count(*) FROM managed_paper_control_events') == 2
             await conn.execute('DELETE FROM managed_paper_control')
             assert (await client.get('/state/paper-control')).status_code == 503
-            assert (await client.post('/state/paper-control',json={'entries_paused':False,'reason':'Isolated QA missing state'})).status_code == 503
+            assert (await client.post('/state/paper-pause',json={'entries_paused':False,'reason':'Isolated QA missing state','operator':'isolated-qa'})).status_code == 503
         print('PASS: migration UP/DOWN/UP, default paused, API pause/resume readback, audit rows, shared admission lock excludes second connection, missing-state refusal; no provider calls.')
     finally:
         await transaction.rollback()

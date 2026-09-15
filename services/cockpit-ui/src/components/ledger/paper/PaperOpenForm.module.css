@@ -1,0 +1,6 @@
+.form { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin: 16px 0; }
+.form label { display: grid; gap: 8px; min-width: 0; flex: 1 1 180px; }
+.form label:first-child { flex-basis: 280px; }
+.form select, .form input { width: 100%; min-width: 0; box-sizing: border-box; padding: 10px; border: 1px solid #344154; border-radius: 8px; background: #111e2e; color: #e5edf7; }
+.note { color: var(--text-muted, #a7b5c7); line-height: 1.6; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .form > * { width: 100%; } }

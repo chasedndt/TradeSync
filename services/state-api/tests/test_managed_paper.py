@@ -108,7 +108,7 @@ def test_paper_control_does_not_claim_to_close_positions():
     assert 'not liquidated' in result.json()['note']
 
 
-def test_blank_control_reason_is_rejected_before_database():
+def test_the_unaudited_pause_route_is_retired():
     with patch.object(state,'pool',None):
-        result = client.post('/state/paper-control',json={'entries_paused':False,'reason':'     '})
-    assert result.status_code == 422
+        result = client.post('/state/paper-control',json={'entries_paused':False,'reason':'Operator review'})
+    assert result.status_code == 410 and '/state/paper-pause' in result.json()['detail']

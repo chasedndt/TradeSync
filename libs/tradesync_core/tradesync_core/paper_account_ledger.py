@@ -24,10 +24,11 @@ ZERO = Decimal("0")
 TOTALS = ("cash_usdc", "realised_pnl_usdc", "gross_pnl_usdc", "fees_usdc", "funding_usdc", "slippage_usdc")
 COMPONENTS = ("amount_usdc", "gross_pnl_usdc", "fees_usdc", "funding_usdc", "slippage_usdc")
 
-# The one place that knows which lifecycle field holds funding. A settled figure
-# wins when the lifecycle records one; otherwise the frozen scenario is charged
-# and the entry says so. Update this tuple, not the callers, if the field changes.
-FUNDING_FIELDS = (("funding_settled_usdc", "settled"), ("funding_scenario_usdc", "scenario"))
+# The one place that knows which lifecycle field holds funding. Managed paper
+# positions record settled Hyperliquid funding as ``funding_usdc`` beside a
+# ``funding`` summary whose status is "awaiting_rows" while an hour's rate is not
+# yet published; older states carry only the frozen scenario, charged as such. Update this tuple, not the callers, if the field changes.
+FUNDING_FIELDS = (("funding_usdc", "settled"), ("funding_scenario_usdc", "scenario"))
 
 
 def money(value: Any) -> Decimal:
@@ -60,6 +61,9 @@ def funding(state: Mapping[str, Any]) -> tuple[float, str]:
     """Funding charged to a closed position, and whether it was settled or the scenario."""
     for key, source in FUNDING_FIELDS:
         if state.get(key) is not None:
+            summary = state.get("funding")
+            if source == "settled" and isinstance(summary, Mapping) and summary.get("status") == "awaiting_rows":
+                source = "settled_partial"
             return _number(state, key), source
     raise ValueError("Closed paper position records no funding figure")
 
