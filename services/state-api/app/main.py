@@ -776,7 +776,16 @@ async def get_evidence(opportunity_id: str):
 @app.get("/state/positions", response_model=List[Position])
 async def get_aggregated_positions(venue: str = "all"):
     """Aggregates positions from execution services."""
-    venue = normalize_venue(venue)
+    # "all" is this route's own default, so it is settled before the venue is
+    # normalised (normalize_venue knows only real venues); an unknown venue is
+    # the caller's mistake (400), never a server failure.
+    if venue.strip().lower() == "all":
+        venue = "all"
+    else:
+        try:
+            venue = normalize_venue(venue)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from None
     venues = ["hyperliquid"] if venue == "all" else [venue]
     urls = {
         "hyperliquid": "http://exec-hl-svc:8004/exec/hl/positions"
