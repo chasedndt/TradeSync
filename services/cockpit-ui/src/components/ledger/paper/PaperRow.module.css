@@ -1,0 +1,10 @@
+.position { border-top: 1px solid #344154; padding: 20px 0; min-width: 0; }
+.position h4 { margin: 0 0 8px; overflow-wrap: anywhere; }
+.position h4 span { color: #a7b5c7; }
+.position > p { color: var(--text-muted, #a7b5c7); line-height: 1.6; }
+.times { font-size: 13px; overflow-wrap: anywhere; }
+.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 16px; margin-top: 12px; }
+.metrics span { font-size: 13px; color: #a7b5c7; }
+.metrics strong { display: block; margin-top: 8px; color: #e5edf7; font-size: 16px; overflow-wrap: anywhere; }
+.actions { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin: 16px 0; }
+@media (max-width: 600px) { .metrics { grid-template-columns: 1fr; } .actions > * { width: 100%; } }
