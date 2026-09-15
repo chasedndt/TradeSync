@@ -1,7 +1,7 @@
 {
   "schema_version": "market_feature_catalog_v1",
   "catalog_id": "tradesync-hyperliquid-market-features",
-  "version": "1.8.0",
+  "version": "1.8.1",
   "status": "paper_shadow",
   "venue": "hyperliquid",
   "purpose": "Define source, unit, comparator, history, normalization, provenance, and scoring authority before a market feature can reach the regime rulebook.",
@@ -41,9 +41,9 @@
       "availability": "implemented",
       "provenance": "derived",
       "source_authority": "authoritative_market_derived",
-      "source": "Hyperliquid mark-price observations",
+      "source": "Hyperliquid mark-price observations; across a gap in them, the Hyperliquid 1-minute candle close",
       "unit": "percent",
-      "comparator": "mark price at or immediately before t minus 1 hour, rejected when the anchor lags the one-hour target by more than the configured tolerance",
+      "comparator": "mark price at or immediately before t minus 1 hour, rejected when the anchor lags the one-hour target by more than the configured tolerance; when no observed mark price qualifies, the close of the newest venue 1-minute candle that closed at or before t minus 1 hour, within the same tolerance",
       "normalization": "ordinary_zscore",
       "score_mode": "direct",
       "scoring_eligible": true,
@@ -55,8 +55,10 @@
       "decision_role": "Directional price movement over the intraday decision horizon.",
       "missing_data": "Feature unavailable; price/volatility block loses coverage.",
       "caveats": [
-        "Requires durable, timestamp-aligned mark-price history; the derivation emits no value when no anchor exists at or before t minus one hour.",
-        "A data gap wider than the anchor tolerance suppresses the feature rather than widening the comparator window."
+        "Requires timestamp-aligned mark-price history; the derivation emits no value when neither an observed mark price nor a venue 1-minute candle close exists at or before t minus one hour within the tolerance.",
+        "A gap wider than the anchor tolerance in both the mark-price series and the venue candles suppresses the feature rather than widening the comparator window.",
+        "Since 1.8.1, when TradeSync observed no mark price at the target (the hour after an outage, or a market's first hour) the anchor is a venue candle close, the last trade of that minute, not the mark price. Each derivation records comparator.anchor_source (observed_mark_price or venue_candle_close) on the snapshot; the stored feature series does not carry it.",
+        "Measured 14-15 September over ten markets (5,037 candles, 15,453 returns; tools/return_anchor_candle_gap.py): candle close minus mark price median 1.6 bps absolute (p90 7.8; BTC 0.5, PUMP 2.7); one-hour return difference median 0.029 percentage points (p90 0.137); same sign 97.5% of the time."
       ]
     },
     "hl_spread_bps": {
