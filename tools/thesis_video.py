@@ -40,7 +40,10 @@ if sys.stdout is None or sys.stderr is None:
     _log.parent.mkdir(parents=True, exist_ok=True)
     sys.stdout = sys.stderr = open(_log, "a", encoding="utf-8", buffering=1)
 
-STATE_API = os.getenv("STATE_API_URL", "http://localhost:8000").rstrip("/")
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "libs" / "tradesync_core"))
+from tradesync_core.state_api_access import HOST_STATE_API_URL, host_operator_headers  # noqa: E402
+
+STATE_API = os.getenv("STATE_API_URL", HOST_STATE_API_URL).rstrip("/")
 OUT_ROOT = Path(os.getenv("EDITIONS_HOST_DIR", r"E:\Projects\TradeSync\dashboard-runtime\editions"))
 VOICE = os.getenv("THESIS_TTS_VOICE", "en-US-AriaNeural")  # the fleet's configured edge-tts voice
 W, H, FPS = 1280, 720, 15
@@ -188,7 +191,7 @@ def main() -> int:
     parser.add_argument("--edition-id")
     parser.add_argument("--audio-only", action="store_true")
     args = parser.parse_args()
-    with httpx.Client(timeout=120.0, trust_env=False) as client:
+    with httpx.Client(timeout=120.0, trust_env=False, headers=host_operator_headers()) as client:
         if args.edition_id:
             ids = [args.edition_id]
         else:

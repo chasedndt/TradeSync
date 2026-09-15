@@ -46,10 +46,11 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "libs" / "tradesync_core"))
 
 from tradesync_core.job_errors import redact  # noqa: E402
+from tradesync_core.state_api_access import HOST_STATE_API_URL, host_operator_headers  # noqa: E402
 
 HERMES_HOME = Path(os.getenv("HERMES_HOME_WINDOWS", r"\\wsl.localhost\Ubuntu\home\chaseos\runtimes\hermes-home"))
 CRON = HERMES_HOME / "cron"
-STATE_API = os.getenv("STATE_API_URL", "http://localhost:8000").rstrip("/")
+STATE_API = os.getenv("STATE_API_URL", HOST_STATE_API_URL).rstrip("/")
 USAGE_TAIL_LINES = 2000
 RUNS_LIMIT = 1500
 DESCRIPTION_CHARS = 400
@@ -192,7 +193,7 @@ def write_registry(data: dict) -> Path:
 def run_pass(dry_run: bool = False) -> None:
     data, jobs = read_jobs()
     snapshot = {"jobs": jobs, "runs": read_runs(), "usage": read_usage(), "gateway": read_gateway()}
-    with httpx.Client(timeout=60.0, trust_env=False) as client:
+    with httpx.Client(timeout=60.0, trust_env=False, headers=host_operator_headers()) as client:
         if dry_run:
             print(f"[FleetBridge] would post {len(jobs)} jobs, {len(snapshot['runs'])} runs, {len(snapshot['usage'])} usage rows")
         else:
