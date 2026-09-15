@@ -35,7 +35,8 @@ ITEMS: tuple[tuple[str, str], ...] = (
     ("funding", "Funding rows"),
     ("thesis_edition", "Thesis edition"),
 )
-RESERVED = frozenset({"schema_version", "entry_time", "cutoff_rule", "items", "excluded_count", "authority", "scoring_influence"})
+RESERVED = frozenset({"schema_version", "entry_time", "cutoff_rule", "items", "item_order", "excluded_count", "authority",
+                      "scoring_influence"})
 
 
 def _time(value: Any) -> bool:
@@ -93,8 +94,10 @@ def document(gathered: Mapping[str, Mapping[str, Any]], entry_time: float, *, in
     if clash:
         raise ValueError(f"Entry inputs cannot replace evidence fields: {sorted(clash)}")
     items = {key: _item(label, gathered.get(key), entry_time) for key, label in ITEMS}
+    # Stored JSON objects lose key order (canonical JSON sorts keys; JSONB reorders them), so the order is kept apart.
     return canonical({"schema_version": SCHEMA_VERSION, "entry_time": entry_time, "cutoff_rule": CUTOFF_RULE,
-                      "items": items, "excluded_count": sum(item["excluded_count"] for item in items.values()),
+                      "items": items, "item_order": [key for key, _ in ITEMS],
+                      "excluded_count": sum(item["excluded_count"] for item in items.values()),
                       "authority": "paper_only", "scoring_influence": False, **extra})
 
 

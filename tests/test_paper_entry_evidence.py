@@ -34,7 +34,8 @@ def test_every_item_is_listed_with_an_explicit_missing_marker():
         'liquidations': {'source': 'market_liquidation_events', 'records': [], 'reason': 'no liquidation received in the hour before entry'},
         'funding': {'source': 'market-data /funding-history', 'records': [record(ENTRY + 5, ENTRY + 6)]},
     }, ENTRY)
-    assert list(doc['items']) == [key for key, _ in evidence.ITEMS]
+    assert doc['item_order'] == [key for key, _ in evidence.ITEMS] and set(doc['items']) == set(doc['item_order'])
+    assert json.loads(evidence.canonical_json(doc))['item_order'] == doc['item_order']
     assert doc['items']['liquidations']['status'] == 'missing'
     assert doc['items']['liquidations']['reason'] == 'no liquidation received in the hour before entry'
     assert doc['items']['funding']['reason'] == 'every record was observed or received after entry'
@@ -62,7 +63,8 @@ def test_schema_version_digest_and_canonical_round_trip():
 
 
 def test_inputs_cannot_replace_the_cutoff_or_items():
-    with pytest.raises(ValueError):
-        evidence.document({}, ENTRY, inputs={'items': {}})
+    for field in ('items', 'item_order', 'entry_time'):
+        with pytest.raises(ValueError):
+            evidence.document({}, ENTRY, inputs={field: {}})
     with pytest.raises(ValueError):
         evidence.document({}, float('nan'))
