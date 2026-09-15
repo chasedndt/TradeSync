@@ -4,6 +4,7 @@ import { ForwardMatrix } from '../components/ledger/ForwardMatrix'
 import { LabHealth } from '../components/ledger/LabHealth'
 import { TradeResearch } from '../components/ledger/TradeResearch'
 import { ManagedPaper } from '../components/ledger/ManagedPaper'
+import { PaperRisk } from '../components/ledger/paperRisk/PaperRisk'
 import { SourceComparison } from '../components/ledger/SourceComparison'
 import { ResearchTrials } from '../components/ledger/ResearchTrials'
 import { LedgerTable } from '../components/ledger/LedgerTable'
@@ -53,6 +54,7 @@ export function SignalLedger() {
       )}
       {f && f.cells.length > 0 && <ForwardMatrix data={f} />}
       {f && f.equity.trades > 0 && <EquityCurve equity={f.equity} notional={f.paper_notional_usdc} />}
+      <PaperRisk />
       <ManagedPaper />
       <SourceComparison />
       <ResearchTrials />

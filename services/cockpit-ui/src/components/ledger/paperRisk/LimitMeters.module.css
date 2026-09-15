@@ -1,0 +1,62 @@
+.meters {
+  margin: 0 0 20px;
+}
+
+.meters h4 {
+  margin: 0 0 12px;
+}
+
+.meters ul {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.label {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin-bottom: 5px;
+  font-size: 13px;
+}
+
+.label span:last-child {
+  color: var(--muted, #a7b5c7);
+  overflow-wrap: anywhere;
+}
+
+.track {
+  height: 8px;
+  border-radius: 4px;
+  background: #1a2838;
+  overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  border-radius: 4px;
+}
+
+.good {
+  background: var(--green, #2fd08a);
+}
+
+.warn {
+  background: var(--amber, #f5b942);
+}
+
+.bad {
+  background: var(--red, #ff414d);
+}
+
+.dim {
+  background: var(--muted, #5d6b7d);
+}
+
+.note {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}

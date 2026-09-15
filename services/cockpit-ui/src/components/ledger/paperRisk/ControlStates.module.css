@@ -1,0 +1,49 @@
+.states {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.card {
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--border, #344154);
+  border-left-width: 3px;
+  border-radius: 6px;
+  background: rgba(8, 19, 31, 0.6);
+}
+
+.card span {
+  display: block;
+  color: var(--muted, #a7b5c7);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.card strong {
+  display: block;
+  margin: 6px 0 8px;
+  font-size: 18px;
+  color: #e5edf7;
+}
+
+.card p {
+  margin: 0 0 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.good {
+  border-left-color: var(--green, #2fd08a);
+}
+
+.warn {
+  border-left-color: var(--amber, #f5b942);
+}
+
+.bad {
+  border-left-color: var(--red, #ff414d);
+}

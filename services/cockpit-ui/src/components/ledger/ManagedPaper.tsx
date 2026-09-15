@@ -63,8 +63,6 @@ function PaperRow({ row, refresh }: { row: Row; refresh: () => void }) {
 export function ManagedPaper() {
   const qc = useQueryClient()
   const control = useQuery({ queryKey: ['paper-control'], queryFn: () => apiGet<Control>('/state/paper-control'), refetchInterval: 5000 })
-  const [controlReason, setControlReason] = useState('')
-  const changeControl = useMutation({ mutationFn: (paused: boolean) => apiPost('/state/paper-control', { entries_paused: paused, reason: controlReason.trim() }), onSuccess: () => qc.invalidateQueries({ queryKey: ['paper-control'] }) })
   const portfolio = useQuery({ queryKey: ['managed-paper'], queryFn: () => apiGet<Portfolio>('/state/paper-positions'), refetchInterval: 15000 })
   const opportunities = useOpportunities('new', 100)
   const [selected, setSelected] = useState('')
@@ -84,12 +82,7 @@ export function ManagedPaper() {
     <p>Observer: {portfolio.isLoading ? 'checking…' : healthy ? 'running' : 'unavailable or stale'}{worker?.last_error ? ` · ${worker.last_error}` : ''}. Maximum three open positions, one per symbol.</p>
     <p>New paper entries: {control.isLoading ? 'checking control…' : control.isError ? 'disabled — control unavailable' : entryAllowed ? 'enabled' : 'paused'}. Existing observations and closes remain available.</p>
     {control.data && <p>Control reason: {control.data.reason} · updated {new Date(control.data.updated_at).toLocaleString()}.</p>}
-    <form className={styles.controls} onSubmit={event => { event.preventDefault(); if (controlReason.trim().length >= 5 && control.data && !control.isError && window.confirm(`${entryAllowed ? 'Pause' : 'Resume'} new paper entries? This does not close existing positions or enable real trading.`)) changeControl.mutate(entryAllowed) }}>
-      <label>Paper control reason<input maxLength={240} value={controlReason} onChange={event => setControlReason(event.target.value)} placeholder="Reason for pause or resume" /></label>
-      <button className="chip" disabled={!control.data || control.isError || changeControl.isPending || controlReason.trim().length < 5}>{entryAllowed ? 'Pause new paper entries' : 'Resume new paper entries'}</button>
-    </form>
-    {changeControl.isError && <p role="alert">Control change failed: {changeControl.error.message}</p>}
-    {changeControl.isSuccess && <p role="status">Paper control updated. No existing position was closed by this action.</p>}
+    <p>Pause, resume and the kill switch are changed in Paper risk above, with your name and a reason; every change is recorded.</p>
     <form className={styles.controls} onSubmit={e => { e.preventDefault(); if (entryAllowed && !invalid && !open.isPending && window.confirm('Open a paper position using current quotes and the selected profile? Costs and risk gates may refuse this entry. No real order will be sent.')) open.mutate() }}>
       <label>Current opportunity<select value={selected} onChange={e => { setSelected(e.target.value); open.reset() }}><option value="">Select a fresh opportunity</option>{candidates.map(o => <option key={o.id} value={o.id}>{o.symbol} · {o.dir} · {o.timeframe} · {new Date(o.snapshot_ts).toLocaleTimeString()}</option>)}</select></label>
       <label>Holding style<select value={style} onChange={e => setStyle(e.target.value)}><option value="scalp">Scalp · 15m / up to 3h</option><option value="intraday">Intraday · 1h / up to 24h</option><option value="swing">Swing · 4h / up to 7 days</option></select></label>

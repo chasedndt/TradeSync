@@ -13,6 +13,7 @@ from tradesync_core.source_comparison import compare
 from tradesync_core.research_trial import specification, fingerprint, evaluate
 from app import background
 from app.entry_context import liquidation_snapshot, book_snapshot
+from app.paper_risk_hooks import admit_entry, record_position_event
 
 # Printed under the paper portfolio in the Cockpit.
 POSITIONS_NOTE = (
@@ -72,6 +73,7 @@ def register(app, state, *, market_data_url):
                 result = advance(current, book, time.time(), manual_close=manual)
                 await conn.execute('UPDATE managed_paper_positions SET position_state=$2::jsonb,updated_at=now() WHERE id=$1', identity, serial(result))
                 await event(conn, identity, 'closed' if result['status']=='closed' else 'observed', {'position': result, 'book': book})
+                await record_position_event(conn, identity, result)
         return result
 
     @app.get('/state/paper-control')
@@ -212,6 +214,7 @@ def register(app, state, *, market_data_url):
                 paused = await conn.fetchval('SELECT entries_paused FROM managed_paper_control WHERE singleton=true')
                 if paused is not False:
                     raise HTTPException(409, 'New paper entries paused or control unavailable; existing observations and closes remain active')
+                await admit_entry(conn, symbol=symbol, plan=plan)
                 active = await conn.fetch("SELECT symbol,position_state FROM managed_paper_positions WHERE position_state->>'status'='open'")
                 if len(active) >= 3 or any(r['symbol']==symbol for r in active):
                     raise HTTPException(409, 'Paper portfolio cap: three positions, one per symbol')

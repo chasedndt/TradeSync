@@ -19,8 +19,15 @@ Current repository migrations:
 `033_horizon_reading_schedule.sql` adds an operator's daily schedule for Hermes readings of the
 timeframe outlook, per market and band, with an enabled flag and a UTC time, and an audit row for
 every change (who, when, the value replaced). Off unless an operator turns it on: it creates no
-schedule. State-api's schedule loop records each slot it handles before starting anything. Numbered
-033 on a parallel branch (031 and 032 belong to other branches); not yet applied.
+schedule. State-api's schedule loop records each slot it handles before starting anything. Applied on
+15 September.
+
+`031_paper_risk_engine.sql` adds the paper risk engine: an append-only account ledger with
+stored balances and equity peaks, operator-editable limits with audit rows (seeded conservative),
+a persistent kill switch (seeded disengaged) with audit rows, restart reconciliation runs,
+observation gaps and measured correlation snapshots, and an `operator` column on pause audit rows.
+Not yet applied; isolated, rolled-back UP/DOWN/UP acceptance is recorded in
+[the change record](../../docs/changes/2026-09-15_paper-risk-engine.md).
 
 `030_horizon_readings.sql` stores every Hermes reading of the timeframe outlook, one per band
 (short term, lower, medium, higher), with its start and finish times and the measurement it read,
