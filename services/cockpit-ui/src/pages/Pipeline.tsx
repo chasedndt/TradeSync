@@ -1,5 +1,6 @@
 import { FlowArrow, Heartbeat, ShieldCheck, WarningCircle } from '../components/icons'
 import { useIntegrationPipeline } from '../api/hooks'
+import { FeedHeartbeats } from '../components/pipeline/FeedHeartbeats'
 import { PipelineNodeCard } from '../components/pipeline/PipelineNodeCard'
 import { readable, statusLabels, tone } from '../components/pipeline/pipelineStatus'
 
@@ -71,6 +72,8 @@ export function Pipeline() {
           {tierANodes.map((node) => <PipelineNodeCard key={node.id} node={node} />)}
         </div>
       </section>
+
+      <FeedHeartbeats feeds={data.feeds} />
 
       <section className="panel pipeline-section" aria-labelledby="connector-path-title">
         <div className="panel-heading pipeline-section-heading">
