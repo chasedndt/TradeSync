@@ -24,6 +24,7 @@ import httpx
 from app import agent_connector
 from app.horizon_reading_facts import FEATURE_NAMES, facts
 from tradesync_core.horizon_spec import BANDS, HORIZONS
+from tradesync_core.state_api_access import operator_headers
 
 SELF_URL = os.getenv("STATE_API_SELF_URL", "http://localhost:8000").rstrip("/")
 READING_TIMEOUT_S = 300.0
@@ -128,7 +129,8 @@ async def run_reading(pool, symbol: str, scope: str, row_id: Any, outlook: Mappi
     text = prompt(symbol, scope) + "\n\nFACTS:\n" + facts(symbol, scope, outlook, evaluation)[:24000]
     try:
         async with httpx.AsyncClient(timeout=READING_TIMEOUT_S, trust_env=False) as client:
-            response = await client.post(f"{SELF_URL}/state/agents/harness/ask", json={"intent": "summarise", "prompt": text})
+            response = await client.post(f"{SELF_URL}/state/agents/harness/ask", json={"intent": "summarise", "prompt": text},
+                                         headers=operator_headers())
     except httpx.HTTPError as exc:
         await _finish(pool, symbol, scope, row_id, status="unavailable", detail=type(exc).__name__)
         return
