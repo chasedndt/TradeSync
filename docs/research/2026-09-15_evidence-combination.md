@@ -233,7 +233,7 @@ score calibrated to slopes of +0.079 (15 min), **−0.073** (1 hour) and +0.044 
 | Coinbase premium | scoring | 1,190 · 80.6 | 1.01 (0.83–1.23) | 0.97 (0.45–2.09) | falling, rising | 54% |
 | Binance funding rate 8h | context only | 911 · 23.2 | 0.96 (0.69–1.33) | 1.15 (0.41–3.26) | none | 61% |
 | Funding spread vs Binance | context only | 890 · 23.3 | 0.98 (0.70–1.37) | 1.06 (0.39–2.92) | none | 47% |
-| GDELT news tone | context only | 50 · 8.2 | 0.94 (0.35–2.53) | 1.03 (0.62–1.74) | none | no test calls |
+| GDELT news tone | context only | 50 · 8.2 | 0.94 (0.35–2.52) | 1.03 (0.62–1.73) | none | no test calls |
 | Resting liquidity imbalance, liquidation-map skew | context only | 0 | — | — | — | nothing yet (257 and 253 newer calls) |
 
 Binance funding's falling regime held 19.99 effective windows, one hundredth short of the minimum, so its
@@ -248,7 +248,9 @@ with opposite polarities, is redundancy). Shared windows are few, so the prior t
 dominates: shrunk values run 0.13 to 0.85, and on the test decisions a source's evidence was counted at
 **55%** of face value on average (78% at 15 minutes, 40% at 4 hours). The mean evidence moved per
 decision was 0.062 log odds adjusted against 0.090 counted as independent. At 15 minutes, 1h return and
-CVD correlate +0.08 but lean opposite ways, so their evidence cancels rather than repeats: redundancy 0.
+CVD correlate +0.08, but their point estimates lean opposite ways, so the rule reads their evidence as
+cancelling rather than repeating: redundancy 0. No source's interval excludes ×1.00 at any horizon, so the
+panel names no source's lean; the sign of a point estimate is used only inside the dependence arithmetic.
 
 **Economics.**
 
