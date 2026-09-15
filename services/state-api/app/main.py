@@ -55,6 +55,7 @@ from app.graph_projection import (
     snapshot_directory,
 )
 from app.integration_pipeline import collect_integration_pipeline
+from app import pipeline_feeds
 from app.regime_lab import (
     RegimeLabEngine,
     collect_live_feature_results,
@@ -3060,12 +3061,17 @@ async def _record_and_annotate_states(status: dict) -> dict:
 async def get_integration_pipeline():
     """Return live Tier A probes and honest optional-connector boundaries."""
 
-    status = await collect_integration_pipeline(
-        pool=state.pool,
-        redis_client=await get_redis(),
-        market_data_url=MARKET_DATA_URL,
-        catalog_feature_count=len(regime_lab_engine.catalog.features),
+    status, feeds = await asyncio.gather(
+        collect_integration_pipeline(
+            pool=state.pool,
+            redis_client=await get_redis(),
+            market_data_url=MARKET_DATA_URL,
+            catalog_feature_count=len(regime_lab_engine.catalog.features),
+        ),
+        pipeline_feeds.collect(MARKET_DATA_URL),
     )
+    # Feed heartbeats sit beside the stages as transport evidence; they change no node or readiness.
+    status["feeds"] = feeds
     return await _record_and_annotate_states(status)
 
 
