@@ -1,8 +1,8 @@
 """Paper risk routes: account, limits, risk state, pause, kill switch and reconciliation.
 
-In the style of ``/state/paper-control``: paper only, a reason on every change,
-and every change audited with the operator's name. Registers the reconciliation,
-monitor and correlation loops with ``app.background``.
+Paper only, a reason on every change, and every change audited with the operator's
+name. ``POST /state/paper-pause`` replaces the retired ``POST /state/paper-control``.
+Registers the reconciliation, monitor and correlation loops with ``app.background``.
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ async def resume_refusal(conn, now_s: float) -> str | None:
 
 
 def register(app, state, *, market_data_url: str) -> None:
-    fetch_book = paper_market.book_fetcher(market_data_url)
+    market = paper_market.market(market_data_url)
 
     def pool():
         if state.pool is None:
@@ -97,9 +97,10 @@ def register(app, state, *, market_data_url: str) -> None:
 
     @app.post("/state/paper-kill")
     async def engage_kill_switch(body: KillRequest):
-        result = await paper_kill_switch.engage(pool(), fetch_book, operator=body.operator, reason=body.reason)
+        result = await paper_kill_switch.engage(pool(), market, operator=body.operator, reason=body.reason)
         return {**result, "authority": AUTHORITY,
-                "note": "No new paper entries. Open paper positions close at their next fresh observed quote; any still open are retried every monitor tick."}
+                "note": "No new paper entries. Open paper positions close at their next fresh observed book, walked for their "
+                        "quantity; any still open are retried every monitor tick."}
 
     @app.post("/state/paper-kill/resume")
     async def resume_after_kill_switch(body: ResumeAfterKillRequest):
@@ -111,5 +112,5 @@ def register(app, state, *, market_data_url: str) -> None:
             return await readmodel.reconciliation_payload(conn)
 
     background.add("paper_reconciliation", runner.loop(state))
-    background.add("paper_risk_monitor", monitor.loop(state, fetch_book))
+    background.add("paper_risk_monitor", monitor.loop(state, market))
     background.add("paper_correlation", paper_correlation_job.loop(state, market_data_url))
